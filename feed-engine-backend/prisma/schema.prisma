@@ -1,0 +1,303 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 喂价员
+model Feeder {
+  id              String    @id @default(uuid())
+  address         String    @unique // 钱包地址
+  nickname        String?
+  rank            String    @default("F") // F/E/D/C/B/A/S
+  xp              Int       @default(0)
+  totalFeeds      Int       @default(0)
+  accuracyRate    Float     @default(0)
+  avgDeviation    Float     @default(0)
+  stakedAmount    Float     @default(0)
+  stakeType       String    @default("USDT") // FEED/USDT/NFT
+  nftLicenseId    String?   // NFT 执照 ID
+  
+  // 偏好设置 (JSON 字符串)
+  countries       String   @default("[]") // ["US", "CN", "HK"]
+  exchanges       String   @default("[]") // ["NYSE", "SSE", "BINANCE"]
+  assetTypes      String   @default("[]") // ["CRYPTO", "US_STOCK", "CN_STOCK"]
+  
+  // 状态
+  isBanned        Boolean   @default(false)
+  banUntil        DateTime?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  submissions     PriceSubmission[]
+  history         FeedHistory[]
+  dailyTasks      DailyTask[]
+}
+
+// 喂价订单
+model Order {
+  id                String    @id @default(uuid())
+  symbol            String    // 标的代码 (AAPL, BTC-USDT, 600519.SH)
+  market            String    // CRYPTO/US_STOCK/CN_STOCK/HK_STOCK/FOREX/COMMODITY
+  country           String    // US/CN/HK/JP/KR/GLOBAL
+  exchange          String    // NYSE/NASDAQ/SSE/BINANCE
+  feedType          String    // INITIAL/DYNAMIC/SETTLEMENT/ARBITRATION
+  
+  // 金额与共识配置
+  notionalAmount    Float     // 名义本金额度 (USDT)
+  requiredFeeders   Int       // 需要的喂价员数量
+  consensusThreshold String   // 共识门槛 (2/3, 3/5, 5/7)
+  
+  // 特殊条件 (JSON 字符串)
+  specialConditions String    @default("[]")
+  
+  // 奖励
+  rewardAmount      Float     // 奖励金额 (FEED)
+  feeAmount         Float     @default(5) // 固定费用 (USDT)
+  
+  // 时间控制
+  grabTimeout       Int       @default(300) // 抢单超时（秒）
+  feedTimeout       Int       @default(600) // 喂价超时（秒）
+  expiresAt         DateTime  // 订单过期时间
+  
+  // 状态
+  status            String    @default("OPEN") // OPEN/GRABBED/FEEDING/CONSENSUS/SETTLED/DISPUTED
+  
+  // 存储
+  ipfsHash          String?   // IPFS 订单详情哈希
+  
+  // 结果
+  finalPrice        Float?    // 最终共识价格
+  settledAt         DateTime?
+  txHash            String?   // 链上交易哈希
+  
+  // 来源协议
+  sourceProtocol    String?   // NST 或其他协议
+  callbackUrl       String?   // 回调地址
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  submissions       PriceSubmission[]
+  observers         OrderObserver[]
+}
+
+// 价格提交
+model PriceSubmission {
+  id            String    @id @default(uuid())
+  orderId       String
+  feederId      String
+  
+  // Commit 阶段
+  priceHash     String?   // keccak256(price + salt)
+  commitTxHash  String?
+  committedAt   DateTime?
+  
+  // Reveal 阶段
+  revealedPrice Float?
+  salt          String?
+  revealTxHash  String?
+  revealedAt    DateTime?
+  
+  // 验证
+  screenshot    String?   // IPFS 截图哈希
+  deviation     Float?    // 与共识价格的偏差
+  isValid       Boolean   @default(true)
+  
+  // 奖惩
+  rewardEarned  Float?
+  penaltyAmount Float?
+  xpEarned      Int?
+  
+  createdAt     DateTime  @default(now())
+  
+  order         Order     @relation(fields: [orderId], references: [id])
+  feeder        Feeder    @relation(fields: [feederId], references: [id])
+  
+  @@unique([orderId, feederId])
+}
+
+// 订单观察者（未抢中但可见）
+model OrderObserver {
+  id        String   @id @default(uuid())
+  orderId   String
+  feederId  String
+  createdAt DateTime @default(now())
+  
+  order     Order    @relation(fields: [orderId], references: [id])
+  
+  @@unique([orderId, feederId])
+}
+
+// 喂价历史
+model FeedHistory {
+  id        String   @id @default(uuid())
+  feederId  String
+  orderId   String
+  symbol    String
+  market    String
+  price     Float
+  deviation Float
+  reward    Float
+  xpEarned  Int
+  createdAt DateTime @default(now())
+  
+  feeder    Feeder   @relation(fields: [feederId], references: [id])
+}
+
+// 每日任务
+model DailyTask {
+  id          String   @id @default(uuid())
+  feederId    String
+  date        DateTime @default(now())
+  feedCount   Int      @default(0)
+  target1     Boolean  @default(false) // 完成1单
+  target3     Boolean  @default(false) // 完成3单
+  target5     Boolean  @default(false) // 完成5单
+  xpClaimed   Int      @default(0)
+  
+  feeder      Feeder   @relation(fields: [feederId], references: [id])
+  
+  @@unique([feederId, date])
+}
+
+// 赛季排行榜快照
+model SeasonSnapshot {
+  id        String   @id @default(uuid())
+  season    String   // 2026-01
+  feederId  String
+  rank      Int
+  totalXp   Int
+  feeds     Int
+  accuracy  Float
+  reward    Float?
+  createdAt DateTime @default(now())
+  
+  @@unique([season, feederId])
+}
+
+// 仲裁案件
+model ArbitrationCase {
+  id              String   @id @default(uuid())
+  orderId         String   // 关联的订单
+  initiatorId     String   // 发起人 (喂价员或用户)
+  initiatorType   String   // FEEDER / USER / SYSTEM
+  
+  // 争议信息
+  disputeReason   String   // 争议原因
+  description     String   // 详细描述
+  evidenceUrls    String   @default("[]") // JSON: IPFS 证据链接
+  
+  // 涉及的喂价员
+  disputedFeederId String? // 被争议的喂价员
+  
+  // 仲裁类型
+  caseType        String   @default("NORMAL") // NORMAL / ADVANCED
+  
+  // 押金
+  depositAmount   Float    @default(50) // 押金金额 (USDT)
+  depositPaid     Boolean  @default(false)
+  depositTxHash   String?
+  
+  // 仲裁员 (JSON: 喂价员ID数组)
+  arbitrators     String   @default("[]")
+  requiredVotes   Int      @default(3) // 所需投票数
+  
+  // 状态
+  status          String   @default("PENDING") // PENDING / VOTING / RESOLVED / CANCELLED
+  
+  // 结果
+  verdict         String?  // INITIATOR_WIN / INITIATOR_LOSE / INCONCLUSIVE
+  verdictReason   String?
+  
+  // 押金处理
+  depositReturned Boolean  @default(false)
+  
+  // 时间
+  votingDeadline  DateTime?
+  resolvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  votes           ArbitrationVote[]
+  appeals         Appeal[]
+}
+
+// 仲裁投票
+model ArbitrationVote {
+  id           String   @id @default(uuid())
+  caseId       String
+  arbitratorId String   // 仲裁员 (喂价员ID)
+  
+  // 投票内容
+  vote         String   // SUPPORT_INITIATOR / REJECT_INITIATOR / ABSTAIN
+  reason       String?  // 投票理由
+  
+  // 补充证据
+  evidenceUrls String   @default("[]") // JSON
+  
+  createdAt    DateTime @default(now())
+  
+  case         ArbitrationCase @relation(fields: [caseId], references: [id])
+  
+  @@unique([caseId, arbitratorId])
+}
+
+// DAO 申诉
+model Appeal {
+  id              String   @id @default(uuid())
+  caseId          String   // 关联的仲裁案件
+  appellantId     String   // 申诉人 (喂价员ID)
+  
+  // 申诉内容
+  reason          String   // 申诉理由
+  evidenceUrls    String   @default("[]") // JSON: 补充证据
+  
+  // 押金
+  depositAmount   Float    @default(100) // 申诉押金 (USDT)
+  depositPaid     Boolean  @default(false)
+  depositTxHash   String?
+  
+  // DAO 投票
+  votingDeadline  DateTime // 7天投票期
+  supportVotes    Int      @default(0) // 支持票数 (按 FEED 持有量加权)
+  rejectVotes     Int      @default(0) // 反对票数
+  totalVoters     Int      @default(0) // 参与投票人数
+  
+  // 状态
+  status          String   @default("VOTING") // VOTING / APPROVED / REJECTED / EXPIRED
+  
+  // 结果
+  originalVerdictOverturned Boolean @default(false)
+  
+  resolvedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  case            ArbitrationCase @relation(fields: [caseId], references: [id])
+  daoVotes        DAOVote[]
+}
+
+// DAO 投票记录
+model DAOVote {
+  id          String   @id @default(uuid())
+  appealId    String
+  voterId     String   // 投票人钱包地址
+  
+  // 投票
+  vote        String   // SUPPORT / REJECT
+  feedAmount  Float    // 投票时持有的 FEED 数量 (权重)
+  
+  createdAt   DateTime @default(now())
+  
+  appeal      Appeal   @relation(fields: [appealId], references: [id])
+  
+  @@unique([appealId, voterId])
+}
