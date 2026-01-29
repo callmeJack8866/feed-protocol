@@ -39,6 +39,71 @@ model Feeder {
   submissions     PriceSubmission[]
   history         FeedHistory[]
   dailyTasks      DailyTask[]
+  stakeRecords    StakeRecord[]
+}
+
+// 质押记录
+model StakeRecord {
+  id              String   @id @default(uuid())
+  feederId        String
+  
+  // 质押信息
+  stakeType       String   // FEED / USDT / NFT
+  amount          Float    // 质押金额 (FEED/USDT 数量)
+  nftTokenId      String?  // NFT Token ID (如果是 NFT 质押)
+  
+  // 交易信息
+  txHash          String   // 链上交易哈希
+  blockNumber     Int?
+  
+  // 状态
+  status          String   @default("ACTIVE") // ACTIVE / UNLOCKING / WITHDRAWN / SLASHED
+  
+  // 解锁相关
+  unlockRequestedAt DateTime? // 申请解锁时间
+  unlockAvailableAt DateTime? // 可提取时间 (申请后 30 天)
+  withdrawnAt       DateTime? // 实际提取时间
+  withdrawTxHash    String?   // 提取交易哈希
+  
+  // 惩罚相关
+  slashedAmount   Float     @default(0) // 被罚没金额
+  slashReason     String?   // 罚没原因
+  slashTxHash     String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  feeder          Feeder   @relation(fields: [feederId], references: [id])
+}
+
+// NFT 执照
+model FeederLicense {
+  id              String   @id @default(uuid())
+  tokenId         String   @unique // 链上 Token ID
+  
+  // NFT 元数据
+  name            String   // 如 "Gold Feeder License #123"
+  tier            String   // BRONZE / SILVER / GOLD / PLATINUM / DIAMOND
+  maxRank         String   // 该执照允许的最高等级
+  
+  // 权益
+  dailyLimit      Int      // 每日抢单上限
+  feeDiscount     Float    @default(0) // 费用折扣百分比
+  
+  // 当前持有人
+  ownerId         String?  // 当前持有的喂价员 ID
+  ownerAddress    String?  // 当前持有人钱包地址
+  
+  // 是否用于质押
+  isStaked        Boolean  @default(false)
+  stakedBy        String?  // 质押者 ID
+  
+  // 历史
+  mintedAt        DateTime @default(now())
+  lastTransferAt  DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 // 喂价订单

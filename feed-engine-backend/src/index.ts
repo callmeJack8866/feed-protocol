@@ -13,9 +13,14 @@ import authRoutes from './controllers/auth.controller';
 import orderRoutes from './controllers/order.controller';
 import feederRoutes from './controllers/feeder.controller';
 import arbitrationRoutes from './controllers/arbitration.controller';
+import stakingRoutes from './controllers/staking.controller';
+import adminRoutes from './controllers/admin.controller';
+import chainRoutes from './controllers/chain.controller';
 
-// 导入 WebSocket 处理
+// 导入服务
 import { setupWebSocket } from './websocket';
+import { initBlockchain } from './services/blockchain.service';
+import { initEventListener } from './services/event-listener.service';
 
 const app = express();
 const httpServer = createServer(app);
@@ -44,9 +49,16 @@ app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/feeders', feederRoutes);
 app.use('/api/arbitration', arbitrationRoutes);
+app.use('/api/staking', stakingRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/chain', chainRoutes);
 
 // WebSocket 设置
 setupWebSocket(io);
+
+// 初始化区块链服务
+initBlockchain();
+initEventListener();
 
 // 错误处理中间件
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -59,6 +71,7 @@ const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
     console.log(`🚀 Feed Engine Backend running on port ${PORT}`);
     console.log(`📡 WebSocket server ready`);
+    console.log(`⛓️ Blockchain services initialized`);
 });
 
 export { io };
