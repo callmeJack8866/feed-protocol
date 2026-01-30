@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
+import { mintAchievementBadge } from '../services/nft-badge.service';
 
 const router = Router();
 
@@ -240,11 +241,36 @@ router.post('/check', async (req: Request, res: Response) => {
                     });
                 }
 
+                // 为传奇和史诗成就铸造 NFT 徽章
+                let nftMintResult = null;
+                if (achievement.rarity === 'LEGENDARY' || achievement.rarity === 'EPIC') {
+                    try {
+                        nftMintResult = await mintAchievementBadge(
+                            feeder.address,
+                            {
+                                id: achievement.id,
+                                code: achievement.code,
+                                name: achievement.name,
+                                description: achievement.description,
+                                icon: achievement.icon,
+                                category: achievement.category,
+                                rarity: achievement.rarity
+                            },
+                            record.unlockedAt
+                        );
+                        console.log(`NFT minting result for ${achievement.code}:`, nftMintResult);
+                    } catch (nftError) {
+                        console.error('NFT minting failed (non-blocking):', nftError);
+                    }
+                }
+
                 newlyUnlocked.push({
                     achievement,
                     unlockedAt: record.unlockedAt,
                     xpEarned: achievement.xpReward,
-                    feedEarned: achievement.feedReward
+                    feedEarned: achievement.feedReward,
+                    nftMinted: nftMintResult?.success || false,
+                    nftTxHash: nftMintResult?.txHash
                 });
             }
         }

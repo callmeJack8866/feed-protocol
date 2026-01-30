@@ -24,6 +24,8 @@ import achievementRoutes from './controllers/achievement.controller';
 import { setupWebSocket } from './websocket';
 import { initBlockchain } from './services/blockchain.service';
 import { initEventListener } from './services/event-listener.service';
+import { startScheduler } from './services/cron.service';
+import { initNFTService } from './services/nft-badge.service';
 
 const app = express();
 const httpServer = createServer(app);
@@ -78,6 +80,12 @@ httpServer.listen(PORT, () => {
     console.log(`🚀 Feed Engine Backend running on port ${PORT}`);
     console.log(`📡 WebSocket server ready`);
     console.log(`⛓️ Blockchain services initialized`);
+
+    // 启动定时任务调度器
+    startScheduler();
+
+    // 初始化 NFT 服务
+    initNFTService();
 });
 
 export { io };
