@@ -412,3 +412,156 @@ export function generateSalt(): string {
     crypto.getRandomValues(array);
     return '0x' + Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
 }
+
+// ============ 培训 API ============
+
+export interface TrainingResponse {
+    success: boolean;
+    courses?: any[];
+    course?: any;
+    progress?: any[];
+    stats?: any;
+    record?: any;
+    exam?: any;
+    result?: any;
+}
+
+/**
+ * 获取课程列表
+ */
+export async function getCourses(category?: string): Promise<TrainingResponse> {
+    const query = category ? `?category=${category}` : '';
+    return request<TrainingResponse>(`/api/training/courses${query}`);
+}
+
+/**
+ * 获取课程详情
+ */
+export async function getCourseDetail(courseId: string): Promise<TrainingResponse> {
+    return request<TrainingResponse>(`/api/training/courses/${courseId}`);
+}
+
+/**
+ * 获取学习进度
+ */
+export async function getTrainingProgress(): Promise<TrainingResponse> {
+    return request<TrainingResponse>('/api/training/progress');
+}
+
+/**
+ * 更新学习进度
+ */
+export async function updateTrainingProgress(courseId: string, progress: number): Promise<TrainingResponse> {
+    return request<TrainingResponse>(`/api/training/progress/${courseId}`, {
+        method: 'POST',
+        body: JSON.stringify({ progress }),
+    });
+}
+
+/**
+ * 获取考试详情
+ */
+export async function getExam(examId: string): Promise<TrainingResponse> {
+    return request<TrainingResponse>(`/api/training/exams/${examId}`);
+}
+
+/**
+ * 提交考试答案
+ */
+export async function submitExam(examId: string, answers: number[], startedAt: Date): Promise<TrainingResponse> {
+    return request<TrainingResponse>(`/api/training/exams/${examId}/submit`, {
+        method: 'POST',
+        body: JSON.stringify({ answers, startedAt: startedAt.toISOString() }),
+    });
+}
+
+// ============ 赛季 API ============
+
+export interface SeasonResponse {
+    success: boolean;
+    seasons?: any[];
+    season?: any;
+    leaderboard?: any[];
+    ranks?: any;
+    stats?: any;
+    rewards?: any;
+    source?: string;
+}
+
+/**
+ * 获取赛季列表
+ */
+export async function getSeasons(limit = 10): Promise<SeasonResponse> {
+    return request<SeasonResponse>(`/api/seasons?limit=${limit}`);
+}
+
+/**
+ * 获取当前赛季
+ */
+export async function getCurrentSeason(): Promise<SeasonResponse> {
+    return request<SeasonResponse>('/api/seasons/current');
+}
+
+/**
+ * 获取赛季排行榜
+ */
+export async function getSeasonLeaderboard(code: string, type = 'OVERALL', limit = 100): Promise<SeasonResponse> {
+    return request<SeasonResponse>(`/api/seasons/${code}/leaderboard?type=${type}&limit=${limit}`);
+}
+
+/**
+ * 获取我的赛季排名
+ */
+export async function getMySeasonRank(code: string): Promise<SeasonResponse> {
+    return request<SeasonResponse>(`/api/seasons/${code}/my-rank`);
+}
+
+/**
+ * 获取赛季奖励信息
+ */
+export async function getSeasonRewards(code: string): Promise<SeasonResponse> {
+    return request<SeasonResponse>(`/api/seasons/${code}/rewards`);
+}
+
+// ============ 成就 API ============
+
+export interface AchievementResponse {
+    success: boolean;
+    achievements?: any[];
+    achievement?: any;
+    stats?: any;
+    newlyUnlocked?: any[];
+    message?: string;
+}
+
+/**
+ * 获取所有成就
+ */
+export async function getAchievements(category?: string): Promise<AchievementResponse> {
+    const query = category ? `?category=${category}` : '';
+    return request<AchievementResponse>(`/api/achievements${query}`);
+}
+
+/**
+ * 获取我的成就
+ */
+export async function getMyAchievements(): Promise<AchievementResponse> {
+    return request<AchievementResponse>('/api/achievements/my');
+}
+
+/**
+ * 获取成就详情
+ */
+export async function getAchievementDetail(achievementId: string): Promise<AchievementResponse> {
+    return request<AchievementResponse>(`/api/achievements/${achievementId}`);
+}
+
+/**
+ * 检查并解锁成就
+ */
+export async function checkAchievements(): Promise<AchievementResponse> {
+    return request<AchievementResponse>('/api/achievements/check', {
+        method: 'POST',
+    });
+}
+

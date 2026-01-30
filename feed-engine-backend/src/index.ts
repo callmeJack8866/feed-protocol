@@ -16,6 +16,9 @@ import arbitrationRoutes from './controllers/arbitration.controller';
 import stakingRoutes from './controllers/staking.controller';
 import adminRoutes from './controllers/admin.controller';
 import chainRoutes from './controllers/chain.controller';
+import trainingRoutes from './controllers/training.controller';
+import seasonRoutes from './controllers/season.controller';
+import achievementRoutes from './controllers/achievement.controller';
 
 // 导入服务
 import { setupWebSocket } from './websocket';
@@ -52,6 +55,9 @@ app.use('/api/arbitration', arbitrationRoutes);
 app.use('/api/staking', stakingRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/chain', chainRoutes);
+app.use('/api/training', trainingRoutes);
+app.use('/api/seasons', seasonRoutes);
+app.use('/api/achievements', achievementRoutes);
 
 // WebSocket 设置
 setupWebSocket(io);

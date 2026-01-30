@@ -40,6 +40,8 @@ model Feeder {
   history         FeedHistory[]
   dailyTasks      DailyTask[]
   stakeRecords    StakeRecord[]
+  trainingRecords FeederTrainingRecord[]
+  achievements    FeederAchievement[]
 }
 
 // 质押记录
@@ -237,15 +239,20 @@ model DailyTask {
 model SeasonSnapshot {
   id        String   @id @default(uuid())
   season    String   // 2026-01
+  seasonId  String?  // 关联赛季 ID
   feederId  String
   rank      Int
+  rankType  String   @default("OVERALL") // OVERALL / FEEDS / ACCURACY / SPEED
   totalXp   Int
   feeds     Int
   accuracy  Float
+  avgSpeed  Float?   // 平均响应速度（秒）
   reward    Float?
   createdAt DateTime @default(now())
   
-  @@unique([season, feederId])
+  seasonRef Season?  @relation(fields: [seasonId], references: [id])
+  
+  @@unique([season, feederId, rankType])
 }
 
 // 仲裁案件
@@ -365,4 +372,145 @@ model DAOVote {
   appeal      Appeal   @relation(fields: [appealId], references: [id])
   
   @@unique([appealId, voterId])
+}
+
+// ========================================
+// 培训系统 (Training System)
+// ========================================
+
+// 培训课程
+model TrainingCourse {
+  id          String   @id @default(uuid())
+  title       String   // 课程标题
+  description String   // 课程描述
+  category    String   // ONBOARDING / MONTHLY / MARKET_SPECIFIC / ADVANCED
+  market      String?  // 关联市场类型（可选）
+  content     String   // 课程内容 (Markdown/JSON)
+  duration    Int      // 预计时长（分钟）
+  xpReward    Int      @default(100) // 完成奖励 XP
+  isRequired  Boolean  @default(false) // 是否必修
+  orderIndex  Int      @default(0) // 排序
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  exams       TrainingExam[]
+  records     FeederTrainingRecord[]
+}
+
+// 培训考试
+model TrainingExam {
+  id           String   @id @default(uuid())
+  courseId     String
+  title        String
+  questions    String   // JSON: 题目数组
+  passingScore Int      @default(80) // 及格分数
+  timeLimit    Int      @default(30) // 时间限制（分钟）
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  course       TrainingCourse @relation(fields: [courseId], references: [id])
+  attempts     ExamAttempt[]
+}
+
+// 考试尝试记录
+model ExamAttempt {
+  id          String   @id @default(uuid())
+  examId      String
+  feederId    String
+  answers     String   // JSON: 答案数组
+  score       Int
+  passed      Boolean
+  startedAt   DateTime
+  submittedAt DateTime @default(now())
+  
+  exam        TrainingExam @relation(fields: [examId], references: [id])
+}
+
+// 喂价员培训记录
+model FeederTrainingRecord {
+  id          String    @id @default(uuid())
+  feederId    String
+  courseId    String
+  status      String    @default("NOT_STARTED") // NOT_STARTED / IN_PROGRESS / COMPLETED
+  progress    Int       @default(0) // 进度百分比
+  completedAt DateTime?
+  examPassed  Boolean   @default(false)
+  examScore   Int?
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  feeder      Feeder         @relation(fields: [feederId], references: [id])
+  course      TrainingCourse @relation(fields: [courseId], references: [id])
+  
+  @@unique([feederId, courseId])
+}
+
+// ========================================
+// 赛季管理系统 (Season Management)
+// ========================================
+
+// 赛季
+model Season {
+  id           String   @id @default(uuid())
+  name         String   // "2026年1月赛季"
+  code         String   @unique // "2026-01"
+  startDate    DateTime
+  endDate      DateTime
+  status       String   @default("UPCOMING") // UPCOMING / ACTIVE / ENDED / SETTLED
+  
+  // 奖励配置 (JSON)
+  rewardConfig String   // 各名次奖励配置
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  snapshots    SeasonSnapshot[]
+}
+
+// ========================================
+// 成就系统 (Achievement System)
+// ========================================
+
+// 成就定义
+model Achievement {
+  id          String   @id @default(uuid())
+  code        String   @unique // "FIRST_FEED", "100_FEEDS"
+  name        String   // "初出茅庐"
+  description String   // "完成首次喂价"
+  category    String   // MILESTONE / PRECISION / SPEED / SPECIAL
+  icon        String   // 图标 emoji 或 URL
+  
+  // 解锁条件 (JSON)
+  conditions  String   // { "totalFeeds": 1 }
+  
+  // 奖励
+  xpReward    Int      @default(0)
+  feedReward  Float    @default(0)
+  nftMetadata String?  // NFT 元数据 JSON
+  
+  // 稀有度
+  rarity      String   @default("COMMON") // COMMON / RARE / EPIC / LEGENDARY
+  
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  unlocks     FeederAchievement[]
+}
+
+// 喂价员成就解锁记录
+model FeederAchievement {
+  id            String   @id @default(uuid())
+  feederId      String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+  nftTokenId    String?  // 铸造的 NFT Token ID
+  
+  feeder        Feeder      @relation(fields: [feederId], references: [id])
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  
+  @@unique([feederId, achievementId])
 }
