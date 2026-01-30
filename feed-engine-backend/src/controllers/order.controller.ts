@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { matchOrdersForFeeder } from '../services/matching.service';
+import { processOrderConsensus } from '../services/consensus.service';
 import { io } from '../index';
 
 const router = Router();
@@ -282,29 +283,14 @@ router.post('/:id/reveal', async (req: Request, res: Response) => {
         if (order) {
             const allRevealed = order.submissions.every(s => s.revealedPrice !== null);
 
-            if (allRevealed) {
-                // 计算共识价格（中位数）
-                const prices = order.submissions
-                    .map(s => s.revealedPrice!)
-                    .sort((a, b) => a - b);
+            if (allRevealed && order.submissions.length >= order.requiredFeeders) {
+                // 使用共识服务处理（包含正确算法和成就检测）
+                const result = await processOrderConsensus(id);
 
-                const mid = Math.floor(prices.length / 2);
-                const consensusPrice = prices.length % 2 === 0
-                    ? (prices[mid - 1] + prices[mid]) / 2
-                    : prices[mid];
-
-                // 更新订单
-                await prisma.order.update({
-                    where: { id },
-                    data: {
-                        status: 'SETTLED',
-                        finalPrice: consensusPrice,
-                        settledAt: new Date()
-                    }
-                });
-
-                // 广播共识达成
-                io.emit('order:consensus', { orderId: id, consensusPrice });
+                if (result) {
+                    // 广播共识达成
+                    io.emit('order:consensus', { orderId: id, consensusPrice: result.consensusPrice });
+                }
             }
         }
 
@@ -312,6 +298,105 @@ router.post('/:id/reveal', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Reveal price error:', error);
         res.status(500).json({ error: 'Failed to reveal price' });
+    }
+});
+
+/**
+ * "无法喂价" 原因类型
+ */
+const UNABLE_TO_FEED_REASONS = [
+    'SUSPENSION',      // 标的停牌
+    'NO_DATA',         // 数据源无数据
+    'INVALID_CODE',    // 代码错误/不存在
+    'MARKET_CLOSED',   // 市场休市
+    'OTHER'            // 其他
+];
+
+/**
+ * POST /api/orders/:id/unable-to-feed
+ * 喂价员报告无法喂价
+ */
+router.post('/:id/unable-to-feed', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { reason, description, evidence } = req.body;
+        const address = req.headers['x-wallet-address'] as string;
+
+        if (!address) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+
+        if (!reason || !UNABLE_TO_FEED_REASONS.includes(reason)) {
+            return res.status(400).json({
+                error: 'Invalid reason',
+                validReasons: UNABLE_TO_FEED_REASONS
+            });
+        }
+
+        const feeder = await prisma.feeder.findUnique({
+            where: { address: address.toLowerCase() }
+        });
+
+        if (!feeder) {
+            return res.status(404).json({ error: 'Feeder not found' });
+        }
+
+        // 查找该喂价员的提交记录
+        const submission = await prisma.priceSubmission.findUnique({
+            where: {
+                orderId_feederId: { orderId: id, feederId: feeder.id }
+            }
+        });
+
+        if (!submission) {
+            return res.status(404).json({ error: 'No submission found for this order' });
+        }
+
+        // 更新提交记录，标记为无法喂价
+        await prisma.priceSubmission.update({
+            where: { id: submission.id },
+            data: {
+                // 使用特殊值标记无法喂价
+                priceHash: `UNABLE:${reason}`,
+                screenshot: evidence || null,
+                committedAt: new Date()
+            }
+        });
+
+        // 记录无法喂价报告（如果有 UnableFeedReport 模型）
+        // 这里假设使用 FeedHistory 记录特殊情况
+        await prisma.feedHistory.create({
+            data: {
+                feederId: feeder.id,
+                orderId: id,
+                symbol: 'N/A',
+                market: 'N/A',
+                price: 0,
+                deviation: 0,
+                reward: 0,
+                xpEarned: 0
+            }
+        }).catch(() => {
+            // 忽略创建失败
+        });
+
+        // 通知系统需要重新分配喂价员
+        io.emit('order:unable-to-feed', {
+            orderId: id,
+            feederId: feeder.id,
+            reason,
+            description
+        });
+
+        res.json({
+            success: true,
+            message: 'Unable to feed reported successfully',
+            reason,
+            status: 'PENDING_REVIEW'
+        });
+    } catch (error) {
+        console.error('Unable to feed report error:', error);
+        res.status(500).json({ error: 'Failed to report unable to feed' });
     }
 });
 

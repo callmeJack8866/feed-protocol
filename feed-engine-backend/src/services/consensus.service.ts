@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import { calculateReward, updateFeederRank, updateFeederStats } from './rank.service';
+import { detectAndUnlockAchievements } from './achievement-detection.service';
 
 /**
  * 共识计算服务
@@ -24,6 +25,76 @@ export function calculateMedianPrice(prices: number[]): number {
         return (sorted[mid - 1] + sorted[mid]) / 2;
     }
     return sorted[mid];
+}
+
+/**
+ * 去掉最高最低后计算平均值
+ */
+export function calculateTrimmedMean(prices: number[]): number {
+    if (prices.length <= 2) return calculateMedianPrice(prices);
+
+    const sorted = [...prices].sort((a, b) => a - b);
+    // 去掉最高和最低
+    const trimmed = sorted.slice(1, -1);
+
+    const sum = trimmed.reduce((acc, p) => acc + p, 0);
+    return sum / trimmed.length;
+}
+
+/**
+ * 去掉最高最低后计算中位数
+ */
+export function calculateTrimmedMedian(prices: number[]): number {
+    if (prices.length <= 2) return calculateMedianPrice(prices);
+
+    const sorted = [...prices].sort((a, b) => a - b);
+    // 去掉最高和最低
+    const trimmed = sorted.slice(1, -1);
+
+    return calculateMedianPrice(trimmed);
+}
+
+/**
+ * 共识算法类型
+ */
+export type ConsensusAlgorithm = 'MEDIAN' | 'TRIMMED_MEAN' | 'TRIMMED_MEDIAN';
+
+/**
+ * 根据名义本金选择共识算法
+ * <10万: 中位数
+ * 10-100万: 中位数
+ * 100-500万: 去掉最高最低后平均
+ * >500万: 去掉最高最低后中位数
+ */
+export function selectConsensusAlgorithm(notionalAmount: number): ConsensusAlgorithm {
+    if (notionalAmount >= 5000000) return 'TRIMMED_MEDIAN';
+    if (notionalAmount >= 1000000) return 'TRIMMED_MEAN';
+    return 'MEDIAN';
+}
+
+/**
+ * 获取共识喂价员数量要求
+ */
+export function getRequiredFeeders(notionalAmount: number): { count: number; threshold: string } {
+    if (notionalAmount >= 5000000) return { count: 10, threshold: '7/10' };
+    if (notionalAmount >= 1000000) return { count: 7, threshold: '5/7' };
+    if (notionalAmount >= 100000) return { count: 5, threshold: '3/5' };
+    return { count: 3, threshold: '2/3' };
+}
+
+/**
+ * 计算共识价格（根据算法类型）
+ */
+export function calculateConsensusPrice(prices: number[], algorithm: ConsensusAlgorithm): number {
+    switch (algorithm) {
+        case 'TRIMMED_MEAN':
+            return calculateTrimmedMean(prices);
+        case 'TRIMMED_MEDIAN':
+            return calculateTrimmedMedian(prices);
+        case 'MEDIAN':
+        default:
+            return calculateMedianPrice(prices);
+    }
 }
 
 /**
@@ -64,8 +135,9 @@ export async function processOrderConsensus(orderId: string): Promise<ConsensusR
     // 获取所有价格
     const prices = order.submissions.map(s => s.revealedPrice!);
 
-    // 计算中位数
-    const consensusPrice = calculateMedianPrice(prices);
+    // 根据名义本金选择算法
+    const algorithm = selectConsensusAlgorithm(order.notionalAmount);
+    const consensusPrice = calculateConsensusPrice(prices, algorithm);
 
     // 计算每个喂价员的偏差和奖励
     const deviations: ConsensusResult['deviations'] = [];
@@ -113,6 +185,11 @@ export async function processOrderConsensus(orderId: string): Promise<ConsensusR
 
         // 更新每日任务
         await updateDailyTask(submission.feederId);
+
+        // 检测并解锁成就（异步执行，不阻塞主流程）
+        detectAndUnlockAchievements(submission.feederId).catch(err => {
+            console.error('Achievement detection error:', err);
+        });
 
         deviations.push({
             feederId: submission.feederId,
