@@ -4,6 +4,7 @@ import { calculateReward, updateFeederRank, updateFeederStats } from './rank.ser
 import { detectAndUnlockAchievements } from './achievement-detection.service';
 import { evaluateAndExecutePenalty } from './penalty.service';
 import { getFeedConsensusContract, getRewardPenaltyContract } from './blockchain.service';
+import { sendConsensusCallback, buildCallbackPayload } from './nst-callback.service';
 
 /**
  * 共识计算服务
@@ -218,6 +219,18 @@ export async function processOrderConsensus(orderId: string): Promise<ConsensusR
             settledAt: new Date()
         }
     });
+
+    // ============================
+    // NST 协议回调：共识价格通知
+    // ============================
+    if (order.callbackUrl) {
+        const payload = buildCallbackPayload(order, consensusPrice, deviations);
+        if (payload) {
+            sendConsensusCallback(order.callbackUrl, payload).catch(err => {
+                console.error(`⚠️ NST callback failed for order ${orderId}:`, err);
+            });
+        }
+    }
 
     // ============================
     // 链上同步：共识提交 + 奖励分配 (70/10/10/10)

@@ -1,5 +1,18 @@
 # Feed Engine 开发进度
 
+## [2026-02-10 16:41] P1-5 NST 协议集成接口 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - `nst.middleware.ts` **[NEW]**：API Key 认证中间件（多 Key 映射、开发环境降级、协议名注入）
+  - `nst-callback.service.ts` **[NEW]**：共识完成后 webhook 回调（HMAC-SHA256 签名 + 指数退避 3 次重试 1s/5s/30s）
+  - `nst.controller.ts` **[NEW]**：4 个 REST API 端点（`POST /request-feed` / `GET /order/:id/status` / `GET /order/:id/result` / `GET /orders`）
+  - `consensus.service.ts`：共识结算后注入回调触发（检查 `callbackUrl` → 异步 webhook）
+  - `index.ts`：注册 `/api/nst` 路由
+  - `FeedEngine.sol`：新增 `requestFeed()` 外部协议喂价入口 + `getConsensusPrice()` 共识查询 + `setAuthorizedProtocol()` 白名单管理
+  - TypeScript **零错误** + Solidity **编译成功**（62 typings）
+- **[Next Step]**: 🎉 **P1 全部完成！** 可进入 P2 或启动部署/测试。
+
 ## [2026-02-10 16:25] P1-7 i18n + P1-8 Zustand 前端迁移 ✅
 
 - **[Status]**: Done

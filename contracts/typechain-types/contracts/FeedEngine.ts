@@ -27,24 +27,30 @@ export interface FeedEngineInterface extends Interface {
   getFunction(
     nameOrSignature:
       | "UPGRADE_INTERFACE_VERSION"
+      | "authorizedProtocols"
       | "awardXP"
       | "consensus"
       | "engineOrders"
+      | "feedRequests"
       | "feedToken"
       | "feederLicense"
       | "feeders"
+      | "getConsensusPrice"
       | "getFeederInfo"
       | "getOrderFeeders"
       | "grabOrder"
       | "initialize"
+      | "isProtocolAuthorized"
       | "maxDailyGrabByRank"
       | "minStakeByRank"
       | "owner"
       | "proxiableUUID"
       | "registerFeeder"
       | "renounceOwnership"
+      | "requestFeed"
       | "requestUnstake"
       | "rewardPenalty"
+      | "setAuthorizedProtocol"
       | "settleOrder"
       | "stake"
       | "totalFeeders"
@@ -60,12 +66,14 @@ export interface FeedEngineInterface extends Interface {
 
   getEvent(
     nameOrSignatureOrTopic:
+      | "FeedRequested"
       | "FeederRankUpdated"
       | "FeederRegistered"
       | "Initialized"
       | "OrderGrabbed"
       | "OrderSettled"
       | "OwnershipTransferred"
+      | "ProtocolAuthorized"
       | "Staked"
       | "UnstakeRequested"
       | "Upgraded"
@@ -78,12 +86,20 @@ export interface FeedEngineInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "authorizedProtocols",
+    values: [AddressLike]
+  ): string;
+  encodeFunctionData(
     functionFragment: "awardXP",
     values: [AddressLike, BigNumberish, string]
   ): string;
   encodeFunctionData(functionFragment: "consensus", values?: undefined): string;
   encodeFunctionData(
     functionFragment: "engineOrders",
+    values: [BytesLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "feedRequests",
     values: [BytesLike]
   ): string;
   encodeFunctionData(functionFragment: "feedToken", values?: undefined): string;
@@ -94,6 +110,10 @@ export interface FeedEngineInterface extends Interface {
   encodeFunctionData(
     functionFragment: "feeders",
     values: [AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "getConsensusPrice",
+    values: [BytesLike]
   ): string;
   encodeFunctionData(
     functionFragment: "getFeederInfo",
@@ -110,6 +130,10 @@ export interface FeedEngineInterface extends Interface {
   encodeFunctionData(
     functionFragment: "initialize",
     values: [AddressLike, AddressLike, AddressLike, AddressLike, AddressLike]
+  ): string;
+  encodeFunctionData(
+    functionFragment: "isProtocolAuthorized",
+    values: [AddressLike]
   ): string;
   encodeFunctionData(
     functionFragment: "maxDailyGrabByRank",
@@ -133,12 +157,20 @@ export interface FeedEngineInterface extends Interface {
     values?: undefined
   ): string;
   encodeFunctionData(
+    functionFragment: "requestFeed",
+    values: [BytesLike, BigNumberish, BigNumberish]
+  ): string;
+  encodeFunctionData(
     functionFragment: "requestUnstake",
     values?: undefined
   ): string;
   encodeFunctionData(
     functionFragment: "rewardPenalty",
     values?: undefined
+  ): string;
+  encodeFunctionData(
+    functionFragment: "setAuthorizedProtocol",
+    values: [AddressLike, boolean]
   ): string;
   encodeFunctionData(
     functionFragment: "settleOrder",
@@ -183,10 +215,18 @@ export interface FeedEngineInterface extends Interface {
     functionFragment: "UPGRADE_INTERFACE_VERSION",
     data: BytesLike
   ): Result;
+  decodeFunctionResult(
+    functionFragment: "authorizedProtocols",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(functionFragment: "awardXP", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "consensus", data: BytesLike): Result;
   decodeFunctionResult(
     functionFragment: "engineOrders",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "feedRequests",
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "feedToken", data: BytesLike): Result;
@@ -195,6 +235,10 @@ export interface FeedEngineInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(functionFragment: "feeders", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "getConsensusPrice",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "getFeederInfo",
     data: BytesLike
@@ -205,6 +249,10 @@ export interface FeedEngineInterface extends Interface {
   ): Result;
   decodeFunctionResult(functionFragment: "grabOrder", data: BytesLike): Result;
   decodeFunctionResult(functionFragment: "initialize", data: BytesLike): Result;
+  decodeFunctionResult(
+    functionFragment: "isProtocolAuthorized",
+    data: BytesLike
+  ): Result;
   decodeFunctionResult(
     functionFragment: "maxDailyGrabByRank",
     data: BytesLike
@@ -227,11 +275,19 @@ export interface FeedEngineInterface extends Interface {
     data: BytesLike
   ): Result;
   decodeFunctionResult(
+    functionFragment: "requestFeed",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
     functionFragment: "requestUnstake",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
     functionFragment: "rewardPenalty",
+    data: BytesLike
+  ): Result;
+  decodeFunctionResult(
+    functionFragment: "setAuthorizedProtocol",
     data: BytesLike
   ): Result;
   decodeFunctionResult(
@@ -272,6 +328,31 @@ export interface FeedEngineInterface extends Interface {
     functionFragment: "xpThresholds",
     data: BytesLike
   ): Result;
+}
+
+export namespace FeedRequestedEvent {
+  export type InputTuple = [
+    orderId: BytesLike,
+    requester: AddressLike,
+    requiredFeeders: BigNumberish,
+    rewardAmount: BigNumberish
+  ];
+  export type OutputTuple = [
+    orderId: string,
+    requester: string,
+    requiredFeeders: bigint,
+    rewardAmount: bigint
+  ];
+  export interface OutputObject {
+    orderId: string;
+    requester: string;
+    requiredFeeders: bigint;
+    rewardAmount: bigint;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
 }
 
 export namespace FeederRankUpdatedEvent {
@@ -358,6 +439,19 @@ export namespace OwnershipTransferredEvent {
   export interface OutputObject {
     previousOwner: string;
     newOwner: string;
+  }
+  export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
+  export type Filter = TypedDeferredTopicFilter<Event>;
+  export type Log = TypedEventLog<Event>;
+  export type LogDescription = TypedLogDescription<Event>;
+}
+
+export namespace ProtocolAuthorizedEvent {
+  export type InputTuple = [protocol: AddressLike, authorized: boolean];
+  export type OutputTuple = [protocol: string, authorized: boolean];
+  export interface OutputObject {
+    protocol: string;
+    authorized: boolean;
   }
   export type Event = TypedContractEvent<InputTuple, OutputTuple, OutputObject>;
   export type Filter = TypedDeferredTopicFilter<Event>;
@@ -479,6 +573,12 @@ export interface FeedEngine extends BaseContract {
 
   UPGRADE_INTERFACE_VERSION: TypedContractMethod<[], [string], "view">;
 
+  authorizedProtocols: TypedContractMethod<
+    [arg0: AddressLike],
+    [boolean],
+    "view"
+  >;
+
   awardXP: TypedContractMethod<
     [feederAddr: AddressLike, amount: BigNumberish, reason: string],
     [void],
@@ -494,6 +594,20 @@ export interface FeedEngine extends BaseContract {
         orderId: string;
         rewardAmount: bigint;
         settled: boolean;
+      }
+    ],
+    "view"
+  >;
+
+  feedRequests: TypedContractMethod<
+    [arg0: BytesLike],
+    [
+      [string, bigint, bigint, bigint, boolean] & {
+        requester: string;
+        requiredFeeders: bigint;
+        rewardAmount: bigint;
+        timestamp: bigint;
+        exists: boolean;
       }
     ],
     "view"
@@ -515,6 +629,18 @@ export interface FeedEngine extends BaseContract {
         unstakeRequestTime: bigint;
         dailyGrabCount: bigint;
         lastGrabDate: bigint;
+      }
+    ],
+    "view"
+  >;
+
+  getConsensusPrice: TypedContractMethod<
+    [orderId: BytesLike],
+    [
+      [bigint, bigint, boolean] & {
+        price: bigint;
+        timestamp: bigint;
+        finalized: boolean;
       }
     ],
     "view"
@@ -555,6 +681,12 @@ export interface FeedEngine extends BaseContract {
     "nonpayable"
   >;
 
+  isProtocolAuthorized: TypedContractMethod<
+    [protocol: AddressLike],
+    [boolean],
+    "view"
+  >;
+
   maxDailyGrabByRank: TypedContractMethod<
     [arg0: BigNumberish],
     [bigint],
@@ -575,9 +707,25 @@ export interface FeedEngine extends BaseContract {
 
   renounceOwnership: TypedContractMethod<[], [void], "nonpayable">;
 
+  requestFeed: TypedContractMethod<
+    [
+      orderId: BytesLike,
+      requiredFeeders: BigNumberish,
+      rewardAmount: BigNumberish
+    ],
+    [void],
+    "nonpayable"
+  >;
+
   requestUnstake: TypedContractMethod<[], [void], "nonpayable">;
 
   rewardPenalty: TypedContractMethod<[], [string], "view">;
+
+  setAuthorizedProtocol: TypedContractMethod<
+    [protocol: AddressLike, authorized: boolean],
+    [void],
+    "nonpayable"
+  >;
 
   settleOrder: TypedContractMethod<
     [orderId: BytesLike, rewardAmount: BigNumberish],
@@ -637,6 +785,9 @@ export interface FeedEngine extends BaseContract {
     nameOrSignature: "UPGRADE_INTERFACE_VERSION"
   ): TypedContractMethod<[], [string], "view">;
   getFunction(
+    nameOrSignature: "authorizedProtocols"
+  ): TypedContractMethod<[arg0: AddressLike], [boolean], "view">;
+  getFunction(
     nameOrSignature: "awardXP"
   ): TypedContractMethod<
     [feederAddr: AddressLike, amount: BigNumberish, reason: string],
@@ -655,6 +806,21 @@ export interface FeedEngine extends BaseContract {
         orderId: string;
         rewardAmount: bigint;
         settled: boolean;
+      }
+    ],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "feedRequests"
+  ): TypedContractMethod<
+    [arg0: BytesLike],
+    [
+      [string, bigint, bigint, bigint, boolean] & {
+        requester: string;
+        requiredFeeders: bigint;
+        rewardAmount: bigint;
+        timestamp: bigint;
+        exists: boolean;
       }
     ],
     "view"
@@ -679,6 +845,19 @@ export interface FeedEngine extends BaseContract {
         unstakeRequestTime: bigint;
         dailyGrabCount: bigint;
         lastGrabDate: bigint;
+      }
+    ],
+    "view"
+  >;
+  getFunction(
+    nameOrSignature: "getConsensusPrice"
+  ): TypedContractMethod<
+    [orderId: BytesLike],
+    [
+      [bigint, bigint, boolean] & {
+        price: bigint;
+        timestamp: bigint;
+        finalized: boolean;
       }
     ],
     "view"
@@ -719,6 +898,9 @@ export interface FeedEngine extends BaseContract {
     "nonpayable"
   >;
   getFunction(
+    nameOrSignature: "isProtocolAuthorized"
+  ): TypedContractMethod<[protocol: AddressLike], [boolean], "view">;
+  getFunction(
     nameOrSignature: "maxDailyGrabByRank"
   ): TypedContractMethod<[arg0: BigNumberish], [bigint], "view">;
   getFunction(
@@ -737,11 +919,29 @@ export interface FeedEngine extends BaseContract {
     nameOrSignature: "renounceOwnership"
   ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
+    nameOrSignature: "requestFeed"
+  ): TypedContractMethod<
+    [
+      orderId: BytesLike,
+      requiredFeeders: BigNumberish,
+      rewardAmount: BigNumberish
+    ],
+    [void],
+    "nonpayable"
+  >;
+  getFunction(
     nameOrSignature: "requestUnstake"
   ): TypedContractMethod<[], [void], "nonpayable">;
   getFunction(
     nameOrSignature: "rewardPenalty"
   ): TypedContractMethod<[], [string], "view">;
+  getFunction(
+    nameOrSignature: "setAuthorizedProtocol"
+  ): TypedContractMethod<
+    [protocol: AddressLike, authorized: boolean],
+    [void],
+    "nonpayable"
+  >;
   getFunction(
     nameOrSignature: "settleOrder"
   ): TypedContractMethod<
@@ -797,6 +997,13 @@ export interface FeedEngine extends BaseContract {
   ): TypedContractMethod<[arg0: BigNumberish], [bigint], "view">;
 
   getEvent(
+    key: "FeedRequested"
+  ): TypedContractEvent<
+    FeedRequestedEvent.InputTuple,
+    FeedRequestedEvent.OutputTuple,
+    FeedRequestedEvent.OutputObject
+  >;
+  getEvent(
     key: "FeederRankUpdated"
   ): TypedContractEvent<
     FeederRankUpdatedEvent.InputTuple,
@@ -839,6 +1046,13 @@ export interface FeedEngine extends BaseContract {
     OwnershipTransferredEvent.OutputObject
   >;
   getEvent(
+    key: "ProtocolAuthorized"
+  ): TypedContractEvent<
+    ProtocolAuthorizedEvent.InputTuple,
+    ProtocolAuthorizedEvent.OutputTuple,
+    ProtocolAuthorizedEvent.OutputObject
+  >;
+  getEvent(
     key: "Staked"
   ): TypedContractEvent<
     StakedEvent.InputTuple,
@@ -875,6 +1089,17 @@ export interface FeedEngine extends BaseContract {
   >;
 
   filters: {
+    "FeedRequested(bytes32,address,uint256,uint256)": TypedContractEvent<
+      FeedRequestedEvent.InputTuple,
+      FeedRequestedEvent.OutputTuple,
+      FeedRequestedEvent.OutputObject
+    >;
+    FeedRequested: TypedContractEvent<
+      FeedRequestedEvent.InputTuple,
+      FeedRequestedEvent.OutputTuple,
+      FeedRequestedEvent.OutputObject
+    >;
+
     "FeederRankUpdated(address,uint8,uint8)": TypedContractEvent<
       FeederRankUpdatedEvent.InputTuple,
       FeederRankUpdatedEvent.OutputTuple,
@@ -939,6 +1164,17 @@ export interface FeedEngine extends BaseContract {
       OwnershipTransferredEvent.InputTuple,
       OwnershipTransferredEvent.OutputTuple,
       OwnershipTransferredEvent.OutputObject
+    >;
+
+    "ProtocolAuthorized(address,bool)": TypedContractEvent<
+      ProtocolAuthorizedEvent.InputTuple,
+      ProtocolAuthorizedEvent.OutputTuple,
+      ProtocolAuthorizedEvent.OutputObject
+    >;
+    ProtocolAuthorized: TypedContractEvent<
+      ProtocolAuthorizedEvent.InputTuple,
+      ProtocolAuthorizedEvent.OutputTuple,
+      ProtocolAuthorizedEvent.OutputObject
     >;
 
     "Staked(address,uint256)": TypedContractEvent<

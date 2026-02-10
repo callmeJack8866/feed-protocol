@@ -53,6 +53,15 @@ contract FeedEngine is
         bool settled;
     }
 
+    /// @notice 外部协议喂价请求记录
+    struct FeedRequest {
+        address requester;          // 请求方合约/地址
+        uint256 requiredFeeders;    // 所需喂价员数量
+        uint256 rewardAmount;       // FEED 奖励
+        uint256 timestamp;          // 请求时间
+        bool exists;                // 是否存在
+    }
+
     // ============ 子合约引用 ============
 
     /// @notice FEED 代币
@@ -74,6 +83,12 @@ contract FeedEngine is
 
     /// @notice 内部订单记录
     mapping(bytes32 => EngineOrder) public engineOrders;
+
+    /// @notice 外部协议喂价请求
+    mapping(bytes32 => FeedRequest) public feedRequests;
+
+    /// @notice 已授权的协议合约（白名单）
+    mapping(address => bool) public authorizedProtocols;
 
     /// @notice 各等级最低质押要求 (USDT, 18 decimals)
     mapping(FeederRank => uint256) public minStakeByRank;
@@ -100,6 +115,8 @@ contract FeedEngine is
     event OrderGrabbed(bytes32 indexed orderId, address indexed feeder);
     event OrderSettled(bytes32 indexed orderId, uint256 consensusPrice, uint256 reward);
     event XPAwarded(address indexed feeder, uint256 amount, string reason);
+    event FeedRequested(bytes32 indexed orderId, address indexed requester, uint256 requiredFeeders, uint256 rewardAmount);
+    event ProtocolAuthorized(address indexed protocol, bool authorized);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -413,6 +430,79 @@ contract FeedEngine is
      */
     function getOrderFeeders(bytes32 orderId) external view returns (address[] memory) {
         return engineOrders[orderId].assignedFeeders;
+    }
+
+    // ============ 外部协议集成接口 ============
+
+    /**
+     * @notice 外部协议发起喂价请求（NST 等链上协议调用）
+     * @dev 需先将 FEED 代币 approve 给本合约作为奖励
+     * @param orderId 订单 ID（由调用方生成 keccak256 哈希）
+     * @param requiredFeeders 所需喂价员数量
+     * @param rewardAmount 奖励金额（FEED 代币，18 decimals）
+     */
+    function requestFeed(
+        bytes32 orderId,
+        uint256 requiredFeeders,
+        uint256 rewardAmount
+    ) external nonReentrant {
+        require(authorizedProtocols[msg.sender] || msg.sender == owner(), "Not authorized protocol");
+        require(!feedRequests[orderId].exists, "Request already exists");
+        require(requiredFeeders >= 3, "Minimum 3 feeders");
+        require(rewardAmount > 0, "Zero reward");
+
+        // 转入奖励代币
+        feedToken.transferFrom(msg.sender, address(this), rewardAmount);
+
+        // 记录请求
+        feedRequests[orderId] = FeedRequest({
+            requester: msg.sender,
+            requiredFeeders: requiredFeeders,
+            rewardAmount: rewardAmount,
+            timestamp: block.timestamp,
+            exists: true
+        });
+
+        // 设置 engineOrder（复用现有抢单逻辑）
+        engineOrders[orderId].orderId = orderId;
+        engineOrders[orderId].rewardAmount = rewardAmount;
+
+        emit FeedRequested(orderId, msg.sender, requiredFeeders, rewardAmount);
+    }
+
+    /**
+     * @notice 获取共识价格（供外部协议查询）
+     * @param orderId 订单 ID
+     * @return price 共识价格
+     * @return timestamp 共识时间戳
+     * @return finalized 是否已完成结算
+     */
+    function getConsensusPrice(bytes32 orderId) external view returns (
+        uint256 price,
+        uint256 timestamp,
+        bool finalized
+    ) {
+        price = consensus.getConsensusPrice(orderId);
+        timestamp = feedRequests[orderId].timestamp;
+        finalized = engineOrders[orderId].settled;
+    }
+
+    /**
+     * @notice 授权/取消授权外部协议合约
+     * @param protocol 协议合约地址
+     * @param authorized 是否授权
+     */
+    function setAuthorizedProtocol(address protocol, bool authorized) external onlyOwner {
+        require(protocol != address(0), "Zero address");
+        authorizedProtocols[protocol] = authorized;
+        emit ProtocolAuthorized(protocol, authorized);
+    }
+
+    /**
+     * @notice 检查协议是否已授权
+     */
+    function isProtocolAuthorized(address protocol) external view returns (bool) {
+        return authorizedProtocols[protocol];
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}

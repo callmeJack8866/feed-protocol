@@ -519,8 +519,8 @@
       ]
     },
     "F:\\Unstandardized_Products\\FeedEngine\\contracts\\contracts\\FeedEngine.sol": {
-      "lastModificationDate": 1770701879763,
-      "contentHash": "a7b95a321a7293340edaa5299511b42f",
+      "lastModificationDate": 1770713167815,
+      "contentHash": "95a24f6cfc8a8064cd1113282d3b1cde",
       "sourceName": "contracts/FeedEngine.sol",
       "solcConfig": {
         "version": "0.8.28",

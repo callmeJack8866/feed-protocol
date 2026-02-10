@@ -19,6 +19,7 @@ import chainRoutes from './controllers/chain.controller';
 import trainingRoutes from './controllers/training.controller';
 import seasonRoutes from './controllers/season.controller';
 import achievementRoutes from './controllers/achievement.controller';
+import nstRoutes from './controllers/nst.controller';
 
 // 导入服务
 import { setupWebSocket } from './websocket';
@@ -78,6 +79,7 @@ app.use('/api/chain', chainRoutes);
 app.use('/api/training', trainingRoutes);
 app.use('/api/seasons', seasonRoutes);
 app.use('/api/achievements', achievementRoutes);
+app.use('/api/nst', nstRoutes);
 
 // WebSocket 设置
 setupWebSocket(io);
