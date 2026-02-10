@@ -27,6 +27,7 @@ import { initEventListener } from './services/event-listener.service';
 import { startScheduler } from './services/cron.service';
 import { initNFTService } from './services/nft-badge.service';
 import { seedTrainingData } from './seeds/training.seed';
+import { globalRateLimit } from './config/rate-limiter';
 
 const app = express();
 const httpServer = createServer(app);
@@ -44,6 +45,9 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+
+// 全局速率限制 (方案 §16.2: 防机器人)
+app.use('/api/', globalRateLimit);
 
 // 健康检查
 app.get('/health', (req, res) => {

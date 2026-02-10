@@ -7,12 +7,12 @@ import prisma from '../config/database';
 // 等级经验值阈值
 const RANK_XP_THRESHOLDS: Record<string, number> = {
     'F': 0,
-    'E': 100,
-    'D': 500,
-    'C': 2000,
-    'B': 5000,
-    'A': 15000,
-    'S': 50000
+    'E': 500,       // 方案 §4.6: 500 XP
+    'D': 2000,      // 方案 §4.6: 2,000 XP
+    'C': 5000,      // 方案 §4.6: 5,000 XP
+    'B': 15000,     // 方案 §4.6: 15,000 XP
+    'A': 50000,     // 方案 §4.6: 50,000 XP
+    'S': 150000     // 方案 §4.6: 150,000 XP
 };
 
 const RANK_ORDER = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];

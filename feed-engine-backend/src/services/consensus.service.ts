@@ -1,7 +1,9 @@
+import { ethers } from 'ethers';
 import prisma from '../config/database';
 import { calculateReward, updateFeederRank, updateFeederStats } from './rank.service';
 import { detectAndUnlockAchievements } from './achievement-detection.service';
 import { evaluateAndExecutePenalty } from './penalty.service';
+import { getFeedConsensusContract, getRewardPenaltyContract } from './blockchain.service';
 
 /**
  * 共识计算服务
@@ -217,6 +219,13 @@ export async function processOrderConsensus(orderId: string): Promise<ConsensusR
         }
     });
 
+    // ============================
+    // 链上同步：共识提交 + 奖励分配 (70/10/10/10)
+    // ============================
+    distributeRewardsOnChain(orderId, order, deviations, consensusPrice).catch(err => {
+        console.error(`⚠️ Chain reward distribution failed for order ${orderId}:`, err);
+    });
+
     return {
         consensusPrice,
         deviations,
@@ -256,5 +265,94 @@ async function updateDailyTask(feederId: string): Promise<void> {
             where: { id: task.id },
             data: updates
         });
+    }
+}
+
+/**
+ * 链上同步：共识提交 + 奖励分配 (70/10/10/10)
+ *
+ * 流程:
+ * 1. FeedConsensus.submitConsensus(orderId, consensusPrice) — 提交共识价格
+ * 2. FeedConsensus.settleOrder(orderId) — 结算订单
+ * 3. RewardPenalty.distributeRewards(orderId, feeders[], totalReward) — 链上分配
+ *
+ * 链上 RewardPenalty 合约将自动按 70/10/10/10 比例分配:
+ *   70% → 喂价员  |  10% → 平台  |  10% → DAO  |  10% → 销毁
+ *
+ * @param orderId 数据库订单 ID
+ * @param order 订单对象(含 submissions)
+ * @param deviations 喂价员偏差结果
+ * @param consensusPrice 共识价格
+ */
+async function distributeRewardsOnChain(
+    orderId: string,
+    order: any,
+    deviations: { feederId: string; deviation: number; reward: number; xp: number }[],
+    consensusPrice: number
+): Promise<void> {
+    const consensusContract = getFeedConsensusContract();
+    const rewardContract = getRewardPenaltyContract();
+
+    if (!consensusContract || !rewardContract) {
+        console.warn('⚠️ Chain contracts not available, skipping on-chain distribution');
+        return;
+    }
+
+    const orderIdBytes32 = ethers.id(orderId);
+
+    try {
+        // 1. 提交共识价格到 FeedConsensus
+        const priceWei = ethers.parseUnits(consensusPrice.toFixed(8), 8);
+        const submitTx = await consensusContract.submitConsensus(orderIdBytes32, priceWei);
+        await submitTx.wait();
+        console.log(`✅ Consensus submitted on-chain: order=${orderId}, price=${consensusPrice}`);
+
+        // 2. 结算订单
+        const settleTx = await consensusContract.settleOrder(orderIdBytes32);
+        await settleTx.wait();
+        console.log(`✅ Order settled on-chain: ${orderId}`);
+
+    } catch (error) {
+        console.error(`⚠️ FeedConsensus chain sync failed (non-fatal):`, error);
+        // 链上共识提交失败不阻塞奖励分配
+    }
+
+    try {
+        // 3. 收集喂价员地址列表
+        const feederAddresses: string[] = [];
+        for (const d of deviations) {
+            const feeder = await prisma.feeder.findUnique({
+                where: { id: d.feederId },
+                select: { address: true }
+            });
+            if (feeder) {
+                feederAddresses.push(feeder.address);
+            }
+        }
+
+        if (feederAddresses.length === 0) {
+            console.warn('⚠️ No feeder addresses found, skipping on-chain distribution');
+            return;
+        }
+
+        // 4. 调用 RewardPenalty.distributeRewards() 做链上 70/10/10/10 分配
+        const totalRewardWei = ethers.parseUnits(order.rewardAmount.toString(), 18);
+        const distributeTx = await rewardContract.distributeRewards(
+            orderIdBytes32,
+            feederAddresses,
+            totalRewardWei
+        );
+        const receipt = await distributeTx.wait();
+        console.log(`✅ Rewards distributed on-chain: order=${orderId}, feeders=${feederAddresses.length}, tx=${receipt.hash}`);
+
+        // 5. 更新数据库记录链上交易哈希
+        await prisma.order.update({
+            where: { id: orderId },
+            data: { txHash: receipt.hash }
+        });
+
+    } catch (error) {
+        console.error(`⚠️ RewardPenalty distribution failed (non-fatal):`, error);
+        // 链上分配失败不影响数据库已完成的结算
     }
 }

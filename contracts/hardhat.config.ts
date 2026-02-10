@@ -9,6 +9,7 @@ const config: HardhatUserConfig = {
     solidity: {
         version: "0.8.28",
         settings: {
+            viaIR: true,
             optimizer: {
                 enabled: true,
                 runs: 200,
@@ -31,10 +32,17 @@ const config: HardhatUserConfig = {
         },
     },
     etherscan: {
-        apiKey: {
-            bscTestnet: process.env.BSCSCAN_API_KEY || "",
-            bsc: process.env.BSCSCAN_API_KEY || "",
-        },
+        apiKey: process.env.BSCSCAN_API_KEY || "",
+        customChains: [
+            {
+                network: "bscTestnet",
+                chainId: 97,
+                urls: {
+                    apiURL: "https://api.bscscan.com/v2/api?chainid=97",
+                    browserURL: "https://testnet.bscscan.com",
+                },
+            },
+        ],
     },
 };
 

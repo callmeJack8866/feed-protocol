@@ -4,6 +4,7 @@
  */
 
 import seasonSettlement from './season-settlement.service';
+import prisma from '../config/database';
 
 // 简单的定时任务调度器（生产环境可使用 node-cron 或 bull）
 interface ScheduledTask {
@@ -19,8 +20,36 @@ const tasks: ScheduledTask[] = [];
 let intervalId: NodeJS.Timeout | null = null;
 
 /**
+ * 匹配单个 cron 字段（支持 * / 逗号分隔 / 范围语法）
+ * 示例: "*" → 全匹配, "5" → 匹配5, "28-31" → 匹配28,29,30,31, "1,15" → 匹配1和15
+ */
+function matchesCronField(field: string, value: number): boolean {
+    if (field === '*') return true;
+
+    // 逗号分隔: "1,15"
+    const parts = field.split(',');
+    for (const part of parts) {
+        const trimmed = part.trim();
+        // 范围语法: "28-31"
+        if (trimmed.includes('-')) {
+            const [minStr, maxStr] = trimmed.split('-');
+            const min = parseInt(minStr);
+            const max = parseInt(maxStr);
+            if (!isNaN(min) && !isNaN(max) && value >= min && value <= max) {
+                return true;
+            }
+        } else {
+            if (parseInt(trimmed) === value) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
  * 解析简单的 cron 表达式
- * 支持: "0 0 1 * *" (每月1日0点)
+ * 支持: "0 0 1 * *" (每月1日0点), "55 23 28-31 * *" (28-31日23:55)
  */
 function shouldRunNow(cronExpr: string): boolean {
     const parts = cronExpr.split(' ');
@@ -29,20 +58,13 @@ function shouldRunNow(cronExpr: string): boolean {
     const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
     const now = new Date();
 
-    // 检查分钟
-    if (minute !== '*' && parseInt(minute) !== now.getMinutes()) return false;
-
-    // 检查小时
-    if (hour !== '*' && parseInt(hour) !== now.getHours()) return false;
-
-    // 检查日期
-    if (dayOfMonth !== '*' && parseInt(dayOfMonth) !== now.getDate()) return false;
-
-    // 检查月份 (cron 月份是 1-12)
-    if (month !== '*' && parseInt(month) !== now.getMonth() + 1) return false;
-
-    // 检查星期 (0-6, 0=周日)
-    if (dayOfWeek !== '*' && parseInt(dayOfWeek) !== now.getDay()) return false;
+    if (!matchesCronField(minute, now.getMinutes())) return false;
+    if (!matchesCronField(hour, now.getHours())) return false;
+    if (!matchesCronField(dayOfMonth, now.getDate())) return false;
+    // cron 月份是 1-12
+    if (!matchesCronField(month, now.getMonth() + 1)) return false;
+    // 星期 0-6, 0=周日
+    if (!matchesCronField(dayOfWeek, now.getDay())) return false;
 
     return true;
 }
@@ -122,6 +144,32 @@ export function startScheduler(): void {
         '5 0 1 * *',
         async () => {
             await seasonSettlement.createNewSeason();
+        }
+    );
+
+    // 订单过期扫描 - 每分钟 (方案 §6.5: 超时订单自动释放)
+    registerTask(
+        'order-expiry-scan',
+        '* * * * *',
+        async () => {
+            const now = new Date();
+            const expiredOrders = await prisma.order.findMany({
+                where: {
+                    status: { in: ['OPEN', 'GRABBED'] },
+                    expiresAt: { lte: now }
+                }
+            });
+
+            if (expiredOrders.length > 0) {
+                for (const order of expiredOrders) {
+                    await prisma.order.update({
+                        where: { id: order.id },
+                        data: { status: 'EXPIRED' }
+                    });
+                    console.log(`⏰ 订单过期: ${order.id} (${order.symbol}) status → EXPIRED`);
+                }
+                console.log(`📋 共处理 ${expiredOrders.length} 笔过期订单`);
+            }
         }
     );
 

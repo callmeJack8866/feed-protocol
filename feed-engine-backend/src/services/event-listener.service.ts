@@ -1,30 +1,56 @@
 import { ethers } from 'ethers';
 import prisma from '../config/database';
 import { io } from '../index';
+import { CONTRACT_ADDRESSES } from './blockchain.service';
 
 /**
  * 链上事件监听服务
+ * 
+ * 监听 5 个已部署合约的链上事件，同步到数据库并广播给前端：
+ * - FEEDToken:      Transfer 事件
+ * - FeederLicense:  LicenseMinted / Transfer 事件
+ * - FeedConsensus:  OrderCreated / PriceCommitted / PriceRevealed / ConsensusSubmitted / OrderSettled 事件
+ * - RewardPenalty:  RewardsDistributed / RewardsClaimed / PenaltyApplied / FeederBanned 事件
+ * - FeedEngine:     FeederRegistered / Staked / UnstakeRequested / Withdrawn / OrderGrabbed / XPAwarded / RankUpgraded 事件
  */
 
 let provider: ethers.JsonRpcProvider | null = null;
-let feedEngineContract: ethers.Contract | null = null;
-let stakingContract: ethers.Contract | null = null;
+let contracts: Record<string, ethers.Contract> = {};
 
-// 合约 ABI（事件部分）
-const FEED_ENGINE_ABI = [
-    'event OrderCreated(bytes32 indexed orderId, string symbol, uint256 notionalAmount, uint256 requiredFeeders)',
-    'event PriceSubmitted(bytes32 indexed orderId, address indexed feeder, bytes32 priceHash)',
-    'event PriceRevealed(bytes32 indexed orderId, address indexed feeder, uint256 price)',
-    'event ConsensusReached(bytes32 indexed orderId, uint256 consensusPrice, uint256 timestamp)',
-    'event OrderSettled(bytes32 indexed orderId, uint256 finalPrice)',
-    'event DisputeRaised(bytes32 indexed orderId, address indexed initiator, string reason)',
+// ============ ABI 定义（仅事件部分） ============
+
+const FEED_TOKEN_EVENTS = [
+    'event Transfer(address indexed from, address indexed to, uint256 value)',
 ];
 
-const STAKING_ABI = [
-    'event Staked(address indexed user, uint256 amount, uint8 stakeType)',
-    'event UnstakeRequested(address indexed user, uint256 amount, uint256 unlockTime)',
-    'event Unstaked(address indexed user, uint256 amount)',
-    'event Slashed(address indexed user, uint256 amount, string reason)',
+const FEEDER_LICENSE_EVENTS = [
+    'event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)',
+    'event LicenseMinted(uint256 indexed tokenId, address indexed to, uint8 licenseType)',
+];
+
+const FEED_CONSENSUS_EVENTS = [
+    'event OrderCreated(bytes32 indexed orderId, string symbol, uint256 notionalAmount, uint256 quorum)',
+    'event PriceCommitted(bytes32 indexed orderId, address indexed feeder)',
+    'event PriceRevealed(bytes32 indexed orderId, address indexed feeder, uint256 price)',
+    'event ConsensusSubmitted(bytes32 indexed orderId, uint256 consensusPrice)',
+    'event OrderSettled(bytes32 indexed orderId)',
+];
+
+const REWARD_PENALTY_EVENTS = [
+    'event RewardsDistributed(bytes32 indexed orderId, uint256 totalReward)',
+    'event RewardsClaimed(address indexed feeder, uint256 amount)',
+    'event PenaltyApplied(address indexed feeder, uint8 level, string reason, uint256 slashAmount)',
+    'event FeederBanned(address indexed feeder)',
+];
+
+const FEED_ENGINE_EVENTS = [
+    'event FeederRegistered(address indexed feeder, uint256 stakeAmount, uint256 licenseTokenId)',
+    'event Staked(address indexed feeder, uint256 amount)',
+    'event UnstakeRequested(address indexed feeder, uint256 unlockTime)',
+    'event Withdrawn(address indexed feeder, uint256 amount)',
+    'event OrderGrabbed(bytes32 indexed orderId, address indexed feeder)',
+    'event XPAwarded(address indexed feeder, uint256 amount, string reason)',
+    'event RankUpgraded(address indexed feeder, uint8 newRank)',
 ];
 
 /**
@@ -33,52 +59,59 @@ const STAKING_ABI = [
 export function initEventListener(): void {
     const rpcUrl = process.env.NODE_ENV === 'production'
         ? process.env.BSC_RPC_URL
-        : process.env.BSC_TESTNET_RPC_URL;
+        : (process.env.BSC_TESTNET_RPC_URL || 'https://bsc-testnet-rpc.publicnode.com');
 
     if (!rpcUrl) {
         console.warn('⚠️ Event listener: RPC URL not configured');
         return;
     }
 
-    // 使用 WebSocket 提供者以获得实时事件
-    const wsUrl = rpcUrl.replace('https://', 'wss://').replace('http://', 'ws://');
-
     try {
         provider = new ethers.JsonRpcProvider(rpcUrl);
 
-        // 初始化 FeedEngine 合约监听
-        const feedEngineAddress = process.env.FEED_ENGINE_CONTRACT;
-        if (feedEngineAddress) {
-            feedEngineContract = new ethers.Contract(feedEngineAddress, FEED_ENGINE_ABI, provider);
-            setupFeedEngineListeners();
-            console.log(`📡 FeedEngine contract listener started: ${feedEngineAddress}`);
-        }
+        // 初始化 5 个合约实例
+        contracts.feedConsensus = new ethers.Contract(
+            CONTRACT_ADDRESSES.FEED_CONSENSUS, FEED_CONSENSUS_EVENTS, provider
+        );
+        contracts.rewardPenalty = new ethers.Contract(
+            CONTRACT_ADDRESSES.REWARD_PENALTY, REWARD_PENALTY_EVENTS, provider
+        );
+        contracts.feedEngine = new ethers.Contract(
+            CONTRACT_ADDRESSES.FEED_ENGINE, FEED_ENGINE_EVENTS, provider
+        );
+        contracts.feederLicense = new ethers.Contract(
+            CONTRACT_ADDRESSES.FEEDER_LICENSE, FEEDER_LICENSE_EVENTS, provider
+        );
+        contracts.feedToken = new ethers.Contract(
+            CONTRACT_ADDRESSES.FEED_TOKEN, FEED_TOKEN_EVENTS, provider
+        );
 
-        // 初始化 Staking 合约监听
-        const stakingAddress = process.env.STAKING_CONTRACT;
-        if (stakingAddress) {
-            stakingContract = new ethers.Contract(stakingAddress, STAKING_ABI, provider);
-            setupStakingListeners();
-            console.log(`📡 Staking contract listener started: ${stakingAddress}`);
-        }
+        // 设置监听器
+        setupFeedConsensusListeners();
+        setupRewardPenaltyListeners();
+        setupFeedEngineListeners();
+        setupFeederLicenseListeners();
+
+        console.log('📡 Event listeners started for all 5 contracts');
+        Object.entries(CONTRACT_ADDRESSES).forEach(([name, addr]) => {
+            console.log(`   ${name}: ${addr}`);
+        });
 
     } catch (error) {
-        console.error('Failed to initialize event listener:', error);
+        console.error('❌ Failed to initialize event listener:', error);
     }
 }
 
-/**
- * 设置 FeedEngine 合约事件监听
- */
-function setupFeedEngineListeners(): void {
-    if (!feedEngineContract) return;
+// ============ FeedConsensus 事件 ============
 
-    // 监听 PriceSubmitted 事件
-    feedEngineContract.on('PriceSubmitted', async (orderId, feeder, priceHash, event) => {
-        console.log(`📥 PriceSubmitted: Order ${orderId}, Feeder ${feeder}`);
+function setupFeedConsensusListeners(): void {
+    const c = contracts.feedConsensus;
+    if (!c) return;
 
+    /** 价格已提交 (Commit 阶段) */
+    c.on('PriceCommitted', async (orderId: string, feeder: string, event: any) => {
+        console.log(`📥 PriceCommitted: order=${orderId}, feeder=${feeder}`);
         try {
-            // 更新数据库中的提交记录
             await prisma.priceSubmission.updateMany({
                 where: {
                     order: { txHash: orderId },
@@ -89,26 +122,17 @@ function setupFeedEngineListeners(): void {
                     committedAt: new Date()
                 }
             });
-
-            // 广播事件
-            io.emit('chain:priceSubmitted', {
-                orderId,
-                feeder,
-                priceHash,
-                txHash: event.log.transactionHash
-            });
+            io.emit('chain:priceCommitted', { orderId, feeder, txHash: event.log.transactionHash });
         } catch (error) {
-            console.error('Error handling PriceSubmitted event:', error);
+            console.error('Error handling PriceCommitted:', error);
         }
     });
 
-    // 监听 PriceRevealed 事件
-    feedEngineContract.on('PriceRevealed', async (orderId, feeder, price, event) => {
-        console.log(`📥 PriceRevealed: Order ${orderId}, Feeder ${feeder}, Price ${price}`);
-
+    /** 价格已揭示 (Reveal 阶段) */
+    c.on('PriceRevealed', async (orderId: string, feeder: string, price: bigint, event: any) => {
+        console.log(`📥 PriceRevealed: order=${orderId}, feeder=${feeder}, price=${price}`);
         try {
             const priceValue = parseFloat(ethers.formatUnits(price, 8));
-
             await prisma.priceSubmission.updateMany({
                 where: {
                     order: { txHash: orderId },
@@ -120,176 +144,221 @@ function setupFeedEngineListeners(): void {
                     revealedAt: new Date()
                 }
             });
-
-            io.emit('chain:priceRevealed', {
-                orderId,
-                feeder,
-                price: priceValue,
-                txHash: event.log.transactionHash
-            });
+            io.emit('chain:priceRevealed', { orderId, feeder, price: priceValue, txHash: event.log.transactionHash });
         } catch (error) {
-            console.error('Error handling PriceRevealed event:', error);
+            console.error('Error handling PriceRevealed:', error);
         }
     });
 
-    // 监听 ConsensusReached 事件
-    feedEngineContract.on('ConsensusReached', async (orderId, consensusPrice, timestamp, event) => {
-        console.log(`📥 ConsensusReached: Order ${orderId}, Price ${consensusPrice}`);
-
+    /** 共识价格已提交 */
+    c.on('ConsensusSubmitted', async (orderId: string, consensusPrice: bigint, event: any) => {
+        console.log(`📥 ConsensusSubmitted: order=${orderId}, price=${consensusPrice}`);
         try {
             const priceValue = parseFloat(ethers.formatUnits(consensusPrice, 8));
-
-            await prisma.order.updateMany({
-                where: { txHash: orderId },
-                data: {
-                    finalPrice: priceValue,
-                    status: 'SETTLED',
-                    settledAt: new Date(Number(timestamp) * 1000)
-                }
-            });
-
-            io.emit('chain:consensusReached', {
-                orderId,
-                consensusPrice: priceValue,
-                txHash: event.log.transactionHash
-            });
+            io.emit('chain:consensusSubmitted', { orderId, consensusPrice: priceValue, txHash: event.log.transactionHash });
         } catch (error) {
-            console.error('Error handling ConsensusReached event:', error);
+            console.error('Error handling ConsensusSubmitted:', error);
         }
     });
 
-    // 监听 DisputeRaised 事件
-    feedEngineContract.on('DisputeRaised', async (orderId, initiator, reason, event) => {
-        console.log(`📥 DisputeRaised: Order ${orderId}, Initiator ${initiator}`);
-
+    /** 订单已结算 */
+    c.on('OrderSettled', async (orderId: string, event: any) => {
+        console.log(`📥 OrderSettled: order=${orderId}`);
         try {
-            // 自动创建仲裁案件
-            const order = await prisma.order.findFirst({
-                where: { txHash: orderId }
-            });
-
-            if (order) {
-                const feeder = await prisma.feeder.findFirst({
-                    where: { address: initiator.toLowerCase() }
-                });
-
-                if (feeder) {
-                    await prisma.arbitrationCase.create({
-                        data: {
-                            orderId: order.id,
-                            initiatorId: feeder.id,
-                            initiatorType: 'FEEDER',
-                            disputeReason: reason,
-                            description: `Chain dispute raised: ${reason}`,
-                            status: 'PENDING'
-                        }
-                    });
-                }
-            }
-
-            io.emit('chain:disputeRaised', {
-                orderId,
-                initiator,
-                reason,
-                txHash: event.log.transactionHash
-            });
+            io.emit('chain:orderSettled', { orderId, txHash: event.log.transactionHash });
         } catch (error) {
-            console.error('Error handling DisputeRaised event:', error);
+            console.error('Error handling OrderSettled:', error);
         }
     });
 }
 
-/**
- * 设置 Staking 合约事件监听
- */
-function setupStakingListeners(): void {
-    if (!stakingContract) return;
+// ============ RewardPenalty 事件 ============
 
-    // 监听 Staked 事件
-    stakingContract.on('Staked', async (user, amount, stakeType, event) => {
-        console.log(`📥 Staked: User ${user}, Amount ${amount}`);
+function setupRewardPenaltyListeners(): void {
+    const c = contracts.rewardPenalty;
+    if (!c) return;
 
+    /** 奖励已分配 (70/10/10/10) */
+    c.on('RewardsDistributed', async (orderId: string, totalReward: bigint, event: any) => {
+        console.log(`📥 RewardsDistributed: order=${orderId}, total=${ethers.formatUnits(totalReward, 18)} FEED`);
+        try {
+            io.emit('chain:rewardsDistributed', {
+                orderId,
+                totalReward: ethers.formatUnits(totalReward, 18),
+                txHash: event.log.transactionHash
+            });
+        } catch (error) {
+            console.error('Error handling RewardsDistributed:', error);
+        }
+    });
+
+    /** 喂价员领取奖励 */
+    c.on('RewardsClaimed', async (feeder: string, amount: bigint, event: any) => {
+        console.log(`📥 RewardsClaimed: feeder=${feeder}, amount=${ethers.formatUnits(amount, 18)}`);
+        try {
+            const feederRecord = await prisma.feeder.findFirst({
+                where: { address: feeder.toLowerCase() }
+            });
+            if (feederRecord) {
+                await prisma.feeder.update({
+                    where: { id: feederRecord.id },
+                    data: { totalEarned: { increment: parseFloat(ethers.formatUnits(amount, 18)) } }
+                });
+            }
+            io.emit('chain:rewardsClaimed', {
+                feeder,
+                amount: ethers.formatUnits(amount, 18),
+                txHash: event.log.transactionHash
+            });
+        } catch (error) {
+            console.error('Error handling RewardsClaimed:', error);
+        }
+    });
+
+    /** 惩罚已执行 */
+    c.on('PenaltyApplied', async (feeder: string, level: number, reason: string, slashAmount: bigint, event: any) => {
+        console.log(`📥 PenaltyApplied: feeder=${feeder}, level=${level}, slash=${ethers.formatUnits(slashAmount, 18)}`);
+        try {
+            io.emit('chain:penaltyApplied', {
+                feeder,
+                level,
+                reason,
+                slashAmount: ethers.formatUnits(slashAmount, 18),
+                txHash: event.log.transactionHash
+            });
+        } catch (error) {
+            console.error('Error handling PenaltyApplied:', error);
+        }
+    });
+
+    /** 喂价员被永久封禁 */
+    c.on('FeederBanned', async (feeder: string, event: any) => {
+        console.log(`📥 FeederBanned: feeder=${feeder}`);
+        try {
+            const feederRecord = await prisma.feeder.findFirst({
+                where: { address: feeder.toLowerCase() }
+            });
+            if (feederRecord) {
+                await prisma.feeder.update({
+                    where: { id: feederRecord.id },
+                    data: { status: 'BANNED' }
+                });
+            }
+            io.emit('chain:feederBanned', { feeder, txHash: event.log.transactionHash });
+        } catch (error) {
+            console.error('Error handling FeederBanned:', error);
+        }
+    });
+}
+
+// ============ FeedEngine 事件 ============
+
+function setupFeedEngineListeners(): void {
+    const c = contracts.feedEngine;
+    if (!c) return;
+
+    /** 喂价员注册 */
+    c.on('FeederRegistered', async (feeder: string, stakeAmount: bigint, licenseTokenId: bigint, event: any) => {
+        console.log(`📥 FeederRegistered: feeder=${feeder}, stake=${ethers.formatUnits(stakeAmount, 18)}`);
+        try {
+            io.emit('chain:feederRegistered', {
+                feeder,
+                stakeAmount: ethers.formatUnits(stakeAmount, 18),
+                licenseTokenId: licenseTokenId.toString(),
+                txHash: event.log.transactionHash
+            });
+        } catch (error) {
+            console.error('Error handling FeederRegistered:', error);
+        }
+    });
+
+    /** 质押 */
+    c.on('Staked', async (feeder: string, amount: bigint, event: any) => {
+        console.log(`📥 Staked: feeder=${feeder}, amount=${ethers.formatUnits(amount, 18)}`);
         try {
             const amountValue = parseFloat(ethers.formatUnits(amount, 18));
-            const stakeTypeMap: Record<number, string> = { 0: 'FEED', 1: 'USDT', 2: 'NFT' };
-
-            const feeder = await prisma.feeder.findFirst({
-                where: { address: user.toLowerCase() }
+            const feederRecord = await prisma.feeder.findFirst({
+                where: { address: feeder.toLowerCase() }
             });
 
-            if (feeder) {
+            if (feederRecord) {
                 await prisma.stakeRecord.create({
                     data: {
-                        feederId: feeder.id,
-                        stakeType: stakeTypeMap[stakeType] || 'USDT',
+                        feederId: feederRecord.id,
+                        stakeType: 'FEED',
                         amount: amountValue,
                         txHash: event.log.transactionHash,
                         blockNumber: event.log.blockNumber,
                         status: 'ACTIVE'
                     }
                 });
-
                 await prisma.feeder.update({
-                    where: { id: feeder.id },
-                    data: {
-                        stakedAmount: { increment: amountValue },
-                        stakeType: stakeTypeMap[stakeType] || 'USDT'
-                    }
+                    where: { id: feederRecord.id },
+                    data: { stakedAmount: { increment: amountValue } }
                 });
             }
-
-            io.emit('chain:staked', {
-                user,
-                amount: amountValue,
-                stakeType: stakeTypeMap[stakeType],
-                txHash: event.log.transactionHash
-            });
+            io.emit('chain:staked', { feeder, amount: amountValue, txHash: event.log.transactionHash });
         } catch (error) {
-            console.error('Error handling Staked event:', error);
+            console.error('Error handling Staked:', error);
         }
     });
 
-    // 监听 Slashed 事件
-    stakingContract.on('Slashed', async (user, amount, reason, event) => {
-        console.log(`📥 Slashed: User ${user}, Amount ${amount}, Reason ${reason}`);
-
+    /** 提取 */
+    c.on('Withdrawn', async (feeder: string, amount: bigint, event: any) => {
+        console.log(`📥 Withdrawn: feeder=${feeder}, amount=${ethers.formatUnits(amount, 18)}`);
         try {
             const amountValue = parseFloat(ethers.formatUnits(amount, 18));
-
-            const feeder = await prisma.feeder.findFirst({
-                where: { address: user.toLowerCase() }
+            const feederRecord = await prisma.feeder.findFirst({
+                where: { address: feeder.toLowerCase() }
             });
 
-            if (feeder) {
-                // 更新最近的活跃质押记录
-                await prisma.stakeRecord.updateMany({
-                    where: {
-                        feederId: feeder.id,
-                        status: 'ACTIVE'
-                    },
-                    data: {
-                        slashedAmount: { increment: amountValue },
-                        slashReason: reason,
-                        slashTxHash: event.log.transactionHash
-                    }
-                });
-
+            if (feederRecord) {
                 await prisma.feeder.update({
-                    where: { id: feeder.id },
-                    data: {
-                        stakedAmount: { decrement: amountValue }
-                    }
+                    where: { id: feederRecord.id },
+                    data: { stakedAmount: { decrement: amountValue } }
                 });
             }
+            io.emit('chain:withdrawn', { feeder, amount: amountValue, txHash: event.log.transactionHash });
+        } catch (error) {
+            console.error('Error handling Withdrawn:', error);
+        }
+    });
 
-            io.emit('chain:slashed', {
-                user,
-                amount: amountValue,
-                reason,
+    /** 等级升级 */
+    c.on('RankUpgraded', async (feeder: string, newRank: number, event: any) => {
+        console.log(`📥 RankUpgraded: feeder=${feeder}, rank=${newRank}`);
+        try {
+            const RANK_MAP: Record<number, string> = { 0: 'F', 1: 'E', 2: 'D', 3: 'C', 4: 'B', 5: 'A', 6: 'S' };
+            io.emit('chain:rankUpgraded', {
+                feeder,
+                newRank: RANK_MAP[newRank] || 'F',
                 txHash: event.log.transactionHash
             });
         } catch (error) {
-            console.error('Error handling Slashed event:', error);
+            console.error('Error handling RankUpgraded:', error);
+        }
+    });
+}
+
+// ============ FeederLicense 事件 ============
+
+function setupFeederLicenseListeners(): void {
+    const c = contracts.feederLicense;
+    if (!c) return;
+
+    /** NFT 执照铸造 */
+    c.on('LicenseMinted', async (tokenId: bigint, to: string, licenseType: number, event: any) => {
+        console.log(`📥 LicenseMinted: tokenId=${tokenId}, to=${to}, type=${licenseType}`);
+        try {
+            const LICENSE_TYPES = ['BASIC', 'ADVANCED', 'PREMIUM', 'LEGENDARY'];
+            io.emit('chain:licenseMinted', {
+                tokenId: tokenId.toString(),
+                to,
+                licenseType: LICENSE_TYPES[licenseType] || 'BASIC',
+                txHash: event.log.transactionHash
+            });
+        } catch (error) {
+            console.error('Error handling LicenseMinted:', error);
         }
     });
 }
@@ -298,11 +367,9 @@ function setupStakingListeners(): void {
  * 停止事件监听
  */
 export function stopEventListener(): void {
-    if (feedEngineContract) {
-        feedEngineContract.removeAllListeners();
-    }
-    if (stakingContract) {
-        stakingContract.removeAllListeners();
-    }
+    Object.values(contracts).forEach(c => {
+        if (c) c.removeAllListeners();
+    });
+    contracts = {};
     console.log('📴 Event listeners stopped');
 }

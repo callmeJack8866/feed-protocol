@@ -91,10 +91,11 @@ const RANK_ORDER = ['F', 'E', 'D', 'C', 'B', 'A', 'S'];
  * @returns 惩罚级别
  */
 export function evaluatePenalty(deviation: number): PenaltyLevel {
-    if (deviation <= 1.0) return 'NONE';
-    if (deviation <= 5.0) return 'MINOR';
-    if (deviation <= 10.0) return 'MODERATE';
-    return 'SEVERE';
+    // 方案 §9.2: 轻微 1%-5%, 中等 5%-10%, 严重 >10%, 极端=串通/重复违规
+    if (deviation <= 1.0) return 'NONE';      // 偏差 ≤1% 无惩罚
+    if (deviation <= 5.0) return 'MINOR';      // 1%-5% 轻微：扣奖励 + 警告
+    if (deviation <= 10.0) return 'MODERATE';  // 5%-10% 中等：质押扣10% + 降级 + 禁7天
+    return 'SEVERE';                           // >10% 严重：质押扣30% + 降2级 + 禁30天
 }
 
 /**

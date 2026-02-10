@@ -4,6 +4,7 @@ import { FeedOrder, MarketType } from '../types';
 import { getReferenceData } from '../constants';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
 import { useTranslation } from '../i18n';
+import { useWallet } from '../hooks';
 
 interface FeedModalProps {
   order: FeedOrder;
@@ -11,7 +12,7 @@ interface FeedModalProps {
   onComplete: (xp: number, feed: number) => void;
 }
 
-type Step = 'input' | 'signing' | 'report' | 'evidence' | 'processing' | 'consensus' | 'success';
+type Step = 'input' | 'commit' | 'reveal' | 'signing' | 'report' | 'evidence' | 'processing' | 'consensus' | 'success';
 
 // Added React.FC to allow standard React attributes like 'key' when used in lists
 const ConfettiPiece: React.FC<{ index: number }> = ({ index }) => {
@@ -159,6 +160,9 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
   const [reportReason, setReportReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isShaking, setIsShaking] = useState(false);
+  const [salt, setSalt] = useState('');
+  const [priceHash, setPriceHash] = useState('');
+  const wallet = useWallet();
 
   const [displayedXP, setDisplayedXP] = useState(0);
   const [displayedFEED, setDisplayedFEED] = useState(0);
@@ -216,7 +220,7 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
     };
   }, [order.symbol, order.notionalAmount]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const val = parseFloat(price);
     if (isNaN(val) || val < range.min || val > range.max) {
@@ -225,15 +229,63 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
       setTimeout(() => setIsShaking(false), 500);
       return;
     }
-    setStep('signing');
-    setTimeout(() => setStep('processing'), 1200);
-    setTimeout(() => setStep('consensus'), 3000);
-    setTimeout(() => {
-      setStep('success');
-      playSound('impact');
-      setTimeout(() => playSound('fanfare'), 400);
-      setTimeout(() => playSound('level-up'), 1500);
-    }, 5000);
+    // === Commit 阶段: 生成盐值 + 哈希，提交 Commit ===
+    const newSalt = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+    setSalt(newSalt);
+    const hash = wallet.computePriceHash(val, newSalt);
+    setPriceHash(hash);
+
+    setStep('commit');
+
+    try {
+      // 提交哈希到后端
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const commitRes = await fetch(`${API_BASE}/orders/${order.id}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-wallet-address': wallet.address || '',
+        },
+        body: JSON.stringify({ priceHash: hash }),
+      });
+
+      if (!commitRes.ok) {
+        const err = await commitRes.json();
+        throw new Error(err.error || 'Commit failed');
+      }
+
+      // === Reveal 阶段: 等待 2 秒后揭示 ===
+      setStep('reveal');
+      await new Promise(r => setTimeout(r, 2000));
+
+      const revealRes = await fetch(`${API_BASE}/orders/${order.id}/reveal`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-wallet-address': wallet.address || '',
+        },
+        body: JSON.stringify({ price: val.toString(), salt: newSalt }),
+      });
+
+      if (!revealRes.ok) {
+        const err = await revealRes.json();
+        throw new Error(err.error || 'Reveal failed');
+      }
+
+      setStep('signing');
+      setTimeout(() => setStep('processing'), 1200);
+      setTimeout(() => setStep('consensus'), 3000);
+      setTimeout(() => {
+        setStep('success');
+        playSound('impact');
+        setTimeout(() => playSound('fanfare'), 400);
+        setTimeout(() => playSound('level-up'), 1500);
+      }, 5000);
+
+    } catch (err: any) {
+      setError(err.message || 'Commit-Reveal 失败');
+      setStep('input');
+    }
   };
 
   const handleFinalClaim = useCallback(() => {
@@ -324,6 +376,61 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                   <button type="submit" className="flex-[2] py-8 rounded-[3rem] bg-cyan-500 text-black font-black font-orbitron text-3xl shadow-[0_25px_50px_rgba(34,211,238,0.3)] active:scale-95 transition-all uppercase italic">COMMIT SIGNAL</button>
                 </div>
               </form>
+            </motion.div>
+          )}
+          {step === 'commit' && (
+            <motion.div key="commit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-32 flex flex-col items-center space-y-14 text-center">
+              <div className="relative">
+                <div className="w-40 h-40 border-4 border-amber-500/10 rounded-full"></div>
+                <motion.div
+                  animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="absolute inset-0 w-40 h-40 border-4 border-amber-500 border-t-transparent rounded-full"
+                ></motion.div>
+                <motion.div
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                  className="absolute inset-0 flex items-center justify-center text-5xl"
+                >🔒</motion.div>
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-4xl font-black font-orbitron text-white italic tracking-widest uppercase">
+                  COMMITTING HASH
+                </h3>
+                <p className="text-xs text-slate-500 font-black uppercase tracking-[0.6em] animate-pulse">
+                  Encrypting price data · Generating commitment proof...
+                </p>
+                <p className="text-xs text-amber-500/60 font-mono mt-4 truncate max-w-md mx-auto">
+                  Hash: {priceHash.slice(0, 16)}...{priceHash.slice(-8)}
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {step === 'reveal' && (
+            <motion.div key="reveal" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="p-32 flex flex-col items-center space-y-14 text-center">
+              <div className="relative">
+                <div className="w-40 h-40 border-4 border-emerald-500/10 rounded-full"></div>
+                <motion.div
+                  animate={{ rotate: -360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
+                  className="absolute inset-0 w-40 h-40 border-4 border-emerald-500 border-t-transparent rounded-full"
+                ></motion.div>
+                <motion.div
+                  animate={{ scale: [1, 1.3, 1], rotateY: [0, 180, 360] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  className="absolute inset-0 flex items-center justify-center text-5xl"
+                >🔓</motion.div>
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-4xl font-black font-orbitron text-white italic tracking-widest uppercase">
+                  REVEALING PRICE
+                </h3>
+                <p className="text-xs text-slate-500 font-black uppercase tracking-[0.6em] animate-pulse">
+                  Broadcasting plaintext · Verifying against commitment...
+                </p>
+                <p className="text-xs text-emerald-500/60 font-mono mt-4">
+                  Price: {price} USDT · Salt verified ✓
+                </p>
+              </div>
             </motion.div>
           )}
 

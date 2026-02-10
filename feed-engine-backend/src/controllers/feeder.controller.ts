@@ -132,6 +132,7 @@ router.get('/leaderboard', async (req: Request, res: Response) => {
         let orderBy: any = { xp: 'desc' };
         if (type === 'feeds') orderBy = { totalFeeds: 'desc' };
         if (type === 'accuracy') orderBy = { accuracyRate: 'desc' };
+        if (type === 'staking') orderBy = { stakedAmount: 'desc' }; // 方案 §4.7: 第4维度 质押量
 
         const feeders = await prisma.feeder.findMany({
             where: { isBanned: false },
@@ -144,7 +145,8 @@ router.get('/leaderboard', async (req: Request, res: Response) => {
                 rank: true,
                 xp: true,
                 totalFeeds: true,
-                accuracyRate: true
+                accuracyRate: true,
+                stakedAmount: true  // 方案 §4.7: 排行榜显示质押量
             }
         });
 

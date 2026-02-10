@@ -4,6 +4,7 @@ import prisma from '../config/database';
 import { matchOrdersForFeeder } from '../services/matching.service';
 import { processOrderConsensus } from '../services/consensus.service';
 import { evaluateAndExecutePenalty, checkBanStatus } from '../services/penalty.service';
+import { grabRateLimit, submitRateLimit } from '../config/rate-limiter';
 import { io } from '../index';
 
 /**
@@ -23,6 +24,31 @@ const STAKE_REQUIREMENTS: Record<string, { minStake: number; dailyLimit: number 
 const MASTER_ZONE_RANKS = ['A', 'S'];
 
 const router = Router();
+
+/**
+ * 动态超时配置 — 方案 §6.5
+ * 不同订单类型有不同的抢单和喂价超时时间
+ * @param grabTimeoutMin 抢单窗口（分钟）
+ * @param feedTimeoutMin 喂价截止（分钟）
+ */
+const FEED_TYPE_TIMEOUTS: Record<string, { grabTimeoutMin: number; feedTimeoutMin: number }> = {
+    'INITIAL': { grabTimeoutMin: 5, feedTimeoutMin: 10 },  // 初始喂价
+    'DYNAMIC': { grabTimeoutMin: 2, feedTimeoutMin: 5 },   // 动态喂价
+    'SETTLEMENT': { grabTimeoutMin: 3, feedTimeoutMin: 8 },   // 结算喂价
+    'ARBITRATION': { grabTimeoutMin: 10, feedTimeoutMin: 30 },  // 仲裁喂价
+};
+
+/**
+ * 根据 feedType 计算订单过期时间
+ * @param feedType 喂价类型
+ * @returns 过期时间 Date
+ */
+function calculateExpiresAt(feedType: string): Date {
+    const config = FEED_TYPE_TIMEOUTS[feedType] || FEED_TYPE_TIMEOUTS['INITIAL'];
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + config.feedTimeoutMin);
+    return expiresAt;
+}
 
 /**
  * GET /api/orders
@@ -143,7 +169,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  * POST /api/orders/:id/grab
  * 抢单
  */
-router.post('/:id/grab', async (req: Request, res: Response) => {
+router.post('/:id/grab', grabRateLimit, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const address = req.headers['x-wallet-address'] as string;
@@ -268,7 +294,7 @@ router.post('/:id/grab', async (req: Request, res: Response) => {
  * POST /api/orders/:id/submit
  * 提交价格哈希 (Commit 阶段)
  */
-router.post('/:id/submit', async (req: Request, res: Response) => {
+router.post('/:id/submit', submitRateLimit, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { priceHash, screenshot } = req.body;
@@ -510,4 +536,180 @@ router.post('/:id/unable-to-feed', async (req: Request, res: Response) => {
     }
 });
 
+/**
+ * GET /api/orders/:id/observers
+ * 观察者模式 — 未抢到的喂价员可以查看订单实时状态 (只读)
+ * 方案 §5.2: 增加透明度和学习机会
+ */
+router.get('/:id/observers', async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const address = req.headers['x-wallet-address'] as string;
+
+        const order = await prisma.order.findUnique({
+            where: { id },
+            include: {
+                submissions: {
+                    select: {
+                        feederId: true,
+                        priceHash: true,
+                        revealedPrice: true,
+                        committedAt: true,
+                        revealedAt: true,
+                        // 不暴露具体价格给观察者（在揭示前）
+                    },
+                },
+                observers: {
+                    select: { feederId: true, createdAt: true },
+                },
+            },
+        });
+
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // 如果有登录的喂价员，记录为观察者
+        if (address) {
+            const feeder = await prisma.feeder.findUnique({
+                where: { address: address.toLowerCase() },
+            });
+            if (feeder) {
+                await prisma.orderObserver.upsert({
+                    where: { orderId_feederId: { orderId: id, feederId: feeder.id } },
+                    update: {},
+                    create: { orderId: id, feederId: feeder.id },
+                }).catch(() => { /* 忽略重复 */ });
+            }
+        }
+
+        // 对观察者隐藏尚未揭示的价格
+        const safeSubmissions = order.submissions.map(s => ({
+            feederId: s.feederId,
+            hasCommitted: !!s.priceHash,
+            hasRevealed: s.revealedPrice !== null,
+            revealedPrice: s.revealedPrice, // reveal 后可见
+            committedAt: s.committedAt,
+            revealedAt: s.revealedAt,
+        }));
+
+        res.json({
+            success: true,
+            order: {
+                id: order.id,
+                symbol: order.symbol,
+                market: order.market,
+                status: order.status,
+                feedType: order.feedType,
+                requiredFeeders: order.requiredFeeders,
+                currentSubmissions: safeSubmissions.length,
+                submissions: safeSubmissions,
+                observerCount: order.observers.length,
+                finalPrice: order.finalPrice,
+            },
+        });
+    } catch (error) {
+        console.error('Get observers error:', error);
+        res.status(500).json({ error: 'Failed to get observer data' });
+    }
+});
+
+/**
+ * POST /api/orders/batch/submit
+ * 批量提交价格哈希 (Commit 阶段) — 方案 §6.8
+ * 喂价员可一次为多个订单提交报价，最多 10 个
+ * 
+ * @body { submissions: Array<{ orderId: string; priceHash: string }> }
+ */
+router.post('/batch/submit', submitRateLimit, async (req: Request, res: Response) => {
+    try {
+        const address = req.headers['x-wallet-address'] as string;
+        const { submissions } = req.body;
+
+        if (!address) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+
+        if (!Array.isArray(submissions) || submissions.length === 0) {
+            return res.status(400).json({ error: 'Submissions array is required' });
+        }
+
+        if (submissions.length > 10) {
+            return res.status(400).json({ error: '每次最多批量提交 10 个订单' });
+        }
+
+        const feeder = await prisma.feeder.findUnique({
+            where: { address: address.toLowerCase() }
+        });
+
+        if (!feeder) {
+            return res.status(404).json({ error: 'Feeder not found' });
+        }
+
+        // 逐条处理，返回成功/失败
+        const results = await Promise.allSettled(
+            submissions.map(async (sub: { orderId: string; priceHash: string }) => {
+                const order = await prisma.order.findUnique({
+                    where: { id: sub.orderId }
+                });
+
+                if (!order) throw new Error(`Order ${sub.orderId} not found`);
+                if (order.status !== 'GRABBED') throw new Error(`Order ${sub.orderId} status is ${order.status}, expected GRABBED`);
+
+                // 检查是否已提交
+                const existingSub = await prisma.submission.findFirst({
+                    where: { orderId: sub.orderId, feederId: feeder.id }
+                });
+
+                if (existingSub?.priceHash) throw new Error(`Order ${sub.orderId} already submitted`);
+
+                // 创建或更新提交记录
+                const submission = await prisma.submission.upsert({
+                    where: {
+                        orderId_feederId: { orderId: sub.orderId, feederId: feeder.id }
+                    },
+                    create: {
+                        orderId: sub.orderId,
+                        feederId: feeder.id,
+                        priceHash: sub.priceHash,
+                        committedAt: new Date()
+                    },
+                    update: {
+                        priceHash: sub.priceHash,
+                        committedAt: new Date()
+                    }
+                });
+
+                return { orderId: sub.orderId, status: 'committed', submissionId: submission.id };
+            })
+        );
+
+        const summary = results.map((result, i) => {
+            if (result.status === 'fulfilled') {
+                return result.value;
+            } else {
+                return {
+                    orderId: submissions[i].orderId,
+                    status: 'failed',
+                    error: result.reason?.message || 'Unknown error'
+                };
+            }
+        });
+
+        const successCount = summary.filter(s => s.status === 'committed').length;
+
+        res.json({
+            success: true,
+            batchSize: submissions.length,
+            successCount,
+            failCount: submissions.length - successCount,
+            results: summary
+        });
+    } catch (error) {
+        console.error('Batch submit error:', error);
+        res.status(500).json({ error: 'Failed to batch submit' });
+    }
+});
+
 export default router;
+

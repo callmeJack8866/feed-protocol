@@ -113,6 +113,8 @@ export async function matchFeedersForOrder(orderId: string): Promise<Feeder[]> {
 
     return allFeeders.filter(feeder => {
         const countries = parseJsonArray(feeder.countries);
+        const exchanges = parseJsonArray(feeder.exchanges);
+        const assetTypes = parseJsonArray(feeder.assetTypes);
 
         // 等级检查
         if (getRankLevel(feeder.rank) < getRankLevel(requiredRank)) {
@@ -121,6 +123,16 @@ export async function matchFeedersForOrder(orderId: string): Promise<Feeder[]> {
 
         // 国家检查（如果没有设置偏好，则匹配所有）
         if (countries.length > 0 && !countries.includes(order.country)) {
+            return false;
+        }
+
+        // 交易所检查（方案 §5.1: 喂价员选择的交易所包含该订单交易所）
+        if (exchanges.length > 0 && !exchanges.includes(order.exchange)) {
+            return false;
+        }
+
+        // 资产类型检查（方案 §5.1: 喂价员选择的资产类型匹配）
+        if (assetTypes.length > 0 && !assetTypes.includes(order.market)) {
             return false;
         }
 

@@ -124,6 +124,7 @@ router.get('/:code/leaderboard', async (req: Request, res: Response) => {
         let orderBy: any = { xp: 'desc' };
         if (type === 'FEEDS') orderBy = { totalFeeds: 'desc' };
         if (type === 'ACCURACY') orderBy = { accuracyRate: 'desc' };
+        if (type === 'STAKING') orderBy = { stakedAmount: 'desc' }; // 方案 §4.7: 第4维度
 
         const feeders = await prisma.feeder.findMany({
             where: { isBanned: false },
@@ -136,7 +137,8 @@ router.get('/:code/leaderboard', async (req: Request, res: Response) => {
                 rank: true,
                 xp: true,
                 totalFeeds: true,
-                accuracyRate: true
+                accuracyRate: true,
+                stakedAmount: true  // 方案 §4.7: 质押量排行
             }
         });
 
@@ -179,7 +181,7 @@ router.get('/:code/my-rank', async (req: Request, res: Response) => {
         }
 
         // 计算各维度排名
-        const [xpRank, feedsRank, accuracyRank] = await Promise.all([
+        const [xpRank, feedsRank, accuracyRank, stakingRank] = await Promise.all([
             prisma.feeder.count({
                 where: { xp: { gt: feeder.xp }, isBanned: false }
             }),
@@ -188,6 +190,9 @@ router.get('/:code/my-rank', async (req: Request, res: Response) => {
             }),
             prisma.feeder.count({
                 where: { accuracyRate: { gt: feeder.accuracyRate }, isBanned: false }
+            }),
+            prisma.feeder.count({
+                where: { stakedAmount: { gt: feeder.stakedAmount }, isBanned: false }
             })
         ]);
 
@@ -196,12 +201,14 @@ router.get('/:code/my-rank', async (req: Request, res: Response) => {
             ranks: {
                 overall: xpRank + 1,
                 feeds: feedsRank + 1,
-                accuracy: accuracyRank + 1
+                accuracy: accuracyRank + 1,
+                staking: stakingRank + 1  // 方案 §4.7: 质押量排名
             },
             stats: {
                 xp: feeder.xp,
                 totalFeeds: feeder.totalFeeds,
-                accuracyRate: feeder.accuracyRate
+                accuracyRate: feeder.accuracyRate,
+                stakedAmount: feeder.stakedAmount  // 方案 §4.7
             }
         });
     } catch (error) {

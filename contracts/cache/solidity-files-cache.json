@@ -8,6 +8,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -50,6 +51,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -90,6 +92,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -129,6 +132,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -170,6 +174,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -207,6 +212,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -246,6 +252,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -283,6 +290,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -325,6 +333,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -364,6 +373,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -401,6 +411,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -438,6 +449,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -475,6 +487,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -512,6 +525,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -558,6 +572,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -602,6 +617,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -645,6 +661,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -682,6 +699,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -729,6 +747,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -771,6 +790,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -815,6 +835,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -855,6 +876,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -896,6 +918,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -935,6 +958,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -974,6 +998,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1011,6 +1036,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1051,6 +1077,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1090,6 +1117,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1130,6 +1158,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1169,6 +1198,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1206,6 +1236,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1243,6 +1274,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1280,6 +1312,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1319,6 +1352,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1359,6 +1393,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1396,6 +1431,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1433,6 +1469,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1472,6 +1509,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1515,6 +1553,7 @@
       "solcConfig": {
         "version": "0.8.28",
         "settings": {
+          "viaIR": true,
           "optimizer": {
             "enabled": true,
             "runs": 200
@@ -1548,6 +1587,164 @@
       ],
       "artifacts": [
         "FEEDToken"
+      ]
+    },
+    "F:\\Unstandardized_Products\\FeedEngine\\contracts\\contracts\\ArbitrationDAO.sol": {
+      "lastModificationDate": 1770706264031,
+      "contentHash": "e4dc35fdd8c6c4b678259b2438f3d6c7",
+      "sourceName": "contracts/ArbitrationDAO.sol",
+      "solcConfig": {
+        "version": "0.8.28",
+        "settings": {
+          "viaIR": true,
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "storageLayout"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/access/Ownable.sol",
+        "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
+        "@openzeppelin/contracts/token/ERC20/IERC20.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "ArbitrationDAO"
+      ]
+    },
+    "F:\\Unstandardized_Products\\FeedEngine\\contracts\\node_modules\\@openzeppelin\\contracts\\utils\\ReentrancyGuard.sol": {
+      "lastModificationDate": 1770694778521,
+      "contentHash": "190613e556d509d9e9a0ea43dc5d891d",
+      "sourceName": "@openzeppelin/contracts/utils/ReentrancyGuard.sol",
+      "solcConfig": {
+        "version": "0.8.28",
+        "settings": {
+          "viaIR": true,
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "storageLayout"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "ReentrancyGuard"
+      ]
+    },
+    "F:\\Unstandardized_Products\\FeedEngine\\contracts\\node_modules\\@openzeppelin\\contracts\\access\\Ownable.sol": {
+      "lastModificationDate": 1770694778502,
+      "contentHash": "d3c790edc9ccf808a17c5a6cd13614fd",
+      "sourceName": "@openzeppelin/contracts/access/Ownable.sol",
+      "solcConfig": {
+        "version": "0.8.28",
+        "settings": {
+          "viaIR": true,
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "storageLayout"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "../utils/Context.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "Ownable"
+      ]
+    },
+    "F:\\Unstandardized_Products\\FeedEngine\\contracts\\node_modules\\@openzeppelin\\contracts\\utils\\Context.sol": {
+      "lastModificationDate": 1770694777995,
+      "contentHash": "67bfbc07588eb8683b3fd8f6f909563e",
+      "sourceName": "@openzeppelin/contracts/utils/Context.sol",
+      "solcConfig": {
+        "version": "0.8.28",
+        "settings": {
+          "viaIR": true,
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "evmVersion": "paris",
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata",
+                "storageLayout"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "Context"
       ]
     }
   }

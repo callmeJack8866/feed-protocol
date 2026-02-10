@@ -4,8 +4,8 @@ import zh from './translations/zh';
 import en from './translations/en';
 import ja from './translations/ja';
 import ko from './translations/ko';
-import ru from './translations/ru';
-import ar from './translations/ar';
+import zhTW from './translations/zhTW';
+import vi from './translations/vi';
 
 /**
  * i18n Context — 轻量级国际化框架
@@ -20,7 +20,7 @@ import ar from './translations/ar';
 // ============ 翻译注册表 ============
 
 const TRANSLATIONS: Record<Language, TranslationKeys> = {
-    zh, en, ja, ko, ru, ar,
+    zh, en, ja, ko, zhTW, vi,
 };
 
 // ============ Context 定义 ============
@@ -39,11 +39,12 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 /** 检测浏览器默认语言 */
 function detectBrowserLanguage(): Language {
     const browserLang = navigator.language.toLowerCase();
+    // 繁体中文优先检测（zh-TW, zh-HK, zh-Hant）
+    if (browserLang === 'zh-tw' || browserLang === 'zh-hk' || browserLang.includes('hant')) return 'zhTW';
     if (browserLang.startsWith('zh')) return 'zh';
     if (browserLang.startsWith('ja')) return 'ja';
     if (browserLang.startsWith('ko')) return 'ko';
-    if (browserLang.startsWith('ru')) return 'ru';
-    if (browserLang.startsWith('ar')) return 'ar';
+    if (browserLang.startsWith('vi')) return 'vi';
     return 'en'; // 默认英文
 }
 

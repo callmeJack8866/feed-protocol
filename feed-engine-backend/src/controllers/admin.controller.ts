@@ -452,4 +452,239 @@ function calculateReward(notionalAmount: number): number {
     return baseReward + notionalAmount * bonusRate;
 }
 
+// ============ 无法喂价审核与重分配 ============
+
+/**
+ * GET /api/admin/unable-to-feed
+ * 获取待审核的 "无法喂价" 报告列表
+ */
+router.get('/unable-to-feed', adminAuth, async (req: Request, res: Response) => {
+    try {
+        const { status = 'pending' } = req.query;
+
+        // 查找所有标记为 UNABLE 的提交
+        const reports = await prisma.priceSubmission.findMany({
+            where: {
+                priceHash: { startsWith: 'UNABLE:' }
+            },
+            include: {
+                order: { select: { id: true, symbol: true, market: true, status: true, requiredFeeders: true } },
+                feeder: { select: { id: true, displayName: true, address: true, rank: true } }
+            },
+            orderBy: { committedAt: 'desc' }
+        });
+
+        const formatted = reports.map(r => ({
+            submissionId: r.id,
+            orderId: r.orderId,
+            feederId: r.feederId,
+            feederName: r.feeder.displayName,
+            feederAddress: r.feeder.address,
+            reason: r.priceHash.replace('UNABLE:', ''),
+            evidence: r.screenshot,
+            reportedAt: r.committedAt,
+            orderSymbol: r.order.symbol,
+            orderMarket: r.order.market,
+            orderStatus: r.order.status,
+            // 如果 revealedPrice === -1，标记已审核通过
+            reviewed: r.revealedPrice === -1 ? 'APPROVED' : (r.revealedPrice === -2 ? 'REJECTED' : 'PENDING')
+        }));
+
+        // 筛选状态
+        const filtered = status === 'all' ? formatted : formatted.filter(r => r.reviewed === status.toString().toUpperCase());
+
+        res.json({ success: true, reports: filtered, total: filtered.length });
+    } catch (error) {
+        console.error('Get unable-to-feed reports error:', error);
+        res.status(500).json({ error: 'Failed to get reports' });
+    }
+});
+
+/**
+ * PUT /api/admin/unable-to-feed/:submissionId/review
+ * 管理员审核 "无法喂价" 报告
+ *
+ * @body decision: 'approve' | 'reject'
+ * @body note: string (可选审核备注)
+ *
+ * approve: 移除该喂价员的提交，自动补充新喂价员
+ * reject:  标记为拒绝，该喂价员需继续喂价（可能触发惩罚）
+ */
+router.put('/unable-to-feed/:submissionId/review', adminAuth, async (req: Request, res: Response) => {
+    try {
+        const { submissionId } = req.params;
+        const { decision, note } = req.body;
+
+        if (!decision || !['approve', 'reject'].includes(decision)) {
+            return res.status(400).json({ error: 'decision must be "approve" or "reject"' });
+        }
+
+        const submission = await prisma.priceSubmission.findUnique({
+            where: { id: submissionId },
+            include: { order: true, feeder: true }
+        });
+
+        if (!submission) {
+            return res.status(404).json({ error: 'Submission not found' });
+        }
+
+        if (!submission.priceHash?.startsWith('UNABLE:')) {
+            return res.status(400).json({ error: 'This submission is not an unable-to-feed report' });
+        }
+
+        if (decision === 'approve') {
+            // ============================
+            // 审核通过：释放该喂价员 + 自动重分配
+            // ============================
+
+            // 1. 标记审核通过 (用 revealedPrice = -1 标记)
+            await prisma.priceSubmission.update({
+                where: { id: submissionId },
+                data: {
+                    revealedPrice: -1,
+                    salt: `REVIEWED:${note || 'approved'}`
+                }
+            });
+
+            // 2. 删除该提交记录（释放名额）
+            await prisma.priceSubmission.delete({
+                where: { id: submissionId }
+            });
+
+            // 3. 尝试自动补充喂价员
+            const order = submission.order;
+            const result = await tryReassignFeeder(order.id, submission.feederId);
+
+            // 4. 通知
+            io.emit('admin:unable-to-feed-reviewed', {
+                submissionId,
+                orderId: order.id,
+                decision: 'approved',
+                reassigned: result.success,
+                newFeederId: result.newFeederId
+            });
+
+            res.json({
+                success: true,
+                decision: 'approved',
+                reassignment: result,
+                message: result.success
+                    ? `已审核通过，新喂价员 ${result.newFeederName} 已自动分配`
+                    : `已审核通过，但暂无合格替补喂价员。订单当前 ${result.currentCount}/${order.requiredFeeders}`
+            });
+
+        } else {
+            // ============================
+            // 审核拒绝：保留提交记录，给予警告
+            // ============================
+
+            // 标记为已拒绝 (用 revealedPrice = -2 标记)
+            await prisma.priceSubmission.update({
+                where: { id: submissionId },
+                data: {
+                    revealedPrice: -2,
+                    salt: `REJECTED:${note || 'no valid reason'}`
+                }
+            });
+
+            // 通知喂价员
+            io.emit('admin:unable-to-feed-reviewed', {
+                submissionId,
+                orderId: submission.orderId,
+                decision: 'rejected',
+                note
+            });
+
+            res.json({
+                success: true,
+                decision: 'rejected',
+                message: '已拒绝。喂价员需继续喂价或将面临惩罚。'
+            });
+        }
+    } catch (error) {
+        console.error('Review unable-to-feed error:', error);
+        res.status(500).json({ error: 'Failed to review report' });
+    }
+});
+
+/**
+ * 尝试为订单自动补充喂价员
+ *
+ * @param orderId 订单 ID
+ * @param excludeFeederId 排除的喂价员 ID (刚被释放的)
+ * @returns 重分配结果
+ */
+async function tryReassignFeeder(
+    orderId: string,
+    excludeFeederId: string
+): Promise<{ success: boolean; newFeederId?: string; newFeederName?: string; currentCount: number }> {
+    const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { submissions: true }
+    });
+
+    if (!order || order.status === 'SETTLED' || order.status === 'CANCELLED') {
+        return { success: false, currentCount: 0 };
+    }
+
+    const currentCount = order.submissions.length;
+    const existingFeederIds = order.submissions.map(s => s.feederId);
+
+    // 查找合格的替补喂价员
+    const candidates = await prisma.feeder.findMany({
+        where: {
+            id: { notIn: [...existingFeederIds, excludeFeederId] },
+            isBanned: false,
+            status: 'ACTIVE',
+            // 质押足够（F 级最低 100）
+            stakedAmount: { gte: 100 }
+        },
+        orderBy: [
+            { accuracyRate: 'desc' },
+            { totalFeeds: 'desc' }
+        ],
+        take: 1
+    });
+
+    if (candidates.length === 0) {
+        // 无合格替补，降低订单所需人数或保持等待
+        if (currentCount >= 1 && order.status === 'FEEDING') {
+            // 订单已有足够人在喂，不需额外操作
+        } else {
+            // 将订单回退到 GRABBED 或 OPEN 状态
+            const newStatus = currentCount > 0 ? 'GRABBED' : 'OPEN';
+            await prisma.order.update({
+                where: { id: orderId },
+                data: { status: newStatus }
+            });
+        }
+        return { success: false, currentCount };
+    }
+
+    const newFeeder = candidates[0];
+
+    // 创建新提交记录
+    await prisma.priceSubmission.create({
+        data: {
+            orderId,
+            feederId: newFeeder.id
+        }
+    });
+
+    // 通知新喂价员
+    io.emit('feeder:assigned', {
+        feederId: newFeeder.id,
+        orderId,
+        symbol: order.symbol,
+        market: order.market
+    });
+
+    return {
+        success: true,
+        newFeederId: newFeeder.id,
+        newFeederName: newFeeder.displayName || newFeeder.address,
+        currentCount: currentCount + 1
+    };
+}
+
 export default router;
