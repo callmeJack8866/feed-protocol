@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
+import { cacheOrFetch, CACHE_PREFIX, CACHE_TTL } from '../config/cache';
 
 const router = Router();
 
@@ -69,14 +70,14 @@ router.get('/current', async (req: Request, res: Response) => {
                     startDate,
                     endDate,
                     status: 'ACTIVE',
-                    rewardConfig: JSON.stringify({
+                    rewardConfig: {
                         1: { feed: 5000, xp: 2000, nft: true },
                         2: { feed: 3000, xp: 1500, nft: true },
                         3: { feed: 3000, xp: 1500, nft: true },
                         '4-10': { feed: 1500, xp: 1000, nft: false },
                         '11-50': { feed: 500, xp: 500, nft: false },
                         '51-100': { feed: 200, xp: 300, nft: false }
-                    })
+                    }
                 }
             });
         }
@@ -96,63 +97,48 @@ router.get('/:code/leaderboard', async (req: Request, res: Response) => {
     try {
         const { code } = req.params;
         const { type = 'OVERALL', limit = 100 } = req.query;
+        const cacheKey = `${CACHE_PREFIX.LEADERBOARD}season:${code}:${type}:${limit}`;
 
-        // 检查赛季是否存在
-        const season = await prisma.season.findUnique({
-            where: { code }
-        });
-
-        // 如果赛季已结束，从快照获取
-        if (season?.status === 'SETTLED' || season?.status === 'ENDED') {
-            const snapshots = await prisma.seasonSnapshot.findMany({
-                where: {
-                    season: code,
-                    rankType: type as string
-                },
-                orderBy: { rank: 'asc' },
-                take: Number(limit)
+        const result = await cacheOrFetch(cacheKey, async () => {
+            // 检查赛季是否存在
+            const season = await prisma.season.findUnique({
+                where: { code }
             });
 
-            return res.json({
-                success: true,
-                leaderboard: snapshots,
-                source: 'snapshot'
-            });
-        }
-
-        // 进行中的赛季，实时计算排行榜
-        let orderBy: any = { xp: 'desc' };
-        if (type === 'FEEDS') orderBy = { totalFeeds: 'desc' };
-        if (type === 'ACCURACY') orderBy = { accuracyRate: 'desc' };
-        if (type === 'STAKING') orderBy = { stakedAmount: 'desc' }; // 方案 §4.7: 第4维度
-
-        const feeders = await prisma.feeder.findMany({
-            where: { isBanned: false },
-            orderBy,
-            take: Number(limit),
-            select: {
-                id: true,
-                address: true,
-                nickname: true,
-                rank: true,
-                xp: true,
-                totalFeeds: true,
-                accuracyRate: true,
-                stakedAmount: true  // 方案 §4.7: 质押量排行
+            // 如果赛季已结束，从快照获取
+            if (season?.status === 'SETTLED' || season?.status === 'ENDED') {
+                const snapshots = await prisma.seasonSnapshot.findMany({
+                    where: { season: code, rankType: type as string },
+                    orderBy: { rank: 'asc' },
+                    take: Number(limit)
+                });
+                return { leaderboard: snapshots, source: 'snapshot' };
             }
-        });
 
-        const leaderboard = feeders.map((feeder, index) => ({
-            ...feeder,
-            position: index + 1,
-            rankType: type
-        }));
+            // 进行中的赛季，实时计算
+            let orderBy: any = { xp: 'desc' };
+            if (type === 'FEEDS') orderBy = { totalFeeds: 'desc' };
+            if (type === 'ACCURACY') orderBy = { accuracyRate: 'desc' };
+            if (type === 'STAKING') orderBy = { stakedAmount: 'desc' };
 
-        res.json({
-            success: true,
-            leaderboard,
-            source: 'realtime'
-        });
+            const feeders = await prisma.feeder.findMany({
+                where: { isBanned: false },
+                orderBy,
+                take: Number(limit),
+                select: {
+                    id: true, address: true, nickname: true, rank: true,
+                    xp: true, totalFeeds: true, accuracyRate: true, stakedAmount: true
+                }
+            });
+
+            const leaderboard = feeders.map((feeder, index) => ({
+                ...feeder, position: index + 1, rankType: type
+            }));
+
+            return { leaderboard, source: 'realtime' };
+        }, CACHE_TTL.LONG); // 30分钟缓存
+
+        res.json({ success: true, ...result });
     } catch (error) {
         console.error('Get leaderboard error:', error);
         res.status(500).json({ error: 'Failed to get leaderboard' });
@@ -233,12 +219,8 @@ router.get('/:code/rewards', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Season not found' });
         }
 
-        let rewardConfig = {};
-        try {
-            rewardConfig = JSON.parse(season.rewardConfig);
-        } catch (e) {
-            console.error('Parse reward config error:', e);
-        }
+        // Prisma Json 类型自动反序列化
+        const rewardConfig = season.rewardConfig || {};
 
         res.json({
             success: true,

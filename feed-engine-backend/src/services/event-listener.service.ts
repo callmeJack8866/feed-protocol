@@ -202,7 +202,7 @@ function setupRewardPenaltyListeners(): void {
             if (feederRecord) {
                 await prisma.feeder.update({
                     where: { id: feederRecord.id },
-                    data: { totalEarned: { increment: parseFloat(ethers.formatUnits(amount, 18)) } }
+                    data: { totalEarnings: { increment: parseFloat(ethers.formatUnits(amount, 18)) } }
                 });
             }
             io.emit('chain:rewardsClaimed', {
@@ -241,7 +241,7 @@ function setupRewardPenaltyListeners(): void {
             if (feederRecord) {
                 await prisma.feeder.update({
                     where: { id: feederRecord.id },
-                    data: { status: 'BANNED' }
+                    data: { isBanned: true }
                 });
             }
             io.emit('chain:feederBanned', { feeder, txHash: event.log.transactionHash });

@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
+import { cacheOrFetch, CACHE_PREFIX, CACHE_TTL } from '../config/cache';
 
 const router = Router();
 
@@ -128,33 +129,35 @@ router.get('/history', async (req: Request, res: Response) => {
 router.get('/leaderboard', async (req: Request, res: Response) => {
     try {
         const { type = 'xp', limit = 50 } = req.query;
+        const cacheKey = `${CACHE_PREFIX.LEADERBOARD}${type}:${limit}`;
 
-        let orderBy: any = { xp: 'desc' };
-        if (type === 'feeds') orderBy = { totalFeeds: 'desc' };
-        if (type === 'accuracy') orderBy = { accuracyRate: 'desc' };
-        if (type === 'staking') orderBy = { stakedAmount: 'desc' }; // 方案 §4.7: 第4维度 质押量
+        const leaderboard = await cacheOrFetch(cacheKey, async () => {
+            let orderBy: any = { xp: 'desc' };
+            if (type === 'feeds') orderBy = { totalFeeds: 'desc' };
+            if (type === 'accuracy') orderBy = { accuracyRate: 'desc' };
+            if (type === 'staking') orderBy = { stakedAmount: 'desc' };
 
-        const feeders = await prisma.feeder.findMany({
-            where: { isBanned: false },
-            orderBy,
-            take: Number(limit),
-            select: {
-                id: true,
-                address: true,
-                nickname: true,
-                rank: true,
-                xp: true,
-                totalFeeds: true,
-                accuracyRate: true,
-                stakedAmount: true  // 方案 §4.7: 排行榜显示质押量
-            }
-        });
+            const feeders = await prisma.feeder.findMany({
+                where: { isBanned: false },
+                orderBy,
+                take: Number(limit),
+                select: {
+                    id: true,
+                    address: true,
+                    nickname: true,
+                    rank: true,
+                    xp: true,
+                    totalFeeds: true,
+                    accuracyRate: true,
+                    stakedAmount: true
+                }
+            });
 
-        // 添加排名
-        const leaderboard = feeders.map((feeder, index) => ({
-            ...feeder,
-            position: index + 1
-        }));
+            return feeders.map((feeder, index) => ({
+                ...feeder,
+                position: index + 1
+            }));
+        }, CACHE_TTL.LONG); // 30分钟缓存
 
         res.json({ success: true, leaderboard });
     } catch (error) {

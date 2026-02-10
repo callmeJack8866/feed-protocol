@@ -1,14 +1,18 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Feed Engine — Prisma Schema (PostgreSQL 上线版)
+// 迁移自 SQLite，适配 PostgreSQL 特性
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+// ========================================
+// 喂价员体系 (Feeder System)
+// ========================================
 
 // 喂价员
 model Feeder {
@@ -20,14 +24,15 @@ model Feeder {
   totalFeeds      Int       @default(0)
   accuracyRate    Float     @default(0)
   avgDeviation    Float     @default(0)
+  totalEarnings   Float     @default(0) // 总收益 (FEED)
   stakedAmount    Float     @default(0)
   stakeType       String    @default("USDT") // FEED/USDT/NFT
   nftLicenseId    String?   // NFT 执照 ID
   
-  // 偏好设置 (JSON 字符串)
-  countries       String   @default("[]") // ["US", "CN", "HK"]
-  exchanges       String   @default("[]") // ["NYSE", "SSE", "BINANCE"]
-  assetTypes      String   @default("[]") // ["CRYPTO", "US_STOCK", "CN_STOCK"]
+  // 偏好设置 (PostgreSQL Json 类型)
+  countries       Json      @default("[]") // ["US", "CN", "HK"]
+  exchanges       Json      @default("[]") // ["NYSE", "SSE", "BINANCE"]
+  assetTypes      Json      @default("[]") // ["CRYPTO", "US_STOCK", "CN_STOCK"]
   
   // 状态
   isBanned        Boolean   @default(false)
@@ -42,6 +47,11 @@ model Feeder {
   stakeRecords    StakeRecord[]
   trainingRecords FeederTrainingRecord[]
   achievements    FeederAchievement[]
+  penalties       FeederPenaltyRecord[]
+
+  @@index([rank])
+  @@index([address])
+  @@index([isBanned])
 }
 
 // 质押记录
@@ -61,7 +71,7 @@ model StakeRecord {
   // 状态
   status          String   @default("ACTIVE") // ACTIVE / UNLOCKING / WITHDRAWN / SLASHED
   
-  // 解锁相关
+  // 解锁相关 (30天冷却期)
   unlockRequestedAt DateTime? // 申请解锁时间
   unlockAvailableAt DateTime? // 可提取时间 (申请后 30 天)
   withdrawnAt       DateTime? // 实际提取时间
@@ -76,6 +86,9 @@ model StakeRecord {
   updatedAt       DateTime  @updatedAt
   
   feeder          Feeder   @relation(fields: [feederId], references: [id])
+
+  @@index([feederId])
+  @@index([status])
 }
 
 // NFT 执照
@@ -106,7 +119,13 @@ model FeederLicense {
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([ownerAddress])
 }
+
+// ========================================
+// 订单系统 (Order System)
+// ========================================
 
 // 喂价订单
 model Order {
@@ -122,12 +141,12 @@ model Order {
   requiredFeeders   Int       // 需要的喂价员数量
   consensusThreshold String   // 共识门槛 (2/3, 3/5, 5/7)
   
-  // 特殊条件 (JSON 字符串)
-  specialConditions String    @default("[]")
+  // 特殊条件 (PostgreSQL Json)
+  specialConditions Json      @default("[]")
   
   // 奖励
   rewardAmount      Float     // 奖励金额 (FEED)
-  feeAmount         Float     @default(5) // 固定费用 (USDT)
+  feeAmount         Float     @default(5) // 固定费用 (USDT): Initial=5/Dynamic=5/Settlement=10/Arbitration=20
   
   // 时间控制
   grabTimeout       Int       @default(300) // 抢单超时（秒）
@@ -135,7 +154,7 @@ model Order {
   expiresAt         DateTime  // 订单过期时间
   
   // 状态
-  status            String    @default("OPEN") // OPEN/GRABBED/FEEDING/CONSENSUS/SETTLED/DISPUTED
+  status            String    @default("OPEN") // OPEN/GRABBED/FEEDING/CONSENSUS/SETTLED/DISPUTED/EXPIRED
   
   // 存储
   ipfsHash          String?   // IPFS 订单详情哈希
@@ -154,6 +173,12 @@ model Order {
   
   submissions       PriceSubmission[]
   observers         OrderObserver[]
+  rewardDistributions RewardDistribution[]
+
+  @@index([status, createdAt])
+  @@index([market, country])
+  @@index([feedType])
+  @@index([sourceProtocol])
 }
 
 // 价格提交
@@ -189,6 +214,8 @@ model PriceSubmission {
   feeder        Feeder    @relation(fields: [feederId], references: [id])
   
   @@unique([orderId, feederId])
+  @@index([orderId])
+  @@index([feederId])
 }
 
 // 订单观察者（未抢中但可见）
@@ -202,6 +229,83 @@ model OrderObserver {
   
   @@unique([orderId, feederId])
 }
+
+// ========================================
+// 奖励分配 (Reward Distribution)
+// ========================================
+
+// 奖励分配记录 — 方案 §9.1 (70/10/10/10)
+model RewardDistribution {
+  id              String   @id @default(uuid())
+  orderId         String
+  
+  // 分配金额
+  totalReward     Float    // 总奖励
+  feederTotal     Float    // 喂价员总额 (70%)
+  platformFee     Float    // 平台运营 (10%)
+  daoFee          Float    // DAO 金库 (10%)
+  burnAmount      Float    // 代币销毁 (10%)
+  
+  // 喂价员明细 (JSON: { feederId: amount })
+  feederShares    Json     // 各喂价员分得金额
+  
+  // 目标钱包
+  platformWallet  String   // 平台运营钱包
+  daoWallet       String   // DAO 金库钱包
+  burnAddress     String   // 销毁地址
+  
+  // 状态
+  status          String   @default("PENDING") // PENDING / DISTRIBUTED / FAILED
+  
+  // 链上交易
+  txHash          String?  // 分配交易哈希
+  distributedAt   DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  order           Order    @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([status])
+}
+
+// ========================================
+// 惩罚记录 (Penalty Records)
+// ========================================
+
+// 喂价员惩罚记录 — 方案 §9.2
+model FeederPenaltyRecord {
+  id              String   @id @default(uuid())
+  feederId        String
+  orderId         String?  // 关联订单（如有）
+  
+  // 惩罚详情
+  level           String   // MINOR / MODERATE / SEVERE / EXTREME
+  reason          String   // 触发原因
+  description     String?  // 详细描述
+  
+  // 惩罚内容
+  rewardForfeited Float    @default(0)  // 扣除本单奖励
+  stakeSlashed    Float    @default(0)  // 扣除质押比例金额
+  xpDeducted      Int      @default(0)  // 扣除经验值
+  rankDemoted     Int      @default(0)  // 等级降级数
+  banDays         Int      @default(0)  // 禁止抢单天数
+  
+  // 链上记录
+  txHash          String?
+  
+  createdAt       DateTime @default(now())
+  
+  feeder          Feeder   @relation(fields: [feederId], references: [id])
+
+  @@index([feederId])
+  @@index([level])
+}
+
+// ========================================
+// 喂价历史与任务 (History & Tasks)
+// ========================================
 
 // 喂价历史
 model FeedHistory {
@@ -217,13 +321,16 @@ model FeedHistory {
   createdAt DateTime @default(now())
   
   feeder    Feeder   @relation(fields: [feederId], references: [id])
+
+  @@index([feederId, createdAt])
+  @@index([orderId])
 }
 
 // 每日任务
 model DailyTask {
   id          String   @id @default(uuid())
   feederId    String
-  date        DateTime @default(now())
+  date        DateTime @default(now()) @db.Date
   feedCount   Int      @default(0)
   target1     Boolean  @default(false) // 完成1单
   target3     Boolean  @default(false) // 完成3单
@@ -235,6 +342,10 @@ model DailyTask {
   @@unique([feederId, date])
 }
 
+// ========================================
+// 赛季管理系统 (Season Management)
+// ========================================
+
 // 赛季排行榜快照
 model SeasonSnapshot {
   id        String   @id @default(uuid())
@@ -242,7 +353,7 @@ model SeasonSnapshot {
   seasonId  String?  // 关联赛季 ID
   feederId  String
   rank      Int
-  rankType  String   @default("OVERALL") // OVERALL / FEEDS / ACCURACY / SPEED
+  rankType  String   @default("OVERALL") // OVERALL / FEEDS / ACCURACY / SPEED / STAKING
   totalXp   Int
   feeds     Int
   accuracy  Float
@@ -253,7 +364,32 @@ model SeasonSnapshot {
   seasonRef Season?  @relation(fields: [seasonId], references: [id])
   
   @@unique([season, feederId, rankType])
+  @@index([season])
 }
+
+// 赛季
+model Season {
+  id           String   @id @default(uuid())
+  name         String   // "2026年1月赛季"
+  code         String   @unique // "2026-01"
+  startDate    DateTime
+  endDate      DateTime
+  status       String   @default("UPCOMING") // UPCOMING / ACTIVE / ENDED / SETTLED
+  
+  // 奖励配置 (JSON)
+  rewardConfig Json     // 各名次奖励配置
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  snapshots    SeasonSnapshot[]
+
+  @@index([status])
+}
+
+// ========================================
+// 仲裁系统 (Arbitration System)
+// ========================================
 
 // 仲裁案件
 model ArbitrationCase {
@@ -265,7 +401,7 @@ model ArbitrationCase {
   // 争议信息
   disputeReason   String   // 争议原因
   description     String   // 详细描述
-  evidenceUrls    String   @default("[]") // JSON: IPFS 证据链接
+  evidenceUrls    Json     @default("[]") // IPFS 证据链接
   
   // 涉及的喂价员
   disputedFeederId String? // 被争议的喂价员
@@ -273,13 +409,13 @@ model ArbitrationCase {
   // 仲裁类型
   caseType        String   @default("NORMAL") // NORMAL / ADVANCED
   
-  // 押金
+  // 押金 (§10.3: 50 USDT)
   depositAmount   Float    @default(50) // 押金金额 (USDT)
   depositPaid     Boolean  @default(false)
   depositTxHash   String?
   
   // 仲裁员 (JSON: 喂价员ID数组)
-  arbitrators     String   @default("[]")
+  arbitrators     Json     @default("[]")
   requiredVotes   Int      @default(3) // 所需投票数
   
   // 状态
@@ -300,6 +436,9 @@ model ArbitrationCase {
   
   votes           ArbitrationVote[]
   appeals         Appeal[]
+
+  @@index([orderId])
+  @@index([status])
 }
 
 // 仲裁投票
@@ -313,7 +452,7 @@ model ArbitrationVote {
   reason       String?  // 投票理由
   
   // 补充证据
-  evidenceUrls String   @default("[]") // JSON
+  evidenceUrls Json     @default("[]")
   
   createdAt    DateTime @default(now())
   
@@ -330,14 +469,14 @@ model Appeal {
   
   // 申诉内容
   reason          String   // 申诉理由
-  evidenceUrls    String   @default("[]") // JSON: 补充证据
+  evidenceUrls    Json     @default("[]") // 补充证据
   
   // 押金
   depositAmount   Float    @default(100) // 申诉押金 (USDT)
   depositPaid     Boolean  @default(false)
   depositTxHash   String?
   
-  // DAO 投票
+  // DAO 投票 (§9.3: 7天投票期)
   votingDeadline  DateTime // 7天投票期
   supportVotes    Int      @default(0) // 支持票数 (按 FEED 持有量加权)
   rejectVotes     Int      @default(0) // 反对票数
@@ -355,6 +494,9 @@ model Appeal {
   
   case            ArbitrationCase @relation(fields: [caseId], references: [id])
   daoVotes        DAOVote[]
+
+  @@index([caseId])
+  @@index([status])
 }
 
 // DAO 投票记录
@@ -404,7 +546,7 @@ model TrainingExam {
   id           String   @id @default(uuid())
   courseId     String
   title        String
-  questions    String   // JSON: 题目数组
+  questions    Json     // 题目数组
   passingScore Int      @default(80) // 及格分数
   timeLimit    Int      @default(30) // 时间限制（分钟）
   
@@ -420,13 +562,16 @@ model ExamAttempt {
   id          String   @id @default(uuid())
   examId      String
   feederId    String
-  answers     String   // JSON: 答案数组
+  answers     Json     // 答案数组
   score       Int
   passed      Boolean
   startedAt   DateTime
   submittedAt DateTime @default(now())
   
   exam        TrainingExam @relation(fields: [examId], references: [id])
+
+  @@index([examId])
+  @@index([feederId])
 }
 
 // 喂价员培训记录
@@ -450,28 +595,6 @@ model FeederTrainingRecord {
 }
 
 // ========================================
-// 赛季管理系统 (Season Management)
-// ========================================
-
-// 赛季
-model Season {
-  id           String   @id @default(uuid())
-  name         String   // "2026年1月赛季"
-  code         String   @unique // "2026-01"
-  startDate    DateTime
-  endDate      DateTime
-  status       String   @default("UPCOMING") // UPCOMING / ACTIVE / ENDED / SETTLED
-  
-  // 奖励配置 (JSON)
-  rewardConfig String   // 各名次奖励配置
-  
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  
-  snapshots    SeasonSnapshot[]
-}
-
-// ========================================
 // 成就系统 (Achievement System)
 // ========================================
 
@@ -485,12 +608,12 @@ model Achievement {
   icon        String   // 图标 emoji 或 URL
   
   // 解锁条件 (JSON)
-  conditions  String   // { "totalFeeds": 1 }
+  conditions  Json     // { "totalFeeds": 1 }
   
   // 奖励
   xpReward    Int      @default(0)
   feedReward  Float    @default(0)
-  nftMetadata String?  // NFT 元数据 JSON
+  nftMetadata Json?    // NFT 元数据
   
   // 稀有度
   rarity      String   @default("COMMON") // COMMON / RARE / EPIC / LEGENDARY

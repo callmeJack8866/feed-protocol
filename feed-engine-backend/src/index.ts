@@ -28,6 +28,7 @@ import { startScheduler } from './services/cron.service';
 import { initNFTService } from './services/nft-badge.service';
 import { seedTrainingData } from './seeds/training.seed';
 import { globalRateLimit } from './config/rate-limiter';
+import { isRedisAvailable, closeRedis, redisHealthCheck } from './config/redis';
 
 const app = express();
 const httpServer = createServer(app);
@@ -49,9 +50,16 @@ app.use(express.json());
 // 全局速率限制 (方案 §16.2: 防机器人)
 app.use('/api/', globalRateLimit);
 
-// 健康检查
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// 健康检查（含 Redis 状态）
+app.get('/health', async (req, res) => {
+    const redisCheck = await redisHealthCheck();
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        services: {
+            redis: redisCheck,
+        },
+    });
 });
 
 // API 路由
@@ -85,6 +93,7 @@ httpServer.listen(PORT, () => {
     console.log(`🚀 Feed Engine Backend running on port ${PORT}`);
     console.log(`📡 WebSocket server ready`);
     console.log(`⛓️ Blockchain services initialized`);
+    console.log(`📦 Redis: ${isRedisAvailable() ? '✅ 已连接' : '⚠️ 未连接（使用内存降级）'}`);
 
     // 启动定时任务调度器
     startScheduler();
@@ -97,5 +106,24 @@ httpServer.listen(PORT, () => {
         console.error('培训数据初始化失败:', err);
     });
 });
+
+// ============ 优雅关闭 ============
+
+const shutdown = async (signal: string) => {
+    console.log(`\n🛑 收到 ${signal}，正在关闭...`);
+    try {
+        await closeRedis();
+        httpServer.close(() => {
+            console.log('✅ HTTP 服务器已关闭');
+            process.exit(0);
+        });
+    } catch (err) {
+        console.error('关闭失败:', err);
+        process.exit(1);
+    }
+};
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 export { io };

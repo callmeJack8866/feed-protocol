@@ -234,19 +234,14 @@ router.get('/exams/:examId', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Exam not found' });
         }
 
-        // 解析题目并隐藏正确答案
-        let questions = [];
-        try {
-            const parsed = JSON.parse(exam.questions);
-            questions = parsed.map((q: any, index: number) => ({
-                id: index,
-                question: q.question,
-                options: q.options,
-                // 不返回正确答案
-            }));
-        } catch (e) {
-            console.error('Parse questions error:', e);
-        }
+        // 解析题目并隐藏正确答案（Prisma Json 类型自动反序列化）
+        const parsed = (exam.questions as any[]) || [];
+        const questions = parsed.map((q: any, index: number) => ({
+            id: index,
+            question: q.question,
+            options: q.options,
+            // 不返回正确答案
+        }));
 
         res.json({
             success: true,
@@ -297,13 +292,8 @@ router.post('/exams/:examId/submit', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Exam not found' });
         }
 
-        // 解析题目并计算分数
-        let questions = [];
-        try {
-            questions = JSON.parse(exam.questions);
-        } catch (e) {
-            return res.status(500).json({ error: 'Invalid exam data' });
-        }
+        // 解析题目并计算分数（Prisma Json 类型自动反序列化）
+        const questions = (exam.questions as any[]) || [];
 
         let correctCount = 0;
         const results = questions.map((q: any, index: number) => {
@@ -326,7 +316,7 @@ router.post('/exams/:examId/submit', async (req: Request, res: Response) => {
             data: {
                 examId,
                 feederId: feeder.id,
-                answers: JSON.stringify(answers),
+                answers: answers,
                 score,
                 passed,
                 startedAt: new Date(startedAt)

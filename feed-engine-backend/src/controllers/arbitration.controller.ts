@@ -122,7 +122,7 @@ router.post('/cases', async (req: Request, res: Response) => {
                 initiatorType: 'FEEDER',
                 disputeReason,
                 description: description || '',
-                evidenceUrls: JSON.stringify(evidenceUrls || []),
+                evidenceUrls: evidenceUrls || [],
                 disputedFeederId,
                 caseType,
                 depositAmount: 50,
@@ -250,7 +250,7 @@ router.post('/cases/:id/vote', async (req: Request, res: Response) => {
                 arbitratorId: feeder.id,
                 vote,
                 reason: reason || null,
-                evidenceUrls: JSON.stringify(evidenceUrls || [])
+                evidenceUrls: evidenceUrls || []
             }
         });
 
@@ -313,7 +313,7 @@ router.post('/cases/:id/appeal', async (req: Request, res: Response) => {
                 caseId: id,
                 appellantId: feeder.id,
                 reason,
-                evidenceUrls: JSON.stringify(evidenceUrls || []),
+                evidenceUrls: evidenceUrls || [],
                 depositAmount: 100,
                 votingDeadline
             }
@@ -419,7 +419,7 @@ async function assignArbitrators(caseId: string, caseType: string): Promise<void
     await prisma.arbitrationCase.update({
         where: { id: caseId },
         data: {
-            arbitrators: JSON.stringify(arbitratorIds)
+            arbitrators: arbitratorIds
         }
     });
 }

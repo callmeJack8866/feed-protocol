@@ -156,7 +156,7 @@ router.post('/orders', adminAuth, async (req: Request, res: Response) => {
                 notionalAmount: parseFloat(notionalAmount),
                 requiredFeeders,
                 consensusThreshold,
-                specialConditions: JSON.stringify(specialConditions || []),
+                specialConditions: specialConditions || [],
                 rewardAmount: rewardAmount || calculateReward(notionalAmount),
                 feeAmount: feeAmount || 5,
                 grabTimeout: grabTimeout || 300,
@@ -233,7 +233,7 @@ router.post('/orders/batch', adminAuth, async (req: Request, res: Response) => {
                     notionalAmount: parseFloat(orderData.notionalAmount),
                     requiredFeeders,
                     consensusThreshold,
-                    specialConditions: JSON.stringify(orderData.specialConditions || []),
+                    specialConditions: orderData.specialConditions || [],
                     rewardAmount: orderData.rewardAmount || calculateReward(orderData.notionalAmount),
                     feeAmount: orderData.feeAmount || 5,
                     grabTimeout: orderData.grabTimeout || 300,
@@ -469,7 +469,7 @@ router.get('/unable-to-feed', adminAuth, async (req: Request, res: Response) => 
             },
             include: {
                 order: { select: { id: true, symbol: true, market: true, status: true, requiredFeeders: true } },
-                feeder: { select: { id: true, displayName: true, address: true, rank: true } }
+                feeder: { select: { id: true, nickname: true, address: true, rank: true } }
             },
             orderBy: { committedAt: 'desc' }
         });
@@ -478,9 +478,9 @@ router.get('/unable-to-feed', adminAuth, async (req: Request, res: Response) => 
             submissionId: r.id,
             orderId: r.orderId,
             feederId: r.feederId,
-            feederName: r.feeder.displayName,
+            feederName: r.feeder.nickname,
             feederAddress: r.feeder.address,
-            reason: r.priceHash.replace('UNABLE:', ''),
+            reason: r.priceHash?.replace('UNABLE:', '') || '',
             evidence: r.screenshot,
             reportedAt: r.committedAt,
             orderSymbol: r.order.symbol,
@@ -635,7 +635,6 @@ async function tryReassignFeeder(
         where: {
             id: { notIn: [...existingFeederIds, excludeFeederId] },
             isBanned: false,
-            status: 'ACTIVE',
             // 质押足够（F 级最低 100）
             stakedAmount: { gte: 100 }
         },
@@ -682,7 +681,7 @@ async function tryReassignFeeder(
     return {
         success: true,
         newFeederId: newFeeder.id,
-        newFeederName: newFeeder.displayName || newFeeder.address,
+        newFeederName: newFeeder.nickname || newFeeder.address,
         currentCount: currentCount + 1
     };
 }

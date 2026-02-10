@@ -83,15 +83,12 @@ router.get('/', async (req: Request, res: Response) => {
             });
 
             if (feeder) {
-                // 解析 JSON 字符串
-                const parseJson = (str: string): string[] => {
-                    try { return JSON.parse(str) || []; }
-                    catch { return []; }
-                };
+                // Prisma Json 类型已自动反序列化
+                const toArray = (val: any): string[] => Array.isArray(val) ? val : [];
 
-                const countries = parseJson(feeder.countries);
-                const exchanges = parseJson(feeder.exchanges);
-                const assetTypes = parseJson(feeder.assetTypes);
+                const countries = toArray(feeder.countries);
+                const exchanges = toArray(feeder.exchanges);
+                const assetTypes = toArray(feeder.assetTypes);
 
                 if (countries.length > 0) {
                     where.country = { in: countries };
@@ -657,14 +654,14 @@ router.post('/batch/submit', submitRateLimit, async (req: Request, res: Response
                 if (order.status !== 'GRABBED') throw new Error(`Order ${sub.orderId} status is ${order.status}, expected GRABBED`);
 
                 // 检查是否已提交
-                const existingSub = await prisma.submission.findFirst({
+                const existingSub = await prisma.priceSubmission.findFirst({
                     where: { orderId: sub.orderId, feederId: feeder.id }
                 });
 
                 if (existingSub?.priceHash) throw new Error(`Order ${sub.orderId} already submitted`);
 
                 // 创建或更新提交记录
-                const submission = await prisma.submission.upsert({
+                const submission = await prisma.priceSubmission.upsert({
                     where: {
                         orderId_feederId: { orderId: sub.orderId, feederId: feeder.id }
                     },

@@ -150,7 +150,7 @@ const EXAMS_DATA = [
     {
         courseIndex: 0, // 关联到第一门课程
         title: '喂价员入门考试',
-        questions: JSON.stringify([
+        questions: [
             {
                 question: 'Feed Engine 的主要目的是什么？',
                 options: ['提供游戏服务', '提供结算级价格数据', '交易加密货币', '发行 NFT'],
@@ -176,14 +176,14 @@ const EXAMS_DATA = [
                 options: ['取最高价', '取最低价', '取平均值', '根据名义本金选择算法（中位数/去极值）'],
                 correctAnswer: 3
             }
-        ]),
+        ],
         passingScore: 80,
         timeLimit: 10
     },
     {
         courseIndex: 1, // 关联到第二门课程
         title: '市场类型考试',
-        questions: JSON.stringify([
+        questions: [
             {
                 question: 'A股市场的特点是什么？',
                 options: ['无涨跌停限制', '有涨跌停板制度', '24/7 交易', '无午休时间'],
@@ -204,7 +204,7 @@ const EXAMS_DATA = [
                 options: ['流动性较低', '价格更稳定', '成交量更大', '不影响喂价'],
                 correctAnswer: 0
             }
-        ]),
+        ],
         passingScore: 75,
         timeLimit: 8
     }

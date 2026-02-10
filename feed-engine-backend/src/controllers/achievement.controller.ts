@@ -58,7 +58,7 @@ router.get('/', async (req: Request, res: Response) => {
             await prisma.achievement.createMany({
                 data: ACHIEVEMENTS_DATA.map(a => ({
                     ...a,
-                    conditions: JSON.stringify(a.conditions)
+                    conditions: a.conditions
                 }))
             });
             achievements = await prisma.achievement.findMany({ where });
@@ -202,12 +202,8 @@ router.post('/check', async (req: Request, res: Response) => {
         const newlyUnlocked: any[] = [];
 
         for (const achievement of pendingAchievements) {
-            let conditions: any = {};
-            try {
-                conditions = JSON.parse(achievement.conditions);
-            } catch (e) {
-                continue;
-            }
+            // Prisma Json 类型自动反序列化
+            const conditions: any = achievement.conditions || {};
 
             let shouldUnlock = false;
 

@@ -7,15 +7,22 @@ import { Order, Feeder } from '@prisma/client';
  */
 
 /**
- * 解析 JSON 字符串为数组
+ * 安全地将 Prisma Json 字段转为 string[]
+ * @param jsonValue Prisma Json 类型值（已自动反序列化）
  */
-function parseJsonArray(jsonStr: string): string[] {
-    try {
-        const arr = JSON.parse(jsonStr);
-        return Array.isArray(arr) ? arr : [];
-    } catch {
-        return [];
+function toStringArray(jsonValue: any): string[] {
+    if (Array.isArray(jsonValue)) {
+        return jsonValue as string[];
     }
+    if (typeof jsonValue === 'string') {
+        try {
+            const arr = JSON.parse(jsonValue);
+            return Array.isArray(arr) ? arr : [];
+        } catch {
+            return [];
+        }
+    }
+    return [];
 }
 
 /**
@@ -30,10 +37,10 @@ export async function matchOrdersForFeeder(feederId: string): Promise<Order[]> {
         return [];
     }
 
-    // 解析喂价员偏好
-    const countries = parseJsonArray(feeder.countries);
-    const exchanges = parseJsonArray(feeder.exchanges);
-    const assetTypes = parseJsonArray(feeder.assetTypes);
+    // 解析喂价员偏好 (PostgreSQL Json 类型自动反序列化)
+    const countries = toStringArray(feeder.countries);
+    const exchanges = toStringArray(feeder.exchanges);
+    const assetTypes = toStringArray(feeder.assetTypes);
 
     const where: any = {
         status: { in: ['OPEN', 'GRABBED'] },
@@ -88,7 +95,7 @@ export async function matchOrdersForFeeder(feederId: string): Promise<Order[]> {
 }
 
 /**
- * 为订单匹配合适的喂价员（内存过滤版本，适配 SQLite）
+ * 为订单匹配合适的喂价员（内存过滤版本）
  */
 export async function matchFeedersForOrder(orderId: string): Promise<Feeder[]> {
     const order = await prisma.order.findUnique({
@@ -99,7 +106,7 @@ export async function matchFeedersForOrder(orderId: string): Promise<Feeder[]> {
         return [];
     }
 
-    // SQLite 不支持数组查询，先获取所有非禁用喂价员
+    // 获取所有非禁用喂价员
     const allFeeders = await prisma.feeder.findMany({
         where: { isBanned: false },
         orderBy: [
@@ -112,9 +119,9 @@ export async function matchFeedersForOrder(orderId: string): Promise<Feeder[]> {
     const requiredRank = getRequiredRank(order.notionalAmount);
 
     return allFeeders.filter(feeder => {
-        const countries = parseJsonArray(feeder.countries);
-        const exchanges = parseJsonArray(feeder.exchanges);
-        const assetTypes = parseJsonArray(feeder.assetTypes);
+        const countries = toStringArray(feeder.countries);
+        const exchanges = toStringArray(feeder.exchanges);
+        const assetTypes = toStringArray(feeder.assetTypes);
 
         // 等级检查
         if (getRankLevel(feeder.rank) < getRankLevel(requiredRank)) {
@@ -159,3 +166,4 @@ function getRankLevel(rank: string): number {
     };
     return levels[rank] || 1;
 }
+

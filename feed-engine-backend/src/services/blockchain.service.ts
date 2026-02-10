@@ -443,5 +443,4 @@ export function generateNonce(): string {
     return ethers.hexlify(ethers.randomBytes(16));
 }
 
-// 导出合约地址供其他模块使用
-export { CONTRACT_ADDRESSES };
+

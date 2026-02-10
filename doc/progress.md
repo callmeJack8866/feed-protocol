@@ -1,5 +1,55 @@
 # Feed Engine 开发进度
 
+## [2026-02-10 15:34] P0-6 Redis 集成 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - `config/redis.ts`: 完整 Redis 客户端（自动重连×10 指数退避、连接状态追踪、健康检查 + ping 延迟、优雅关闭）
+  - `config/cache.ts` **[NEW]**: 通用缓存服务（Redis 优先 + 内存 Map 降级、get/set/del、SCAN 批量失效、`cacheOrFetch` 读穿模式）
+  - `config/rate-limiter.ts`: 从内存 Map 重写为 Redis INCR+PEXPIRE 滑动窗口限流（3 级策略不变：全局60/分、抢单5/分、提交1/10秒），Redis 不可用时自动降级内存
+  - `index.ts`: Redis 启动日志 + 健康检查增强（含 Redis 延迟）+ SIGTERM/SIGINT 优雅关闭
+  - `feeder.controller.ts`: 排行榜接口集成 `cacheOrFetch`（30 分钟 TTL）
+  - `season.controller.ts`: 赛季排行榜接口集成 `cacheOrFetch`（30 分钟 TTL）
+  - TypeScript 零错误编译 ✅
+- **[Next Step]**: 执行 P0-2 SIWE 钱包认证 / P0-3 合约部署套件 / P0-4 后端合约集成
+
+
+
+## [2026-02-10 15:20] P0-1 数据库迁移 + P0-5 Schema 补全 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - `schema.prisma`: provider `sqlite` → `postgresql`，10 个 String JSON 字段迁移为原生 `Json` 类型
+  - 新增 `RewardDistribution` model（70/10/10/10 奖励分配记录）
+  - 新增 `FeederPenaltyRecord` model（4 级惩罚记录）
+  - 添加 22 个查询性能索引（覆盖 status/rank/feederId/orderId/createdAt 等热点字段）
+  - `DailyTask.date` 使用 `@db.Date` PostgreSQL 原生日期类型
+  - `.env`: 更新 DATABASE_URL 为 PostgreSQL 连接串，新增 6 个合约地址 + BURN_ADDRESS
+  - 修复 10 个 TS 文件共 20+ 处 JSON.parse/stringify 兼容性问题
+  - 修复 6 个预存 bug：`displayName→nickname`(×2)、`status→isBanned`(×2)、`totalEarned→totalEarnings`、`prisma.submission→priceSubmission`
+  - Prisma generate ✅ + TypeScript 零错误编译 ✅
+- **[Next Step]**: 执行 P0-6 Redis 集成 或 P0-2 SIWE 钱包认证
+
+
+## [2026-02-10 15:08] 上线版本开发计划撰写完成
+
+- **[Status]**: Done
+- **[Changes]**:
+  - 通读方案全 20 章 1342 行，对照代码逐条审计
+  - 生成完成度矩阵（41 个功能点）、22 项任务清单（P0×6/P1×8/P2×8，共 50 人·天）
+  - 包含 10 天排期建议、30+ 项上线前检查清单、风险评估
+  - 输出文件: `doc/上线版本开发计划.md`
+- **[Next Step]**: 按计划优先级执行 P0 任务
+
+## [2026-02-10 15:10] Phase 4 P0/P1 缺口扫尾完成
+
+- **[Status]**: Done
+- **[Changes]**:
+  - 验证发现 P0 项全部已存在于代码：keccak256 哈希验证、质押最低要求（STAKE_REQUIREMENTS 7级）、单日上限（dailyLimit）、大师区权限（MASTER_ZONE_RANKS）
+  - 验证发现前端 P1 项已存在：附加条件高亮（CONDITION_STYLE_BASE 8种 + ConditionBadge 动画）、分区设计（QuestHallView 3-tab + filteredOrders 逻辑）
+  - **新建** `reward-distribution.service.ts`: 奖励分配 70/10/10/10（喂价员/平台/DAO/销毁）+ 数据库事务 + WebSocket 通知
+- **[Next Step]**: 四阶段审计修复全部完成 🎉 差距分析中所有 P0/P1 项已闭环
+
 ## [2026-02-10 14:55] Phase 3 优化增强完成
 
 - **[Status]**: Done
