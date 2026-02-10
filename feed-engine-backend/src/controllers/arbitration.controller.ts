@@ -371,7 +371,7 @@ router.post('/appeals/:id/vote', async (req: Request, res: Response) => {
 
         // 更新投票统计
         const voteWeight = parseFloat(feedAmount);
-        await prisma.appeal.update({
+        const updatedAppeal = await prisma.appeal.update({
             where: { id },
             data: {
                 supportVotes: vote === 'SUPPORT'
@@ -383,6 +383,9 @@ router.post('/appeals/:id/vote', async (req: Request, res: Response) => {
                 totalVoters: { increment: 1 }
             }
         });
+
+        // 检查是否达到解决条件
+        await checkAndResolveAppeal(id);
 
         res.json({ success: true, vote: daoVote });
     } catch (error: any) {
@@ -457,19 +460,172 @@ async function checkAndResolveCase(caseId: string): Promise<void> {
         verdictReason = '票数相等，无定论';
     }
 
+    // 计算押金分配
+    const depositAmount = arbitrationCase.depositAmount;
+    const depositReturned = verdict === 'INITIATOR_WIN';
+
+    // 更新案件状态
     await prisma.arbitrationCase.update({
         where: { id: caseId },
         data: {
             status: 'RESOLVED',
             verdict,
             verdictReason,
-            depositReturned: verdict === 'INITIATOR_WIN',
+            depositReturned,
             resolvedAt: new Date()
         }
     });
 
+    // 分配仲裁费用给投票正确的仲裁员
+    await distributeArbitrationFees(caseId, votes, verdict, depositAmount, depositReturned);
+
     // 广播结果
     io.emit('arbitration:resolved', { caseId, verdict });
+}
+
+/**
+ * 分配仲裁费用
+ * 按照实施方案：
+ * - 发起方胜诉：返还押金，被告方罚款的一部分分配给仲裁员
+ * - 发起方败诉：押金的一部分分配给仲裁员
+ */
+async function distributeArbitrationFees(
+    caseId: string,
+    votes: any[],
+    verdict: string,
+    depositAmount: number,
+    depositReturned: boolean
+): Promise<void> {
+    // 确定正确的投票方向
+    const correctVote = verdict === 'INITIATOR_WIN' ? 'SUPPORT_INITIATOR' : 'REJECT_INITIATOR';
+
+    // 获取投票正确的仲裁员
+    const correctVoters = votes.filter(v => v.vote === correctVote);
+
+    if (correctVoters.length === 0) {
+        console.log('No correct voters to distribute fees');
+        return;
+    }
+
+    // 计算分配金额
+    // 如果发起方败诉，70% 押金分配给仲裁员
+    // 如果发起方胜诉，假设有被告方罚款（这里简化处理）
+    const feePool = depositReturned ? 0 : depositAmount * 0.7;
+    const feePerArbitrator = feePool / correctVoters.length;
+
+    console.log(`📊 仲裁费用分配: 案件 ${caseId}`);
+    console.log(`   - 正确投票数: ${correctVoters.length}`);
+    console.log(`   - 费用池: ${feePool} FEED`);
+    console.log(`   - 每人分配: ${feePerArbitrator} FEED`);
+
+    // 记录费用分配（这里简化为日志，实际需要更新链上或数据库）
+    for (const voter of correctVoters) {
+        try {
+            // 更新仲裁员的奖励记录
+            await prisma.feeder.update({
+                where: { id: voter.arbitratorId },
+                data: {
+                    // 假设有一个 arbitrationRewards 字段
+                    // 这里使用 XP 奖励作为替代
+                    xp: { increment: Math.floor(feePerArbitrator) }
+                }
+            });
+
+            console.log(`   ✅ 仲裁员 ${voter.arbitratorId} 获得 ${feePerArbitrator} 奖励`);
+        } catch (error) {
+            console.error(`   ❌ 分配失败: ${voter.arbitratorId}`, error);
+        }
+    }
+
+    // 惩罚投票错误的仲裁员
+    const incorrectVoters = votes.filter(v => v.vote !== correctVote && v.vote !== 'ABSTAIN');
+    for (const voter of incorrectVoters) {
+        try {
+            await prisma.feeder.update({
+                where: { id: voter.arbitratorId },
+                data: {
+                    xp: { decrement: 10 } // 轻微 XP 惩罚
+                }
+            });
+            console.log(`   ⚠️ 仲裁员 ${voter.arbitratorId} 投票错误，扣除 10 XP`);
+        } catch (error) {
+            console.error(`   ❌ 惩罚失败: ${voter.arbitratorId}`, error);
+        }
+    }
+}
+
+/**
+ * 检查并解决 DAO 申诉
+ * 条件：支持票权重 > 反对票权重 * 2（超过2/3支持）
+ */
+async function checkAndResolveAppeal(appealId: string): Promise<void> {
+    const appeal = await prisma.appeal.findUnique({
+        where: { id: appealId },
+        include: { case: true }
+    });
+
+    if (!appeal || appeal.status !== 'VOTING') {
+        return;
+    }
+
+    const totalVotes = appeal.supportVotes + appeal.rejectVotes;
+
+    // 需要至少1000 FEED投票参与
+    const minVoteThreshold = 1000;
+    if (totalVotes < minVoteThreshold) {
+        console.log(`申诉 ${appealId} 投票权重不足: ${totalVotes}/${minVoteThreshold}`);
+        return;
+    }
+
+    // 检查是否达到2/3多数
+    const supportRatio = appeal.supportVotes / totalVotes;
+    const rejectRatio = appeal.rejectVotes / totalVotes;
+
+    let verdict: string;
+    let verdictReason: string;
+
+    if (supportRatio >= 0.67) {
+        verdict = 'APPEAL_UPHELD'; // 申诉成功
+        verdictReason = `支持票 ${appeal.supportVotes.toFixed(2)} (${(supportRatio * 100).toFixed(1)}%) 达到2/3多数`;
+    } else if (rejectRatio >= 0.67) {
+        verdict = 'APPEAL_REJECTED'; // 申诉失败
+        verdictReason = `反对票 ${appeal.rejectVotes.toFixed(2)} (${(rejectRatio * 100).toFixed(1)}%) 达到2/3多数`;
+    } else {
+        // 未达到2/3多数，继续投票
+        console.log(`申诉 ${appealId} 未达到多数: 支持 ${(supportRatio * 100).toFixed(1)}% 反对 ${(rejectRatio * 100).toFixed(1)}%`);
+        return;
+    }
+
+    // 更新申诉状态
+    await prisma.appeal.update({
+        where: { id: appealId },
+        data: {
+            status: 'RESOLVED',
+            resolvedAt: new Date()
+        } as any // 扩展字段通过 as any 处理
+    });
+
+    // 如果申诉成功，需要推翻原仲裁结果
+    if (verdict === 'APPEAL_UPHELD' && appeal.case) {
+        const originalVerdict = appeal.case.verdict;
+        const newVerdict = originalVerdict === 'INITIATOR_WIN' ? 'INITIATOR_LOSE' : 'INITIATOR_WIN';
+
+        await prisma.arbitrationCase.update({
+            where: { id: appeal.caseId },
+            data: {
+                verdict: newVerdict,
+                verdictReason: `DAO 申诉推翻原判决: ${verdictReason}`,
+                depositReturned: newVerdict === 'INITIATOR_WIN'
+            }
+        });
+
+        console.log(`🔄 申诉 ${appealId} 成功: 原判决 ${originalVerdict} → ${newVerdict}`);
+    }
+
+    // 广播申诉结果
+    io.emit('appeal:resolved', { appealId, verdict });
+
+    console.log(`⚖️ 申诉 ${appealId} 已解决: ${verdict}`);
 }
 
 export default router;

@@ -1,6 +1,7 @@
 import prisma from '../config/database';
 import { calculateReward, updateFeederRank, updateFeederStats } from './rank.service';
 import { detectAndUnlockAchievements } from './achievement-detection.service';
+import { evaluateAndExecutePenalty } from './penalty.service';
 
 /**
  * 共识计算服务
@@ -168,6 +169,13 @@ export async function processOrderConsensus(orderId: string): Promise<ConsensusR
         // 更新喂价员状态
         await updateFeederRank(submission.feederId, rewardResult.xp);
         await updateFeederStats(submission.feederId, deviation);
+
+        // 惩罚检测：偏差超过1%时触发分级惩罚
+        if (deviation > 1.0) {
+            evaluateAndExecutePenalty(submission.feederId, deviation, orderId).catch(err => {
+                console.error(`Penalty execution error for feeder ${submission.feederId}:`, err);
+            });
+        }
 
         // 记录历史
         await prisma.feedHistory.create({

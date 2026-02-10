@@ -14,26 +14,27 @@ import PreferencesModal from './components/PreferencesModal';
 import { FeederProfile, FeederRank, FeedOrder, ViewType } from './types';
 import { MOCK_ORDERS, MOCK_HISTORY } from './constants';
 import { motion, AnimatePresence, useTransform, useMotionValue, useSpring, MotionValue } from 'framer-motion';
+import { useTranslation } from './i18n';
 
 // Separate component for Orbital Rings to fix Hook violations
-const OrbitalRing: React.FC<{ 
-  index: number; 
-  springX: MotionValue<number>; 
-  springY: MotionValue<number> 
+const OrbitalRing: React.FC<{
+  index: number;
+  springX: MotionValue<number>;
+  springY: MotionValue<number>
 }> = ({ index, springX, springY }) => {
   const x = useTransform(springX, [-500, 500], [index * -15, index * 15]);
   const y = useTransform(springY, [-500, 500], [index * -15, index * 15]);
   const rotate = index % 2 === 0 ? 360 : -360;
 
   return (
-    <motion.div 
+    <motion.div
       animate={{ rotate }}
       transition={{ duration: 40 + index * 15, repeat: Infinity, ease: "linear" }}
       className="absolute rounded-full border border-dashed border-cyan-500/10 shadow-[inset_0_0_50px_rgba(34,211,238,0.05)]"
-      style={{ 
-        x, y, 
-        width: 450 + index * 280, 
-        height: 450 + index * 280 
+      style={{
+        x, y,
+        width: 450 + index * 280,
+        height: 450 + index * 280
       }}
     />
   );
@@ -41,11 +42,11 @@ const OrbitalRing: React.FC<{
 
 const DigitCounter: React.FC<{ label: string; value: string; colorClass: string; icon?: string }> = ({ label, value, colorClass, icon }) => {
   const [displayValue, setDisplayValue] = useState(value);
-  
+
   useEffect(() => {
     let iteration = 0;
     const interval = setInterval(() => {
-      setDisplayValue(prev => 
+      setDisplayValue(prev =>
         prev.split("")
           .map((char, index) => {
             if (index < iteration) return value[index];
@@ -55,7 +56,7 @@ const DigitCounter: React.FC<{ label: string; value: string; colorClass: string;
           .join("")
       );
       if (iteration >= value.length) clearInterval(interval);
-      iteration += 1/2;
+      iteration += 1 / 2;
     }, 40);
     return () => clearInterval(interval);
   }, [value]);
@@ -63,10 +64,10 @@ const DigitCounter: React.FC<{ label: string; value: string; colorClass: string;
   return (
     <div className="space-y-3 group perspective-1000">
       <div className="flex items-center gap-3 px-2">
-         <div className={`w-1 h-1 rounded-full ${colorClass.replace('text-', 'bg-')} animate-pulse`} />
-         <p className={`text-[10px] font-black uppercase tracking-[0.8em] transition-colors duration-500 ${colorClass} opacity-50 group-hover:opacity-100`}>
-           {label}
-         </p>
+        <div className={`w-1 h-1 rounded-full ${colorClass.replace('text-', 'bg-')} animate-pulse`} />
+        <p className={`text-[10px] font-black uppercase tracking-[0.8em] transition-colors duration-500 ${colorClass} opacity-50 group-hover:opacity-100`}>
+          {label}
+        </p>
       </div>
       <div className="flex items-center gap-6 justify-center">
         {icon && (
@@ -94,52 +95,52 @@ const CosmicHero: React.FC<{ springX: MotionValue<number>; springY: MotionValue<
         {[1, 2, 3, 4].map(i => (
           <OrbitalRing key={i} index={i} springX={springX} springY={springY} />
         ))}
-        
-        <motion.div 
+
+        <motion.div
           style={{ x: coreX, y: coreY, rotateX: craftRotateX, rotateY: craftRotateY }}
           className="relative w-[500px] h-[500px] flex items-center justify-center"
         >
-          <motion.div 
+          <motion.div
             animate={{ scale: [1, 1.25, 1], opacity: [0.1, 0.4, 0.1] }}
             transition={{ duration: 5, repeat: Infinity }}
             className="absolute w-full h-full bg-cyan-500/10 blur-[150px] rounded-full"
           />
-          <motion.div 
+          <motion.div
             animate={{ y: [0, -20, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
             className="relative z-10"
           >
-            <img 
-               src="https://pngimg.com/uploads/spaceship/spaceship_PNG46.png" 
-               className="w-[550px] drop-shadow-[0_60px_100px_rgba(34,211,238,0.3)] filter contrast-125" 
-               alt="hero craft"
+            <img
+              src="https://pngimg.com/uploads/spaceship/spaceship_PNG46.png"
+              className="w-[550px] drop-shadow-[0_60px_100px_rgba(34,211,238,0.3)] filter contrast-125"
+              alt="hero craft"
             />
           </motion.div>
         </motion.div>
       </div>
 
       <div className="relative z-20 space-y-20">
-         <div className="space-y-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center"
-            >
-               <h2 className="text-[160px] font-black font-orbitron tracking-tighter italic uppercase text-white leading-none drop-shadow-[0_30px_60px_rgba(0,0,0,1)] selection:bg-cyan-500">
-                  OWL<span className="text-cyan-400 glow-cyan">VERSE</span>
-               </h2>
-               <div className="flex items-center gap-10 w-full max-w-4xl opacity-40">
-                  <div className="h-px flex-1 bg-gradient-to-r from-transparent to-cyan-500" />
-                  <p className="text-[10px] font-black tracking-[1.5em] text-cyan-400">COMMAND_CENTER_V4</p>
-                  <div className="h-px flex-1 bg-gradient-to-l from-transparent to-cyan-500" />
-               </div>
-            </motion.div>
-         </div>
+        <div className="space-y-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col items-center"
+          >
+            <h2 className="text-[160px] font-black font-orbitron tracking-tighter italic uppercase text-white leading-none drop-shadow-[0_30px_60px_rgba(0,0,0,1)] selection:bg-cyan-500">
+              OWL<span className="text-cyan-400 glow-cyan">VERSE</span>
+            </h2>
+            <div className="flex items-center gap-10 w-full max-w-4xl opacity-40">
+              <div className="h-px flex-1 bg-gradient-to-r from-transparent to-cyan-500" />
+              <p className="text-[10px] font-black tracking-[1.5em] text-cyan-400">COMMAND_CENTER_V4</p>
+              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-cyan-500" />
+            </div>
+          </motion.div>
+        </div>
 
-         <div className="flex flex-col md:flex-row items-center justify-center gap-32">
-            <DigitCounter label="Global Hash Power" value="2122520" colorClass="text-cyan-400" />
-            <DigitCounter label="Total XTTA Secured" value="2565336" colorClass="text-amber-500" icon="T" />
-         </div>
+        <div className="flex flex-col md:flex-row items-center justify-center gap-32">
+          <DigitCounter label="Global Hash Power" value="2122520" colorClass="text-cyan-400" />
+          <DigitCounter label="Total XTTA Secured" value="2565336" colorClass="text-amber-500" icon="T" />
+        </div>
       </div>
     </section>
   );
@@ -155,6 +156,8 @@ const QuestHallView: React.FC<{
   springY: MotionValue<number>;
   onMouseMove: (e: React.MouseEvent) => void;
 }> = ({ filteredOrders, activeTab, setActiveTab, setShowPrefs, setViewingOrder, springX, springY, onMouseMove }) => {
+  const { t } = useTranslation();
+
   return (
     <div onMouseMove={onMouseMove} className="space-y-24 max-w-7xl mx-auto pb-40 relative">
       <CosmicHero springX={springX} springY={springY} />
@@ -163,18 +166,17 @@ const QuestHallView: React.FC<{
         <div className="flex bg-black/80 p-3 rounded-[3.5rem] border border-white/5 backdrop-blur-3xl shadow-[0_30px_80px_rgba(0,0,0,0.8)] relative group overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           {[
-            { id: 'beginner', label: 'Primary Sync', icon: '🌀' },
-            { id: 'competitive', label: 'Combat Feed', icon: '🔥' },
-            { id: 'master', label: 'Zenith Oracle', icon: '💎' }
+            { id: 'beginner', label: 'Primary Sync', icon: '🌀', desc: '新手训练场 · F-D级 · <10万U', activeColor: 'bg-gradient-to-r from-cyan-500 to-blue-500 text-black shadow-[0_0_50px_rgba(34,211,238,0.4)]' },
+            { id: 'competitive', label: 'Combat Feed', icon: '🔥', desc: '竞技场 · C-B级 · 10万-100万U', activeColor: 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-[0_0_50px_rgba(249,115,22,0.4)]' },
+            { id: 'master', label: 'Zenith Oracle', icon: '💎', desc: '大师区 · A-S级 · >100万U', activeColor: 'bg-gradient-to-r from-amber-400 to-yellow-300 text-black shadow-[0_0_50px_rgba(251,191,36,0.4)]' }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-14 py-6 rounded-[2.8rem] text-[11px] font-black uppercase tracking-[0.4em] transition-all flex items-center gap-5 group relative z-10 ${
-                activeTab === tab.id 
-                ? 'bg-white text-black shadow-[0_0_50px_rgba(255,255,255,0.4)] scale-105' 
+              className={`px-14 py-6 rounded-[2.8rem] text-[11px] font-black uppercase tracking-[0.4em] transition-all flex items-center gap-5 group relative z-10 ${activeTab === tab.id
+                ? `${tab.activeColor} scale-105`
                 : 'text-slate-500 hover:text-cyan-400'
-              }`}
+                }`}
             >
               <span className="text-2xl group-hover:scale-125 transition-transform">{tab.icon}</span>
               {tab.label}
@@ -183,14 +185,48 @@ const QuestHallView: React.FC<{
         </div>
 
         <div className="flex gap-8">
-           <button onClick={() => setShowPrefs(true)} className="w-24 h-24 rounded-[3.5rem] bg-black/60 border border-white/10 flex items-center justify-center text-3xl hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-all group relative overflow-hidden">
-              <span className="group-hover:rotate-180 transition-transform duration-700 relative z-10">⚙️</span>
-           </button>
-           <button className="px-16 py-6 rounded-[3.5rem] bg-cyan-500 text-black font-black font-orbitron text-[13px] uppercase tracking-[0.4em] italic shadow-[0_30px_60px_rgba(34,211,238,0.4)] hover:bg-cyan-400 hover:scale-105 active:scale-95 transition-all relative overflow-hidden group">
-              Initiate Neural Scan
-           </button>
+          <button onClick={() => setShowPrefs(true)} className="w-24 h-24 rounded-[3.5rem] bg-black/60 border border-white/10 flex items-center justify-center text-3xl hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-all group relative overflow-hidden">
+            <span className="group-hover:rotate-180 transition-transform duration-700 relative z-10">⚙️</span>
+          </button>
+          <button className="px-16 py-6 rounded-[3.5rem] bg-cyan-500 text-black font-black font-orbitron text-[13px] uppercase tracking-[0.4em] italic shadow-[0_30px_60px_rgba(34,211,238,0.4)] hover:bg-cyan-400 hover:scale-105 active:scale-95 transition-all relative overflow-hidden group">
+            Initiate Neural Scan
+          </button>
         </div>
       </section>
+
+      {/* 分区描述横幅 */}
+      <motion.div
+        key={activeTab}
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="px-14"
+      >
+        <div className={`flex items-center justify-between px-10 py-5 rounded-[2rem] border backdrop-blur-sm ${activeTab === 'beginner' ? 'bg-cyan-500/5 border-cyan-500/10' :
+          activeTab === 'competitive' ? 'bg-orange-500/5 border-orange-500/10' :
+            'bg-amber-500/5 border-amber-500/10'
+          }`}>
+          <div className="flex items-center gap-6">
+            <span className="text-3xl">{activeTab === 'beginner' ? '🌀' : activeTab === 'competitive' ? '🔥' : '💎'}</span>
+            <div>
+              <p className={`text-sm font-black uppercase tracking-widest ${activeTab === 'beginner' ? 'text-cyan-400' : activeTab === 'competitive' ? 'text-orange-400' : 'text-amber-400'
+                }`}>
+                {activeTab === 'beginner' ? t.zone.beginner : activeTab === 'competitive' ? t.zone.competitive : t.zone.master}
+              </p>
+              <p className="text-[10px] text-slate-500 font-bold tracking-wider mt-1">
+                {activeTab === 'beginner' ? t.zone.beginnerDesc :
+                  activeTab === 'competitive' ? t.zone.competitiveDesc :
+                    t.zone.masterDesc}
+              </p>
+            </div>
+          </div>
+          <div className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === 'beginner' ? 'bg-cyan-500/10 text-cyan-400' :
+            activeTab === 'competitive' ? 'bg-orange-500/10 text-orange-400' :
+              'bg-amber-500/10 text-amber-400'
+            }`}>
+            {filteredOrders.length} {t.zone.quests}
+          </div>
+        </div>
+      </motion.div>
 
       <div className="px-14">
         <AnimatePresence mode="popLayout">
@@ -210,14 +246,14 @@ const QuestHallView: React.FC<{
             </motion.div>
           ) : (
             <div className="py-80 flex flex-col items-center text-center space-y-12 opacity-30">
-               <motion.div 
-                  animate={{ rotate: 360, scale: [1, 1.1, 1] }}
-                  transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-                  className="text-[180px] filter drop-shadow-[0_0_80px_rgba(34,211,238,0.2)]"
-               >
-                  🛰️
-               </motion.div>
-               <p className="font-orbitron font-black text-4xl uppercase tracking-[0.8em] text-cyan-400 glow-cyan">VOID_DETECTED</p>
+              <motion.div
+                animate={{ rotate: 360, scale: [1, 1.1, 1] }}
+                transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+                className="text-[180px] filter drop-shadow-[0_0_80px_rgba(34,211,238,0.2)]"
+              >
+                🛰️
+              </motion.div>
+              <p className="font-orbitron font-black text-4xl uppercase tracking-[0.8em] text-cyan-400 glow-cyan">VOID_DETECTED</p>
             </div>
           )}
         </AnimatePresence>
@@ -247,7 +283,7 @@ const App: React.FC = () => {
   const [activeOrder, setActiveOrder] = useState<FeedOrder | null>(null);
   const [showPrefs, setShowPrefs] = useState(false);
   const [activeTab, setActiveTab] = useState<'beginner' | 'competitive' | 'master'>('beginner');
-  
+
   // Parallax Values - Correctly placed at top level
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -288,11 +324,11 @@ const App: React.FC = () => {
 
   const filteredOrders = useMemo(() => {
     return orders.filter(order => {
-      const matchesTab = 
+      const matchesTab =
         (activeTab === 'beginner' && order.notionalAmount < 100000) ||
         (activeTab === 'competitive' && order.notionalAmount >= 100000 && order.notionalAmount < 1000000) ||
         (activeTab === 'master' && order.notionalAmount >= 1000000);
-      
+
       if (!matchesTab) return false;
       return prefs.countries.includes(order.country) && prefs.exchanges.includes(order.exchange) && prefs.assets.includes(order.market);
     });
@@ -302,7 +338,7 @@ const App: React.FC = () => {
     switch (activeView) {
       case 'Quest Hall':
         return (
-          <QuestHallView 
+          <QuestHallView
             filteredOrders={filteredOrders}
             activeTab={activeTab}
             setActiveTab={setActiveTab}

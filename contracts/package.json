@@ -1,0 +1,20 @@
+{
+    "name": "feed-engine-contracts",
+    "version": "1.0.0",
+    "description": "Feed Engine Smart Contracts — BSC",
+    "scripts": {
+        "compile": "hardhat compile",
+        "test": "hardhat test",
+        "deploy:testnet": "hardhat run scripts/deploy.ts --network bscTestnet",
+        "deploy:mainnet": "hardhat run scripts/deploy.ts --network bscMainnet",
+        "verify": "hardhat verify"
+    },
+    "devDependencies": {
+        "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+        "@openzeppelin/contracts": "^5.1.0",
+        "@openzeppelin/contracts-upgradeable": "^5.1.0",
+        "@openzeppelin/hardhat-upgrades": "^3.0.0",
+        "hardhat": "^2.19.0",
+        "dotenv": "^16.3.0"
+    }
+}

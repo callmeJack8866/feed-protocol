@@ -26,6 +26,7 @@ import { initBlockchain } from './services/blockchain.service';
 import { initEventListener } from './services/event-listener.service';
 import { startScheduler } from './services/cron.service';
 import { initNFTService } from './services/nft-badge.service';
+import { seedTrainingData } from './seeds/training.seed';
 
 const app = express();
 const httpServer = createServer(app);
@@ -86,6 +87,11 @@ httpServer.listen(PORT, () => {
 
     // 初始化 NFT 服务
     initNFTService();
+
+    // 初始化培训数据（仅首次启动时创建）
+    seedTrainingData().catch(err => {
+        console.error('培训数据初始化失败:', err);
+    });
 });
 
 export { io };

@@ -1,8 +1,26 @@
 import { Router, Request, Response } from 'express';
+import { ethers } from 'ethers';
 import prisma from '../config/database';
 import { matchOrdersForFeeder } from '../services/matching.service';
 import { processOrderConsensus } from '../services/consensus.service';
+import { evaluateAndExecutePenalty, checkBanStatus } from '../services/penalty.service';
 import { io } from '../index';
+
+/**
+ * 质押要求配置（与 staking.controller.ts 保持一致）
+ */
+const STAKE_REQUIREMENTS: Record<string, { minStake: number; dailyLimit: number }> = {
+    'F': { minStake: 100, dailyLimit: 10 },
+    'E': { minStake: 500, dailyLimit: 20 },
+    'D': { minStake: 1000, dailyLimit: 30 },
+    'C': { minStake: 2500, dailyLimit: 50 },
+    'B': { minStake: 5000, dailyLimit: 80 },
+    'A': { minStake: 10000, dailyLimit: 120 },
+    'S': { minStake: 25000, dailyLimit: Infinity }
+};
+
+/** 等级权限：大师区仅限 A/S 级 */
+const MASTER_ZONE_RANKS = ['A', 'S'];
 
 const router = Router();
 
@@ -143,6 +161,50 @@ router.post('/:id/grab', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Feeder not found' });
         }
 
+        // ============================
+        // P0 验证：封禁、质押、限额、等级
+        // ============================
+
+        // 1. 封禁检查
+        const banStatus = await checkBanStatus(feeder.id);
+        if (banStatus.banned) {
+            return res.status(403).json({
+                error: '您已被禁止抢单',
+                banUntil: banStatus.banUntil,
+                reason: banStatus.reason
+            });
+        }
+
+        // 2. 质押最低要求检查
+        const rankReq = STAKE_REQUIREMENTS[feeder.rank];
+        if (rankReq && feeder.stakedAmount < rankReq.minStake) {
+            return res.status(403).json({
+                error: '质押不足，无法抢单',
+                currentStake: feeder.stakedAmount,
+                minRequired: rankReq.minStake,
+                rank: feeder.rank
+            });
+        }
+
+        // 3. 每日抢单上限检查
+        if (rankReq && rankReq.dailyLimit !== Infinity) {
+            const todayStart = new Date(new Date().toDateString());
+            const todayGrabs = await prisma.priceSubmission.count({
+                where: {
+                    feederId: feeder.id,
+                    createdAt: { gte: todayStart }
+                }
+            });
+            if (todayGrabs >= rankReq.dailyLimit) {
+                return res.status(429).json({
+                    error: '今日抢单已达上限',
+                    currentCount: todayGrabs,
+                    dailyLimit: rankReq.dailyLimit,
+                    rank: feeder.rank
+                });
+            }
+        }
+
         // 查找订单
         const order = await prisma.order.findUnique({
             where: { id },
@@ -151,6 +213,15 @@ router.post('/:id/grab', async (req: Request, res: Response) => {
 
         if (!order) {
             return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // 4. 大师区等级权限检查（名义本金 > 100万U 仅限 A/S 级）
+        if (order.notionalAmount >= 1000000 && !MASTER_ZONE_RANKS.includes(feeder.rank)) {
+            return res.status(403).json({
+                error: '大师区订单仅限 A/S 级喂价员',
+                currentRank: feeder.rank,
+                requiredRanks: MASTER_ZONE_RANKS
+            });
         }
 
         if (order.status !== 'OPEN' && order.status !== 'GRABBED') {
@@ -259,10 +330,49 @@ router.post('/:id/reveal', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Feeder not found' });
         }
 
-        // 验证哈希 (简化版，实际需要 keccak256)
-        // TODO: 实现完整的哈希验证
+        // ============================
+        // Commit-Reveal 哈希验证
+        // ============================
 
-        // 更新提交记录
+        // 1. 获取 commit 阶段存储的 priceHash
+        const existingSubmission = await prisma.priceSubmission.findUnique({
+            where: {
+                orderId_feederId: { orderId: id, feederId: feeder.id }
+            }
+        });
+
+        if (!existingSubmission) {
+            return res.status(404).json({ error: 'No submission found. Must grab order first.' });
+        }
+
+        if (!existingSubmission.priceHash) {
+            return res.status(400).json({ error: 'No price hash committed. Must submit hash first.' });
+        }
+
+        if (existingSubmission.revealedPrice !== null) {
+            return res.status(400).json({ error: 'Price already revealed' });
+        }
+
+        // 2. 使用 keccak256 计算哈希并比对
+        //    哈希算法: keccak256(abi.encodePacked(price_in_wei, salt))
+        //    price_in_wei = price * 1e18 (转为整数避免浮点误差)
+        const priceWei = BigInt(Math.round(parseFloat(price) * 1e18));
+        const computedHash = ethers.solidityPackedKeccak256(
+            ['uint256', 'bytes32'],
+            [priceWei, salt]
+        );
+
+        if (computedHash !== existingSubmission.priceHash) {
+            console.warn(`⚠️ Hash mismatch for order ${id}, feeder ${feeder.id}`);
+            console.warn(`   Committed: ${existingSubmission.priceHash}`);
+            console.warn(`   Computed:  ${computedHash}`);
+            return res.status(400).json({
+                error: 'Hash verification failed. Revealed price/salt does not match committed hash.',
+                detail: 'keccak256(abi.encodePacked(price_wei, salt)) !== committedHash'
+            });
+        }
+
+        // 3. 哈希验证通过，更新提交记录
         const submission = await prisma.priceSubmission.update({
             where: {
                 orderId_feederId: { orderId: id, feederId: feeder.id }

@@ -87,7 +87,7 @@ export function calculateRank(currentXp: number): string {
 export async function updateFeederRank(
     feederId: string,
     xpChange: number
-): Promise<{ newXp: number; newRank: string; rankUp: boolean }> {
+): Promise<{ newXp: number; newRank: string; rankUp: boolean; rankDown: boolean; oldRank: string }> {
     const feeder = await prisma.feeder.findUnique({
         where: { id: feederId }
     });
@@ -96,9 +96,13 @@ export async function updateFeederRank(
         throw new Error('Feeder not found');
     }
 
+    const oldRank = feeder.rank;
     const newXp = Math.max(0, feeder.xp + xpChange);
     const newRank = calculateRank(newXp);
-    const rankUp = RANK_ORDER.indexOf(newRank) > RANK_ORDER.indexOf(feeder.rank);
+    const oldRankIndex = RANK_ORDER.indexOf(oldRank);
+    const newRankIndex = RANK_ORDER.indexOf(newRank);
+    const rankUp = newRankIndex > oldRankIndex;
+    const rankDown = newRankIndex < oldRankIndex;
 
     await prisma.feeder.update({
         where: { id: feederId },
@@ -108,7 +112,14 @@ export async function updateFeederRank(
         }
     });
 
-    return { newXp, newRank, rankUp };
+    // 记录升降级日志
+    if (rankUp) {
+        console.log(`🎉 Feeder ${feederId} ranked up: ${oldRank} → ${newRank}`);
+    } else if (rankDown) {
+        console.log(`⚠️ Feeder ${feederId} ranked down: ${oldRank} → ${newRank}`);
+    }
+
+    return { newXp, newRank, rankUp, rankDown, oldRank };
 }
 
 /**
