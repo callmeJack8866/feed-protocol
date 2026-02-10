@@ -115,4 +115,89 @@ export interface TranslationKeys {
         settings: string;
         language: string;
     };
+
+    // ======== 仪表盘 ========
+    dashboard: {
+        title: string;
+        totalFeeds: string;
+        accuracy: string;
+        xpProgress: string;
+        currentRank: string;
+        nextRank: string;
+        balance: string;
+        staked: string;
+        recentFeeds: string;
+        noHistory: string;
+        deviation: string;
+        reward: string;
+    };
+
+    // ======== 质押 ========
+    staking: {
+        title: string;
+        stake: string;
+        unstake: string;
+        claim: string;
+        currentStake: string;
+        minRequired: string;
+        lockPeriod: string;
+        rewards: string;
+        apr: string;
+        stakeType: string;
+    };
+
+    // ======== 排行榜 ========
+    leaderboard: {
+        title: string;
+        rank: string;
+        feeder: string;
+        feeds: string;
+        accuracy: string;
+        xp: string;
+    };
+
+    // ======== 培训 ========
+    training: {
+        title: string;
+        courses: string;
+        progress: string;
+        startCourse: string;
+        exam: string;
+        passed: string;
+        failed: string;
+        xpReward: string;
+    };
+
+    // ======== 仲裁 ========
+    arbitration: {
+        title: string;
+        cases: string;
+        vote: string;
+        evidence: string;
+        appeal: string;
+        support: string;
+        oppose: string;
+        pending: string;
+    };
+
+    // ======== 库存 ========
+    inventory: {
+        title: string;
+        nfts: string;
+        badges: string;
+        licenses: string;
+        empty: string;
+        rarity: string;
+        unlockedAt: string;
+    };
+
+    // ======== 钱包 ========
+    wallet: {
+        connect: string;
+        disconnect: string;
+        switchChain: string;
+        wrongChain: string;
+        noMetamask: string;
+        signing: string;
+    };
 }

@@ -1,5 +1,21 @@
 # Feed Engine 开发进度
 
+## [2026-02-10 16:25] P1-7 i18n + P1-8 Zustand 前端迁移 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - **P1-8 Zustand 状态管理**：
+    - `store.ts` **[NEW]**：3 个 Zustand store（`useAuthStore` JWT持久化 / `useFeederStore` 喂价员数据 / `useUIStore` 视图控制）
+    - `App.tsx`：从 6 个 `useState` 迁移到 Zustand，消除 props drilling
+    - 安装 `zustand` 依赖
+  - **JWT/SIWE API 层**：
+    - `services/api.ts` 全面升级 — JWT Bearer 优先认证 + SIWE 流程（`getNonce`/`verifySIWE`/`buildSIWEMessage`）+ 401 自动清除 + token 刷新 + 新增 `getExam`/`getMySeasonRank` 函数
+  - **P1-7 i18n 扩展**：
+    - `i18n/types.ts`：新增 7 个翻译键模块（dashboard/staking/leaderboard/training/arbitration/inventory/wallet）
+    - 8 个翻译文件（zh/en/zhTW/ja/ko/vi/ar/ru）各添加 7 模块，总计 56 个新翻译块
+  - TypeScript **零错误编译** ✅
+- **[Next Step]**: P1 仅剩 P1-5 NST 协议集成接口。可进入 P2 优化或启动全面测试。
+
 ## [2026-02-10 15:53] P1 后端逻辑补全 ✅
 
 - **[Status]**: Done

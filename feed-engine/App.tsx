@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Layout from './components/Layout';
 import OrderCard from './components/OrderCard';
 import FeedModal from './components/FeedModal';
@@ -11,10 +11,11 @@ import TrainingView from './components/TrainingView';
 import StakingView from './components/StakingView';
 import ArbitrationView from './components/ArbitrationView';
 import PreferencesModal from './components/PreferencesModal';
-import { FeederProfile, FeederRank, FeedOrder, ViewType } from './types';
+import { FeederRank, FeedOrder } from './types';
 import { MOCK_ORDERS, MOCK_HISTORY } from './constants';
 import { motion, AnimatePresence, useTransform, useMotionValue, useSpring, MotionValue } from 'framer-motion';
 import { useTranslation } from './i18n';
+import { useFeederStore, useUIStore } from './store';
 
 // Separate component for Orbital Rings to fix Hook violations
 const OrbitalRing: React.FC<{
@@ -263,38 +264,53 @@ const QuestHallView: React.FC<{
 };
 
 const App: React.FC = () => {
-  const [profile, setProfile] = useState<FeederProfile>({
-    address: '0x71C...3a21',
-    nickname: 'Sophia Lane',
-    rank: FeederRank.B,
-    xp: 12450,
-    totalFeeds: 342,
-    accuracyRate: 98.4,
-    balanceFEED: 1540,
-    balanceUSDT: 5000,
-    history: MOCK_HISTORY,
-    stakedAmount: 5000,
-    stakeType: 'USDT'
-  });
+  // ====== Zustand Stores ======
+  const profile = useFeederStore((s) => s.profile);
+  const orders = useFeederStore((s) => s.orders);
+  const prefs = useFeederStore((s) => s.preferences);
+  const setPrefs = useFeederStore((s) => s.setPreferences);
+  const feederOnComplete = useFeederStore((s) => s.onFeedComplete);
+  const removeOrder = useFeederStore((s) => s.removeOrder);
 
-  const [activeView, setActiveView] = useState<ViewType>('Quest Hall');
-  const [orders, setOrders] = useState<FeedOrder[]>(MOCK_ORDERS);
-  const [viewingOrder, setViewingOrder] = useState<FeedOrder | null>(null);
-  const [activeOrder, setActiveOrder] = useState<FeedOrder | null>(null);
-  const [showPrefs, setShowPrefs] = useState(false);
-  const [activeTab, setActiveTab] = useState<'beginner' | 'competitive' | 'master'>('beginner');
+  const activeView = useUIStore((s) => s.activeView);
+  const setActiveView = useUIStore((s) => s.setActiveView);
+  const viewingOrder = useUIStore((s) => s.viewingOrder);
+  const setViewingOrder = useUIStore((s) => s.setViewingOrder);
+  const activeOrder = useUIStore((s) => s.activeOrder);
+  const setActiveOrder = useUIStore((s) => s.setActiveOrder);
+  const showPrefs = useUIStore((s) => s.showPreferences);
+  const setShowPrefs = useUIStore((s) => s.setShowPreferences);
+  const activeTab = useUIStore((s) => s.activeTab);
+  const setActiveTab = useUIStore((s) => s.setActiveTab);
+  const grabAndFeed = useUIStore((s) => s.grabAndFeed);
+
+  // 初始化 mock 数据（仅在 store 为空时设置）
+  React.useEffect(() => {
+    if (!profile) {
+      useFeederStore.getState().setProfile({
+        address: '0x71C...3a21',
+        nickname: 'Sophia Lane',
+        rank: FeederRank.B,
+        xp: 12450,
+        totalFeeds: 342,
+        accuracyRate: 98.4,
+        balanceFEED: 1540,
+        balanceUSDT: 5000,
+        history: MOCK_HISTORY,
+        stakedAmount: 5000,
+        stakeType: 'USDT',
+      });
+    }
+    if (orders.length === 0) {
+      useFeederStore.getState().setOrders(MOCK_ORDERS);
+    }
+  }, []);
 
   // Parallax Values - Correctly placed at top level
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
   const springX = useSpring(mouseX, { damping: 50, stiffness: 200 });
   const springY = useSpring(mouseY, { damping: 50, stiffness: 200 });
-
-  const [prefs, setPrefs] = useState({
-    countries: ['CN', 'US', 'GLOBAL'],
-    exchanges: ['SSE', 'NASDAQ', 'BINANCE'],
-    assets: ['CRYPTO', 'US_STOCK', 'CN_STOCK']
-  });
 
   const handleMouseMove = (e: React.MouseEvent) => {
     const { clientX, clientY } = e;
@@ -306,19 +322,15 @@ const App: React.FC = () => {
   const handleGrab = (orderId: string) => {
     const order = orders.find(o => o.orderId === orderId);
     if (order) {
-      setViewingOrder(null);
-      setActiveOrder(order);
+      grabAndFeed(order);
     }
   };
 
   const handleComplete = (xp: number, feed: number) => {
-    setProfile(prev => ({
-      ...prev,
-      xp: prev.xp + xp,
-      balanceFEED: prev.balanceFEED + feed,
-      totalFeeds: prev.totalFeeds + 1,
-    }));
-    setOrders(prev => prev.filter(o => o.orderId !== activeOrder?.orderId));
+    feederOnComplete(xp, feed);
+    if (activeOrder) {
+      removeOrder(activeOrder.orderId);
+    }
     setActiveOrder(null);
   };
 
@@ -349,18 +361,18 @@ const App: React.FC = () => {
             onMouseMove={handleMouseMove}
           />
         );
-      case 'Dashboard': return <DashboardView profile={profile} />;
+      case 'Dashboard': return <DashboardView profile={profile!} />;
       case 'Leaderboard': return <LeaderboardView />;
       case 'Inventory': return <InventoryView />;
       case 'Training Center': return <TrainingView />;
-      case 'Staking': return <StakingView profile={profile} />;
+      case 'Staking': return <StakingView profile={profile!} />;
       case 'Arbitration': return <ArbitrationView />;
       default: return null;
     }
   };
 
   return (
-    <Layout profile={profile} activeView={activeView} onNavigate={setActiveView}>
+    <Layout profile={profile!} activeView={activeView} onNavigate={setActiveView}>
       {renderContent()}
       <AnimatePresence>
         {viewingOrder && <OrderDetailModal order={viewingOrder} onClose={() => setViewingOrder(null)} onGrab={handleGrab} />}
