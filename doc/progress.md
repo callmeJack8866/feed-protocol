@@ -1,5 +1,58 @@
 # Feed Engine 开发进度
 
+## [2026-02-10 15:53] P1 后端逻辑补全 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - P1-1 Commit-Reveal keccak256 哈希验证（`order.controller.ts` L379-396 已实现）✅ 已确认
+  - P1-4 惩罚分级服务（`penalty.service.ts` 303行，4级惩罚已完整）✅ 已确认
+  - P1-4 质押要求验证（`order.controller.ts` L201-210，F=100U~S=25000U）✅ 已确认
+  - P1-1 奖励分配 70/10/10/10（`reward-distribution.service.ts` 已完整）✅ 已确认
+  - **全局 JWT 集成**：`index.ts` 注入 `optionalAuth` 中间件（JWT → `x-wallet-address` 自动桥接，8 个控制器 29 处引用零改动兼容）
+  - **IPFS 服务升级**：`ipfs.service.ts` 重写 — Pinata JWT 优先认证 + NFT 元数据上传 + 健康检查 + keccak256 哈希与链上合约一致 + 随机盐值工具
+  - `.env` 新增 `PINATA_JWT` + `PINATA_GATEWAY`
+  - TypeScript 零错误编译 ✅
+- **[Next Step]**: P1-7 i18n / P1-8 前端 Zustand（前端任务）
+
+
+
+## [2026-02-10 15:48] P0-3 合约部署套件 + P0-4 后端合约集成 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - P0-3 合约部署套件:
+    - `scripts/verify.ts` **[NEW]**: BSCScan 批量合约验证（自动获取 ERC-1967 implementation 地址，处理 Already Verified）
+    - `scripts/upgrade.ts` **[NEW]**: UUPS 代理升级脚本（通过 UPGRADE_CONTRACT 环境变量指定目标，对比新旧 implementation）
+  - P0-4 后端合约集成:
+    - `chain.controller.ts`: 全面重写 — 所有写操作加 `requireAuth` JWT 认证，新增 3 个端点：
+      - `GET /api/chain/feeder-info` — 并行查询链上完整信息（注册/等级/质押/XP/待领奖励/FEED余额/封禁状态）
+      - `GET /api/chain/pending-rewards` — 待领取奖励 + FEED 余额
+      - `GET /api/chain/contracts` — 公开合约地址（前端配置用）
+  - TypeScript 零错误编译 ✅
+- **[Next Step]**: 🎉 **所有 P0 上线阻断项已完成！** 可进入 P1 核心功能开发
+
+
+
+## [2026-02-10 15:42] P0-2 EIP-4361 SIWE 钱包认证 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - `middlewares/auth.middleware.ts` **[NEW]**: JWT 认证体系（`signToken`/`verifyToken` + `requireAuth`/`optionalAuth`/`adminAuth` 3 种中间件 + Express Request 类型扩展 + 向后兼容 `x-wallet-address` header）
+  - `auth.controller.ts`: 完整 EIP-4361 SIWE 流程重写
+    - `GET /api/auth/nonce` — Redis 存储随机 nonce（5分钟有效 + 内存降级）
+    - `POST /api/auth/verify` — 签名验证 + EIP-4361 消息解析 + nonce 消费防重放 + JWT 签发
+    - `POST /api/auth/connect` — 旧接口向后兼容（改用 JWT 替代 UUID）
+    - `POST /api/auth/register` — 加 `requireAuth` 中间件
+    - `GET /api/auth/profile` — 加 `requireAuth` 中间件
+    - `POST /api/auth/refresh` — JWT Token 刷新
+    - `POST /api/auth/logout` — 登出（审计日志）
+  - `.env`: 新增 `JWT_EXPIRES_IN=7d` + `ADMIN_ADDRESSES` 管理员白名单
+  - 安装 `jsonwebtoken` + `@types/jsonwebtoken`
+  - TypeScript 零错误编译 ✅
+- **[Next Step]**: 执行 P0-3 智能合约部署套件 / P0-4 后端合约集成
+
+
+
 ## [2026-02-10 15:34] P0-6 Redis 集成 ✅
 
 - **[Status]**: Done

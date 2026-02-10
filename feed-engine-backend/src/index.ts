@@ -29,6 +29,7 @@ import { initNFTService } from './services/nft-badge.service';
 import { seedTrainingData } from './seeds/training.seed';
 import { globalRateLimit } from './config/rate-limiter';
 import { isRedisAvailable, closeRedis, redisHealthCheck } from './config/redis';
+import { optionalAuth } from './middlewares/auth.middleware';
 
 const app = express();
 const httpServer = createServer(app);
@@ -49,6 +50,10 @@ app.use(express.json());
 
 // 全局速率限制 (方案 §16.2: 防机器人)
 app.use('/api/', globalRateLimit);
+
+// 全局 JWT 解析（可选认证：有 token 自动解析，无 token 也通过）
+// 解析后自动设置 req.user + req.headers['x-wallet-address']，向后兼容所有控制器
+app.use('/api/', optionalAuth);
 
 // 健康检查（含 Redis 状态）
 app.get('/health', async (req, res) => {
