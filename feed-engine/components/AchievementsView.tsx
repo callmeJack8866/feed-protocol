@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as api from '../services/api';
 
@@ -23,6 +23,32 @@ const AchievementsView: React.FC = () => {
     const [stats, setStats] = useState({ total: 0, unlocked: 0, byCategory: {} as Record<string, number> });
     const [newlyUnlocked, setNewlyUnlocked] = useState<any[]>([]);
     const [showUnlockAnimation, setShowUnlockAnimation] = useState(false);
+
+    /**
+     * 解锁音效 — Web Audio 升调和弦
+     * 触发条件：showUnlockAnimation 变为 true
+     */
+    const playUnlockSound = useCallback(() => {
+        try {
+            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+            notes.forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+                osc.connect(gain).connect(ctx.destination);
+                osc.start(ctx.currentTime + i * 0.15);
+                osc.stop(ctx.currentTime + 1.5);
+            });
+        } catch { /* 静默降级 */ }
+    }, []);
+
+    useEffect(() => {
+        if (showUnlockAnimation) playUnlockSound();
+    }, [showUnlockAnimation, playUnlockSound]);
 
     const categories = [
         { key: 'ALL', label: '全部', icon: '🏆' },
@@ -157,8 +183,8 @@ const AchievementsView: React.FC = () => {
                         key={cat.key}
                         onClick={() => setSelectedCategory(cat.key)}
                         className={`px-6 py-3 rounded-xl font-bold whitespace-nowrap transition-all ${selectedCategory === cat.key
-                                ? 'bg-cyan-500 text-black'
-                                : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                            ? 'bg-cyan-500 text-black'
+                            : 'bg-white/5 text-slate-400 hover:bg-white/10'
                             }`}
                     >
                         {cat.icon} {cat.label}
@@ -175,8 +201,8 @@ const AchievementsView: React.FC = () => {
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: idx * 0.05 }}
                         className={`relative p-6 rounded-2xl border transition-all ${achievement.unlocked
-                                ? 'glass-panel border-white/20'
-                                : 'bg-slate-900/50 border-white/5 opacity-60 grayscale'
+                            ? 'glass-panel border-white/20'
+                            : 'bg-slate-900/50 border-white/5 opacity-60 grayscale'
                             }`}
                     >
                         {/* 稀有度背景 */}
@@ -223,46 +249,144 @@ const AchievementsView: React.FC = () => {
 
             {/* 解锁动画弹窗 */}
             <AnimatePresence>
-                {showUnlockAnimation && newlyUnlocked.length > 0 && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md">
-                        <motion.div
-                            initial={{ scale: 0, rotate: -10 }}
-                            animate={{ scale: 1, rotate: 0 }}
-                            exit={{ scale: 0, opacity: 0 }}
-                            className="text-center space-y-8"
-                        >
-                            <motion.div
-                                animate={{
-                                    scale: [1, 1.2, 1],
-                                    rotate: [0, 5, -5, 0]
-                                }}
-                                transition={{ duration: 0.5, repeat: 2 }}
-                                className="text-9xl"
-                            >
-                                {newlyUnlocked[0].achievement.icon}
-                            </motion.div>
+                {showUnlockAnimation && newlyUnlocked.length > 0 && (() => {
+                    const achievement = newlyUnlocked[0].achievement;
+                    const rarityGlow: Record<string, string> = {
+                        COMMON: 'from-slate-400/40 via-slate-300/20 to-slate-400/40',
+                        RARE: 'from-blue-500/50 via-cyan-400/25 to-blue-500/50',
+                        EPIC: 'from-purple-500/50 via-pink-400/25 to-purple-500/50',
+                        LEGENDARY: 'from-amber-500/60 via-yellow-300/30 to-amber-500/60',
+                    };
+                    const glowClass = rarityGlow[achievement.rarity] || rarityGlow.COMMON;
 
-                            <div className="space-y-4">
-                                <h2 className="text-2xl font-bold text-amber-400 uppercase tracking-widest">成就解锁!</h2>
-                                <h3 className="text-4xl font-black font-orbitron text-white">
-                                    {newlyUnlocked[0].achievement.name}
-                                </h3>
-                                <p className="text-slate-400">{newlyUnlocked[0].achievement.description}</p>
-                                <p className="text-2xl font-bold text-amber-400">
-                                    +{newlyUnlocked[0].xpEarned} XP
-                                    {newlyUnlocked[0].feedEarned > 0 && ` · +${newlyUnlocked[0].feedEarned} FEED`}
-                                </p>
+                    return (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md overflow-hidden">
+
+                            {/* 金色粒子爆炸 */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                {[...Array(40)].map((_, i) => {
+                                    const angle = (i * (360 / 40)) + (Math.random() * 10);
+                                    const dist = 120 + Math.random() * 350;
+                                    const x = Math.cos(angle * (Math.PI / 180)) * dist;
+                                    const y = Math.sin(angle * (Math.PI / 180)) * dist;
+                                    const size = 3 + Math.random() * 7;
+                                    const isCircle = i % 3 !== 0;
+                                    const colors = ['#fbbf24', '#f59e0b', '#fcd34d', '#ffffff', '#22d3ee'];
+                                    const color = colors[i % colors.length];
+
+                                    return (
+                                        <motion.div
+                                            key={i}
+                                            initial={{ x: 0, y: 0, scale: 0, opacity: 1 }}
+                                            animate={{ x, y, scale: [0, 1.5, 0.5], opacity: [1, 1, 0] }}
+                                            transition={{ duration: 1.5 + Math.random(), delay: 0.2 + Math.random() * 0.3, ease: 'easeOut' }}
+                                            style={{
+                                                width: size, height: size,
+                                                backgroundColor: color,
+                                                borderRadius: isCircle ? '50%' : '2px',
+                                                boxShadow: `0 0 ${size * 2}px ${color}`,
+                                                position: 'absolute',
+                                                transform: isCircle ? '' : `rotate(${Math.random() * 360}deg)`,
+                                            }}
+                                        />
+                                    );
+                                })}
                             </div>
 
-                            <button
-                                onClick={() => setShowUnlockAnimation(false)}
-                                className="px-12 py-4 rounded-2xl bg-cyan-500 text-black font-black font-orbitron"
+                            {/* 稀有度脉冲光晕 */}
+                            <motion.div
+                                animate={{ scale: [0.5, 2.5], opacity: [0.8, 0] }}
+                                transition={{ duration: 2, repeat: 2, ease: 'easeOut' }}
+                                className={`absolute w-[300px] h-[300px] rounded-full bg-gradient-radial ${glowClass} blur-2xl pointer-events-none`}
+                            />
+
+                            <motion.div
+                                initial={{ scale: 0, rotate: -10 }}
+                                animate={{ scale: 1, rotate: 0 }}
+                                exit={{ scale: 0, opacity: 0 }}
+                                className="text-center space-y-8 relative z-10"
                             >
-                                太棒了！
-                            </button>
-                        </motion.div>
-                    </div>
-                )}
+                                {/* 图标 + 光环 */}
+                                <div className="relative inline-block">
+                                    <motion.div
+                                        animate={{ scale: [1, 1.2, 1], rotate: [0, 5, -5, 0] }}
+                                        transition={{ duration: 0.5, repeat: 2 }}
+                                        className="text-9xl relative z-10"
+                                    >
+                                        {achievement.icon}
+                                    </motion.div>
+                                    {/* 旋转光环 */}
+                                    <motion.div
+                                        animate={{ rotate: 360 }}
+                                        transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+                                        className="absolute -inset-8 border-2 border-dashed border-amber-400/30 rounded-full"
+                                    />
+                                    <motion.div
+                                        animate={{ rotate: -360 }}
+                                        transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+                                        className="absolute -inset-14 border border-dashed border-amber-500/15 rounded-full"
+                                    />
+                                </div>
+
+                                <div className="space-y-4">
+                                    <motion.h2
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.3 }}
+                                        className="text-2xl font-bold text-amber-400 uppercase tracking-widest"
+                                    >
+                                        🏆 成就解锁!
+                                    </motion.h2>
+                                    <motion.h3
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: 0.5 }}
+                                        className="text-4xl font-black font-orbitron text-white"
+                                    >
+                                        {achievement.name}
+                                    </motion.h3>
+                                    <motion.p
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 0.7 }}
+                                        className="text-slate-400"
+                                    >
+                                        {achievement.description}
+                                    </motion.p>
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: 0.9 }}
+                                        className={`inline-block px-4 py-1.5 rounded-full text-xs font-black uppercase bg-gradient-to-r ${rarityColors[achievement.rarity]} text-white`}
+                                    >
+                                        {rarityLabels[achievement.rarity]}
+                                    </motion.div>
+                                    <motion.p
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        transition={{ delay: 1.1 }}
+                                        className="text-2xl font-bold text-amber-400"
+                                    >
+                                        +{newlyUnlocked[0].xpEarned} XP
+                                        {newlyUnlocked[0].feedEarned > 0 && ` · +${newlyUnlocked[0].feedEarned} FEED`}
+                                    </motion.p>
+                                </div>
+
+                                <motion.button
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 1.3 }}
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => setShowUnlockAnimation(false)}
+                                    className="px-12 py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-black font-orbitron shadow-[0_20px_60px_rgba(251,191,36,0.3)] hover:shadow-[0_25px_70px_rgba(251,191,36,0.5)] transition-shadow"
+                                >
+                                    太棒了！
+                                </motion.button>
+                            </motion.div>
+                        </div>
+                    );
+                })()}
             </AnimatePresence>
         </div>
     );

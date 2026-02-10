@@ -3,6 +3,7 @@
  */
 
 import prisma from '../config/database';
+import { mintSeasonChampionNFT } from './nft-badge.service';
 
 // 赛季奖励配置
 const SEASON_REWARDS: Record<string, { feed: number; xp: number; nft: boolean }> = {
@@ -152,6 +153,35 @@ export async function settleSeasonRewards(seasonCode: string): Promise<{ settled
         totalFeedRewarded += reward.feed;
         totalXpRewarded += reward.xp;
         settledCount++;
+
+        // 为前3名铸造赛季冠军 NFT
+        if (reward.nft && snapshot.rank <= 3) {
+            const feeder = await prisma.feeder.findUnique({
+                where: { id: snapshot.feederId },
+                select: { address: true, xp: true, totalFeeds: true, accuracyRate: true }
+            });
+
+            if (feeder?.address) {
+                mintSeasonChampionNFT(
+                    feeder.address,
+                    seasonCode,
+                    snapshot.rank,
+                    {
+                        xp: feeder.xp,
+                        feeds: feeder.totalFeeds,
+                        accuracy: feeder.accuracyRate
+                    }
+                ).then(result => {
+                    if (result.success) {
+                        console.log(`  🏆 Champion NFT minted for rank #${snapshot.rank}: TX ${result.txHash}`);
+                    } else {
+                        console.warn(`  ⚠️ Champion NFT mint failed for rank #${snapshot.rank}: ${result.error}`);
+                    }
+                }).catch(err => {
+                    console.error(`  ❌ Champion NFT error for rank #${snapshot.rank}:`, err);
+                });
+            }
+        }
 
         console.log(`  🎁 Rank #${snapshot.rank}: +${reward.xp} XP, +${reward.feed} FEED`);
     }
