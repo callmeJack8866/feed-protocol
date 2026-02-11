@@ -103,13 +103,17 @@ export interface AuthResponse {
 export interface NonceResponse {
     success: boolean;
     nonce: string;
+    expiresIn?: number;
+    /** 后端预构造的 EIP-4361 SIWE 消息，前端可直接用于签名 */
+    message?: string;
 }
 
 /**
  * 获取 SIWE nonce（EIP-4361 步骤 1）
+ * @param address 钱包地址（后端要求必传）
  */
-export async function getNonce(): Promise<NonceResponse> {
-    return request<NonceResponse>('/api/auth/nonce');
+export async function getNonce(address: string): Promise<NonceResponse> {
+    return request<NonceResponse>(`/api/auth/nonce?address=${encodeURIComponent(address)}`);
 }
 
 /**

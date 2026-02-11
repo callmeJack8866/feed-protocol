@@ -109,13 +109,38 @@ const CosmicHero: React.FC<{ springX: MotionValue<number>; springY: MotionValue<
           <motion.div
             animate={{ y: [0, -20, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="relative z-10"
+            className="relative z-10 flex items-center justify-center"
           >
-            <img
-              src="https://pngimg.com/uploads/spaceship/spaceship_PNG46.png"
-              className="w-[550px] drop-shadow-[0_60px_100px_rgba(34,211,238,0.3)] filter contrast-125"
-              alt="hero craft"
-            />
+            {/* 纯 CSS 飞船核心 — 替代外部 broken 图片 */}
+            <div className="relative w-[300px] h-[300px] flex items-center justify-center">
+              {/* 外圈旋转 */}
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                className="absolute w-full h-full border-2 border-dashed border-cyan-500/20 rounded-full"
+              />
+              <motion.div
+                animate={{ rotate: -360 }}
+                transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+                className="absolute w-[80%] h-[80%] border border-cyan-400/30 rounded-full"
+              />
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+                className="absolute w-[60%] h-[60%] border border-cyan-300/40 rounded-full"
+              />
+              {/* 六边形核心 */}
+              <div className="absolute w-[120px] h-[120px] bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rotate-45 rounded-2xl border border-cyan-400/40 backdrop-blur-sm" />
+              <div className="absolute w-[90px] h-[90px] bg-gradient-to-br from-cyan-400/30 to-blue-500/30 rotate-[30deg] rounded-xl border border-cyan-300/50" />
+              {/* 中心标识 */}
+              <div className="relative text-6xl drop-shadow-[0_0_30px_rgba(34,211,238,0.6)]">🦉</div>
+              {/* 发光粒子 */}
+              <motion.div
+                animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.7, 0.3] }}
+                transition={{ duration: 3, repeat: Infinity }}
+                className="absolute w-[200px] h-[200px] bg-cyan-500/10 rounded-full blur-[60px]"
+              />
+            </div>
           </motion.div>
         </motion.div>
       </div>
@@ -371,8 +396,21 @@ const App: React.FC = () => {
     }
   };
 
+  // 首次渲染时 profile 尚未初始化（useEffect 还未执行），显示加载画面
+  if (!profile) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#030406] text-cyan-400">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-400 rounded-full"
+        />
+      </div>
+    );
+  }
+
   return (
-    <Layout profile={profile!} activeView={activeView} onNavigate={setActiveView}>
+    <Layout profile={profile} activeView={activeView} onNavigate={setActiveView}>
       {renderContent()}
       <AnimatePresence>
         {viewingOrder && <OrderDetailModal order={viewingOrder} onClose={() => setViewingOrder(null)} onGrab={handleGrab} />}

@@ -230,7 +230,7 @@ export async function createNewSeason(): Promise<any> {
             startDate,
             endDate,
             status: 'ACTIVE',
-            rewardConfig: SEASON_REWARDS
+            rewardConfig: JSON.stringify(SEASON_REWARDS)
         }
     });
 

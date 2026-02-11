@@ -70,14 +70,14 @@ router.get('/current', async (req: Request, res: Response) => {
                     startDate,
                     endDate,
                     status: 'ACTIVE',
-                    rewardConfig: {
+                    rewardConfig: JSON.stringify({
                         1: { feed: 5000, xp: 2000, nft: true },
                         2: { feed: 3000, xp: 1500, nft: true },
                         3: { feed: 3000, xp: 1500, nft: true },
                         '4-10': { feed: 1500, xp: 1000, nft: false },
                         '11-50': { feed: 500, xp: 500, nft: false },
                         '51-100': { feed: 200, xp: 300, nft: false }
-                    }
+                    })
                 }
             });
         }

@@ -58,7 +58,7 @@ router.get('/', async (req: Request, res: Response) => {
             await prisma.achievement.createMany({
                 data: ACHIEVEMENTS_DATA.map(a => ({
                     ...a,
-                    conditions: a.conditions
+                    conditions: JSON.stringify(a.conditions)
                 }))
             });
             achievements = await prisma.achievement.findMany({ where });

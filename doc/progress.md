@@ -1,5 +1,98 @@
 # Feed Engine 开发进度
 
+## [2026-02-11 14:15] 前端钱包登录流程打通 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - `Layout.tsx` 集成完整 ENGAGE NODE → SIWE 登录流程（6 步）
+  - 导入 `useWallet` + `useAuthStore` + SIWE API（getNonce/verifySIWE/buildSIWEMessage）
+  - 已连接状态 UI：缩略地址（0x1234...abcd）+ 断开按钮
+  - 连接中状态：动画按钮 + 步骤文案（正在连接/获取凭证/请签名/验证中）
+  - 错误处理：红色文案显示
+- **[Next Step]**: 用户手动测试 MetaMask 登录 + 验证 JWT 注入
+
+## [2026-02-11 14:35] ArbitrationDAO 合约部署 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - 创建部署脚本 `scripts/deploy-arbitration.ts`
+  - ArbitrationDAO 部署到 BSC Testnet: `0x58264daEec1Cd17Edd465b4e941376c1403F8Fa1`
+  - 构造参数: FEEDToken `0xD07a137450EA3CB3f8133bf01550d1B1F1e71471`
+  - 更新后端 `.env` 中 `ARBITRATION_DAO_CONTRACT`
+- **[Next Step]**: 清理临时部署文件，继续其他优化项
+
+## [2026-02-11 13:55] 前后端联调成功 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - 前端 Vite v6.4.1 启动（`localhost:3000`）
+  - CORS 修复：`FRONTEND_URL` 从 `5173` → `3000`
+  - 前后端 API 通信正常（无 CORS 错误）
+  - 培训模块数据加载成功
+- **[Next Step]**: 用户可连接钱包测试完整功能
+
+## [2026-02-11 13:50] 后端服务启动成功 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - Prisma 从 PostgreSQL 切换到 SQLite（本地开发）
+  - Schema 兼容：12 处 `Json→String` + `@db.Date` 移除
+  - 代码修复：10 处 TS2322（`JSON.stringify` 写入 + `JSON.parse` 读取）
+  - 后端启动：WebSocket ✅ + BSC Testnet 连接 ✅ + 培训数据初始化 ✅
+- **[Next Step]**: 启动前端 + 前后端联调
+
+## [2026-02-11 11:20] 后端配置连接 BSC Testnet ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - `.env` 填入 5 个合约地址 + 部署者钱包 + Testnet RPC URL
+  - `blockchain.service.ts` fallback 地址 + 注释头全部同步
+  - 后端 TypeScript 编译零错误
+- **[Next Step]**: 启动后端（需 PostgreSQL/SQLite），或进一步集成前端
+
+## [2026-02-11 11:15] BSC Testnet 合约验证完成 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - 5 个合约全部在 BSCScan 验证成功（5 成功, 0 失败）
+  - 修复 BSCScan API URL: `api.bscscan.com/v2/api` → `api.etherscan.io/v2/api?chainid=97`
+  - 修复 Node.js 代理: 设置 `HTTPS_PROXY=127.0.0.1:10808` 解决 ECONNRESET
+- **[Next Step]**: 后端部署 / 前端连接链上合约
+
+## [2026-02-10 22:35] BSC Testnet 合约部署完成 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - 5 个合约全部部署到 BSC Testnet (chainId: 97)
+  - FEEDToken: `0xD07a137450EA3CB3f8133bf01550d1B1F1e71471`
+  - FeederLicense: `0x4E42539570aEB80D402a782CF1eD8a9ba6B9F08E`
+  - FeedConsensus: `0x7fd163c3E3aACFa9c80C68194535DFC8A6604703`
+  - RewardPenalty: `0x02D83c59E2348C70FAE6BbD96dDB67d0A46BbabA`
+  - FeedEngine: `0x4E5b9EB72419e7B49F9E6Ab67311fC7705c92420`
+  - 跨合约权限已设置 + 100 万 FEED 转入奖励池
+- **[Next Step]**: BSCScan 合约验证
+
+## [2026-02-10 21:25] 测试验证 + 浏览器巡检完成 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - 合约 50/50 全部通过（修复 FeedConsensus 测试逻辑）
+  - 后端/前端 TypeScript 编译零错误
+  - Vite Dev Server 启动正常
+  - 浏览器 7 个视图全部正常渲染（修复 App.tsx 首渲染崩溃）
+  - 验证视图：Quest Hall + Dashboard + Leaderboard + Training + Staking + Arbitration + 首页
+- **[Next Step]**: 可进入 BSC Testnet 部署
+
+## [2026-02-10 17:17] 全面审计完成 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - 对照实施方案 v2.0 全部 21 章节（1342 行），逐条验证 120 个功能点
+  - 确认 113 项已实现（94%），7 项偏差（0 高危）
+  - 偏差项：质押冷却期 7 天 vs 方案 30 天、无 EIP-712/wagmi/WalletConnect SDK、无 EIP-1167/签名聚合/消息队列
+  - 生成完整审计报告 `full_audit_report.md`
+- **[Next Step]**: 修正 7 项偏差或确认接受；可进入部署测试
+
 ## [2026-02-10 17:00] P3 优化与体验增强 ✅
 
 - **[Status]**: Done

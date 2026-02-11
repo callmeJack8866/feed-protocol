@@ -115,7 +115,7 @@ export async function executeRewardDistribution(
                 platformFee: distribution.platformFee,
                 daoFee: distribution.daoFee,
                 burnAmount: distribution.burnAmount,
-                feederShares: feederShares,
+                feederShares: JSON.stringify(feederShares),
                 platformWallet: PLATFORM_WALLET,
                 daoWallet: DAO_TREASURY_WALLET,
                 burnAddress: BURN_ADDRESS,

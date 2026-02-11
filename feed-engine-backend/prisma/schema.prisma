@@ -1,13 +1,13 @@
-// Feed Engine — Prisma Schema (PostgreSQL 上线版)
-// 迁移自 SQLite，适配 PostgreSQL 特性
+// Feed Engine — Prisma Schema
+// 本地开发: SQLite | 生产环境: 切换 provider 为 postgresql
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 // ========================================
@@ -29,10 +29,10 @@ model Feeder {
   stakeType       String    @default("USDT") // FEED/USDT/NFT
   nftLicenseId    String?   // NFT 执照 ID
   
-  // 偏好设置 (PostgreSQL Json 类型)
-  countries       Json      @default("[]") // ["US", "CN", "HK"]
-  exchanges       Json      @default("[]") // ["NYSE", "SSE", "BINANCE"]
-  assetTypes      Json      @default("[]") // ["CRYPTO", "US_STOCK", "CN_STOCK"]
+  // 偏好设置 (JSON字符串)
+  countries       String    @default("[]") // ["US", "CN", "HK"]
+  exchanges       String    @default("[]") // ["NYSE", "SSE", "BINANCE"]
+  assetTypes      String    @default("[]") // ["CRYPTO", "US_STOCK", "CN_STOCK"]
   
   // 状态
   isBanned        Boolean   @default(false)
@@ -141,8 +141,8 @@ model Order {
   requiredFeeders   Int       // 需要的喂价员数量
   consensusThreshold String   // 共识门槛 (2/3, 3/5, 5/7)
   
-  // 特殊条件 (PostgreSQL Json)
-  specialConditions Json      @default("[]")
+  // 特殊条件 (JSON字符串)
+  specialConditions String    @default("[]")
   
   // 奖励
   rewardAmount      Float     // 奖励金额 (FEED)
@@ -246,8 +246,8 @@ model RewardDistribution {
   daoFee          Float    // DAO 金库 (10%)
   burnAmount      Float    // 代币销毁 (10%)
   
-  // 喂价员明细 (JSON: { feederId: amount })
-  feederShares    Json     // 各喂价员分得金额
+  // 喂价员明细 (JSON字符串: { feederId: amount })
+  feederShares    String   // 各喂价员分得金额
   
   // 目标钱包
   platformWallet  String   // 平台运营钱包
@@ -330,7 +330,7 @@ model FeedHistory {
 model DailyTask {
   id          String   @id @default(uuid())
   feederId    String
-  date        DateTime @default(now()) @db.Date
+  date        DateTime @default(now())
   feedCount   Int      @default(0)
   target1     Boolean  @default(false) // 完成1单
   target3     Boolean  @default(false) // 完成3单
@@ -376,8 +376,8 @@ model Season {
   endDate      DateTime
   status       String   @default("UPCOMING") // UPCOMING / ACTIVE / ENDED / SETTLED
   
-  // 奖励配置 (JSON)
-  rewardConfig Json     // 各名次奖励配置
+  // 奖励配置 (JSON字符串)
+  rewardConfig String   // 各名次奖励配置
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -401,7 +401,7 @@ model ArbitrationCase {
   // 争议信息
   disputeReason   String   // 争议原因
   description     String   // 详细描述
-  evidenceUrls    Json     @default("[]") // IPFS 证据链接
+  evidenceUrls    String   @default("[]") // IPFS 证据链接
   
   // 涉及的喂价员
   disputedFeederId String? // 被争议的喂价员
@@ -414,8 +414,8 @@ model ArbitrationCase {
   depositPaid     Boolean  @default(false)
   depositTxHash   String?
   
-  // 仲裁员 (JSON: 喂价员ID数组)
-  arbitrators     Json     @default("[]")
+  // 仲裁员 (JSON字符串: 喂价员ID数组)
+  arbitrators     String   @default("[]")
   requiredVotes   Int      @default(3) // 所需投票数
   
   // 状态
@@ -452,7 +452,7 @@ model ArbitrationVote {
   reason       String?  // 投票理由
   
   // 补充证据
-  evidenceUrls Json     @default("[]")
+  evidenceUrls String   @default("[]")
   
   createdAt    DateTime @default(now())
   
@@ -469,7 +469,7 @@ model Appeal {
   
   // 申诉内容
   reason          String   // 申诉理由
-  evidenceUrls    Json     @default("[]") // 补充证据
+  evidenceUrls    String   @default("[]") // 补充证据
   
   // 押金
   depositAmount   Float    @default(100) // 申诉押金 (USDT)
@@ -546,7 +546,7 @@ model TrainingExam {
   id           String   @id @default(uuid())
   courseId     String
   title        String
-  questions    Json     // 题目数组
+  questions    String   // 题目数组 (JSON字符串)
   passingScore Int      @default(80) // 及格分数
   timeLimit    Int      @default(30) // 时间限制（分钟）
   
@@ -562,7 +562,7 @@ model ExamAttempt {
   id          String   @id @default(uuid())
   examId      String
   feederId    String
-  answers     Json     // 答案数组
+  answers     String   // 答案数组 (JSON字符串)
   score       Int
   passed      Boolean
   startedAt   DateTime
@@ -608,12 +608,12 @@ model Achievement {
   icon        String   // 图标 emoji 或 URL
   
   // 解锁条件 (JSON)
-  conditions  Json     // { "totalFeeds": 1 }
+  conditions  String   // { "totalFeeds": 1 } (JSON字符串)
   
   // 奖励
   xpReward    Int      @default(0)
   feedReward  Float    @default(0)
-  nftMetadata Json?    // NFT 元数据
+  nftMetadata String?  // NFT 元数据 (JSON字符串)
   
   // 稀有度
   rarity      String   @default("COMMON") // COMMON / RARE / EPIC / LEGENDARY

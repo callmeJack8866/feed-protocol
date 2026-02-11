@@ -38,8 +38,16 @@ const config: HardhatUserConfig = {
                 network: "bscTestnet",
                 chainId: 97,
                 urls: {
-                    apiURL: "https://api.bscscan.com/v2/api?chainid=97",
+                    apiURL: "https://api.etherscan.io/v2/api?chainid=97",
                     browserURL: "https://testnet.bscscan.com",
+                },
+            },
+            {
+                network: "bsc",
+                chainId: 56,
+                urls: {
+                    apiURL: "https://api.etherscan.io/v2/api?chainid=56",
+                    browserURL: "https://bscscan.com",
                 },
             },
         ],

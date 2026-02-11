@@ -234,8 +234,8 @@ router.get('/exams/:examId', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Exam not found' });
         }
 
-        // 解析题目并隐藏正确答案（Prisma Json 类型自动反序列化）
-        const parsed = (exam.questions as any[]) || [];
+        // 解析题目并隐藏正确答案（从 String 反序列化 JSON）
+        const parsed = (JSON.parse(exam.questions as string) as any[]) || [];
         const questions = parsed.map((q: any, index: number) => ({
             id: index,
             question: q.question,
@@ -292,8 +292,8 @@ router.post('/exams/:examId/submit', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Exam not found' });
         }
 
-        // 解析题目并计算分数（Prisma Json 类型自动反序列化）
-        const questions = (exam.questions as any[]) || [];
+        // 解析题目并计算分数（从 String 反序列化 JSON）
+        const questions = (JSON.parse(exam.questions as string) as any[]) || [];
 
         let correctCount = 0;
         const results = questions.map((q: any, index: number) => {

@@ -419,7 +419,7 @@ async function assignArbitrators(caseId: string, caseType: string): Promise<void
     await prisma.arbitrationCase.update({
         where: { id: caseId },
         data: {
-            arbitrators: arbitratorIds
+            arbitrators: JSON.stringify(arbitratorIds)
         }
     });
 }

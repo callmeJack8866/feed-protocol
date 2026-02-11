@@ -249,7 +249,7 @@ async function seedTrainingData() {
                 data: {
                     courseId: course.id,
                     title: examData.title,
-                    questions: examData.questions,
+                    questions: JSON.stringify(examData.questions),
                     passingScore: examData.passingScore,
                     timeLimit: examData.timeLimit
                 }

@@ -1,9 +1,12 @@
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { FeederProfile, ViewType } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useTranslation } from '../i18n';
+import { useAuthStore } from '../store';
+import { useWallet } from '../hooks/useWallet';
+import { getNonce, verifySIWE, buildSIWEMessage, setAuthToken, setWalletAddress } from '../services/api';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -31,6 +34,93 @@ const SystemMarquee = () => {
 
 const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNavigate }) => {
   const { t } = useTranslation();
+  const auth = useAuthStore();
+  const wallet = useWallet();
+  const [loginStatus, setLoginStatus] = useState<string>('');
+
+  /**
+   * ENGAGE NODE 完整登录流程:
+   * 1. 连接 MetaMask（EIP-1193）
+   * 2. 获取 SIWE nonce
+   * 3. 构造 EIP-4361 消息
+   * 4. 钱包签名
+   * 5. 后端验证签名 → 返回 JWT
+   * 6. 存入 Zustand AuthStore
+   */
+  const handleEngageNode = useCallback(async () => {
+    if (auth.isConnected) return; // 已连接则跳过
+    auth.setConnecting(true);
+    auth.setError(null);
+    setLoginStatus('正在连接钱包...');
+
+    try {
+      // Step 0: 检查 MetaMask 是否安装
+      const ethereum = (window as any).ethereum;
+      if (!ethereum) {
+        throw new Error('请先安装 MetaMask 钱包扩展');
+      }
+
+      // Step 1: 连接 MetaMask
+      const accounts: string[] = await ethereum.request({ method: 'eth_requestAccounts' });
+      const chainHex: string = await ethereum.request({ method: 'eth_chainId' });
+      const address = accounts[0]?.toLowerCase();
+      const chainId = parseInt(chainHex, 16);
+
+      if (!address) {
+        throw new Error('未能获取钱包地址');
+      }
+
+      // Step 2: 获取 SIWE nonce + 后端预构造消息
+      setLoginStatus('获取认证凭证...');
+      setWalletAddress(address); // 向后兼容 x-wallet-address header
+      const nonceRes = await getNonce(address);
+      if (!nonceRes.success || !nonceRes.nonce) {
+        throw new Error('获取 nonce 失败');
+      }
+
+      // Step 3: 使用后端预构造的 SIWE 消息（或本地构造作为 fallback）
+      const message = nonceRes.message || buildSIWEMessage(address, nonceRes.nonce, chainId);
+
+      // Step 4: 钱包签名
+      setLoginStatus('请在钱包中签名...');
+      const signature: string = await ethereum.request({
+        method: 'personal_sign',
+        params: [message, address],
+      });
+      if (!signature) {
+        throw new Error('用户取消签名');
+      }
+
+      // Step 5: 后端验证签名 → JWT
+      setLoginStatus('验证签名...');
+      const authRes = await verifySIWE(message, signature);
+      if (!authRes.success || !authRes.token) {
+        throw new Error(authRes.message || '签名验证失败');
+      }
+
+      // Step 6: 存入全局状态
+      auth.setToken(authRes.token);
+      auth.setWallet(address, chainId);
+      setAuthToken(authRes.token);
+      setLoginStatus('');
+
+      console.log('✅ SIWE 登录成功:', address.slice(0, 10) + '...');
+    } catch (err: any) {
+      console.error('❌ 登录失败:', err);
+      auth.setError(err.message || '登录失败');
+      auth.setConnecting(false);
+      setLoginStatus('');
+    }
+  }, [auth, wallet]);
+
+  /** 断开钱包 */
+  const handleDisconnect = useCallback(() => {
+    wallet.disconnectWallet();
+    auth.disconnect();
+    setAuthToken(null);
+    setWalletAddress(null);
+    setLoginStatus('');
+  }, [wallet, auth]);
 
   /** 导航项：name 用于路由，label 用于国际化显示 */
   const menuItems: { name: ViewType; icon: string; label: string }[] = [
@@ -87,8 +177,8 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
                 key={item.name}
                 onClick={() => onNavigate(item.name)}
                 className={`w-full text-left px-5 py-5 rounded-[1.8rem] transition-all flex items-center gap-5 font-bold text-sm relative group overflow-hidden ${activeView === item.name
-                    ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 shadow-[inset_0_0_20px_rgba(34,211,238,0.1)]'
-                    : 'text-slate-500 hover:text-white hover:bg-white/5'
+                  ? 'bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 shadow-[inset_0_0_20px_rgba(34,211,238,0.1)]'
+                  : 'text-slate-500 hover:text-white hover:bg-white/5'
                   }`}
               >
                 {activeView === item.name && (
@@ -147,9 +237,36 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
             <div className="h-10 w-px bg-white/5" />
             <LanguageSwitcher />
             <div className="h-10 w-px bg-white/5" />
-            <button className="bg-white text-black text-[11px] font-black px-12 py-4 rounded-full shadow-[0_20px_50px_rgba(255,255,255,0.15)] hover:bg-cyan-500 hover:text-black transition-all uppercase italic tracking-tighter font-orbitron hover:scale-105 active:scale-95">
-              Engage Node
-            </button>
+            {auth.isConnected && auth.address ? (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 bg-cyan-500/10 border border-cyan-500/30 px-5 py-3 rounded-full">
+                  <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span className="text-[10px] font-mono font-black text-cyan-400 tracking-wider">
+                    {auth.address.slice(0, 6)}...{auth.address.slice(-4)}
+                  </span>
+                </div>
+                <button
+                  onClick={handleDisconnect}
+                  className="bg-red-500/10 border border-red-500/30 text-red-400 text-[9px] font-black px-4 py-3 rounded-full hover:bg-red-500/20 transition-all uppercase tracking-wider"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleEngageNode}
+                disabled={auth.isConnecting}
+                className={`text-[11px] font-black px-12 py-4 rounded-full shadow-[0_20px_50px_rgba(255,255,255,0.15)] transition-all uppercase italic tracking-tighter font-orbitron hover:scale-105 active:scale-95 ${auth.isConnecting
+                  ? 'bg-cyan-500/50 text-black cursor-wait animate-pulse'
+                  : 'bg-white text-black hover:bg-cyan-500 hover:text-black'
+                  }`}
+              >
+                {auth.isConnecting ? (loginStatus || '连接中...') : 'Engage Node'}
+              </button>
+            )}
+            {auth.error && (
+              <span className="text-[9px] text-red-400 font-mono">{auth.error}</span>
+            )}
           </div>
         </header>
 

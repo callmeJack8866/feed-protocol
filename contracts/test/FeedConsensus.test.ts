@@ -122,9 +122,15 @@ describe("FeedConsensus", function () {
 
         it("揭示价格 — 哈希不匹配应 revert", async function () {
             const h1 = await consensus.computePriceHash(price1, salt1);
-            await consensus.connect(feeder1).submitPriceHash(ORDER_ID, h1);
+            const h2 = await consensus.computePriceHash(price2, salt2);
+            const h3 = await consensus.computePriceHash(price3, salt3);
 
-            // 使用错误的 salt
+            // 先达到法定人数进入 REVEAL 阶段
+            await consensus.connect(feeder1).submitPriceHash(ORDER_ID, h1);
+            await consensus.connect(feeder2).submitPriceHash(ORDER_ID, h2);
+            await consensus.connect(feeder3).submitPriceHash(ORDER_ID, h3);
+
+            // 使用错误的 salt 揭示
             await expect(
                 consensus.connect(feeder1).revealPrice(ORDER_ID, price1, salt2)
             ).to.be.revertedWith("Hash mismatch");
