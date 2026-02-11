@@ -161,8 +161,8 @@ const LeaderboardView: React.FC = () => {
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
             className={`px-6 py-3 rounded-xl font-bold transition-all ${activeTab === tab.key
-                ? 'bg-cyan-500 text-black'
-                : 'bg-white/5 text-slate-400 hover:bg-white/10'
+              ? 'bg-cyan-500 text-black'
+              : 'bg-white/5 text-slate-400 hover:bg-white/10'
               }`}
           >
             {tab.icon} {tab.label}
@@ -195,19 +195,19 @@ const LeaderboardView: React.FC = () => {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
                 className={`p-1 px-10 rounded-[2rem] glass-panel border border-white/5 flex items-center min-h-[80px] grid grid-cols-12 group hover:border-cyan-500/30 transition-all ${index === 0 ? 'bg-amber-500/5 border-amber-500/20' :
-                    index === 1 ? 'bg-slate-400/5 border-slate-400/20' :
-                      index === 2 ? 'bg-orange-500/5 border-orange-500/20' : ''
+                  index === 1 ? 'bg-slate-400/5 border-slate-400/20' :
+                    index === 2 ? 'bg-orange-500/5 border-orange-500/20' : ''
                   }`}
               >
                 <div className={`col-span-1 font-orbitron font-black text-2xl ${index === 0 ? 'text-amber-400' :
-                    index === 1 ? 'text-slate-300' :
-                      index === 2 ? 'text-orange-400' : 'text-slate-600'
+                  index === 1 ? 'text-slate-300' :
+                    index === 2 ? 'text-orange-400' : 'text-slate-600'
                   } group-hover:text-cyan-400 transition-colors`}>
                   #{user.position}
                 </div>
                 <div className="col-span-4 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center overflow-hidden border border-white/10">
-                    <img src={`https://picsum.photos/seed/${user.address}/100/100`} alt="avatar" />
+                    <img src="/assets/images/owl-mascot-v2.png" alt="avatar" />
                   </div>
                   <div>
                     <p className="font-bold text-lg group-hover:text-white transition-colors">{user.nickname || 'Anonymous'}</p>

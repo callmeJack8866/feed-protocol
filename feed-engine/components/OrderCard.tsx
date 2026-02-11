@@ -57,14 +57,15 @@ const ConditionBadge: React.FC<{ condition: SpecialCondition; conditionLabels: T
 const OrderCard: React.FC<OrderCardProps> = ({ order, onGrab }) => {
   const { t } = useTranslation();
   const isLargeOrder = order.notionalAmount >= 1000000;
-  const headerImage = `https://picsum.photos/seed/${order.symbol}/800/450`;
+  const CARD_IMAGES = ['/assets/images/card-btc-v2.png', '/assets/images/card-eth-v2.png', '/assets/images/card-oracle-v2.png'];
+  const headerImage = CARD_IMAGES[order.symbol.length % CARD_IMAGES.length];
   const zone = getZoneBadge(order.notionalAmount);
   const conditions = order.specialConditions || [];
 
   return (
     <motion.div
       onClick={() => onGrab(order.orderId)}
-      className="cosmic-card relative h-[560px] flex flex-col overflow-hidden cursor-pointer group shadow-2xl"
+      className="cosmic-card relative h-[480px] flex flex-col overflow-hidden cursor-pointer group shadow-2xl"
     >
       {/* Visual Header */}
       <div className="h-3/5 relative overflow-hidden">
@@ -72,6 +73,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onGrab }) => {
           src={headerImage}
           className="w-full h-full object-cover group-hover:scale-125 transition-transform duration-[2s] brightness-75 group-hover:brightness-110"
           alt="quest header"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).parentElement!.classList.add('bg-gradient-to-br', 'from-cyan-900/40', 'to-slate-900'); }}
         />
 
         {/* Animated Scanline Overlay */}
@@ -81,7 +83,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onGrab }) => {
 
         {/* Floating Mascot Avatar */}
         <div className="absolute bottom-[-50px] left-12 w-28 h-28 rounded-[2.5rem] bg-[#0A0F1E] border-4 border-cyan-500/20 shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex items-center justify-center overflow-hidden z-20 group-hover:border-cyan-400 group-hover:scale-110 transition-all duration-500">
-          <img src={`https://picsum.photos/seed/${order.orderId}/200/200`} className="w-full h-full object-cover opacity-80 group-hover:opacity-100" alt="mascot" />
+          <img src="/assets/images/owl-mascot-v2.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100" alt="mascot" />
           <div className="absolute inset-0 bg-cyan-500/5 mix-blend-overlay" />
         </div>
 

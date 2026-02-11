@@ -301,7 +301,7 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
                   <div className="flex items-center gap-8 mb-10 relative z-10">
                     <div className="relative group/avatar">
                       <div className="absolute inset-[-4px] rounded-[2.2rem] bg-gradient-to-tr from-cyan-500 to-amber-500 opacity-40 group-hover/avatar:opacity-100 transition-opacity blur-[2px]" />
-                      <img src={`https://picsum.photos/seed/${profile.address}/200/200`} className="w-24 h-24 rounded-[2rem] border-2 border-black relative z-10" alt="avatar" />
+                      <img src="/assets/images/owl-mascot-v2.png" className="w-24 h-24 rounded-[2rem] border-2 border-black relative z-10" alt="avatar" />
                       <div className="absolute -bottom-3 -right-3 bg-white text-black border border-white/10 px-4 py-1.5 rounded-xl text-[10px] font-black font-orbitron italic z-20 shadow-xl">
                         LVL 42
                       </div>

@@ -72,11 +72,11 @@ const DigitCounter: React.FC<{ label: string; value: string; colorClass: string;
       </div>
       <div className="flex items-center gap-6 justify-center">
         {icon && (
-          <div className={`w-16 h-16 rounded-[1.5rem] flex items-center justify-center font-black text-black text-3xl shadow-[0_0_40px_rgba(0,0,0,0.5)] transition-all duration-500 bg-current ${colorClass.replace('text-', 'bg-')} group-hover:scale-110`}>
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-black text-2xl shadow-[0_0_40px_rgba(0,0,0,0.5)] transition-all duration-500 bg-current ${colorClass.replace('text-', 'bg-')} group-hover:scale-110`}>
             {icon}
           </div>
         )}
-        <h3 className={`text-8xl font-black font-orbitron italic text-white glow-text transition-all duration-500 group-hover:scale-105 tracking-tighter`}>
+        <h3 className={`text-5xl md:text-6xl font-black font-orbitron italic text-white glow-text transition-all duration-500 group-hover:scale-105 tracking-tighter`}>
           {displayValue}
         </h3>
       </div>
@@ -91,7 +91,7 @@ const CosmicHero: React.FC<{ springX: MotionValue<number>; springY: MotionValue<
   const coreY = useTransform(springY, [-500, 500], [-30, 30]);
 
   return (
-    <section className="relative h-[750px] flex flex-col items-center justify-center text-center">
+    <section className="relative h-[580px] flex flex-col items-center justify-center text-center overflow-hidden">
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
         {[1, 2, 3, 4].map(i => (
           <OrbitalRing key={i} index={i} springX={springX} springY={springY} />
@@ -109,38 +109,13 @@ const CosmicHero: React.FC<{ springX: MotionValue<number>; springY: MotionValue<
           <motion.div
             animate={{ y: [0, -20, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="relative z-10 flex items-center justify-center"
+            className="relative z-10"
           >
-            {/* 纯 CSS 飞船核心 — 替代外部 broken 图片 */}
-            <div className="relative w-[300px] h-[300px] flex items-center justify-center">
-              {/* 外圈旋转 */}
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                className="absolute w-full h-full border-2 border-dashed border-cyan-500/20 rounded-full"
-              />
-              <motion.div
-                animate={{ rotate: -360 }}
-                transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-                className="absolute w-[80%] h-[80%] border border-cyan-400/30 rounded-full"
-              />
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                className="absolute w-[60%] h-[60%] border border-cyan-300/40 rounded-full"
-              />
-              {/* 六边形核心 */}
-              <div className="absolute w-[120px] h-[120px] bg-gradient-to-br from-cyan-500/20 to-purple-500/20 rotate-45 rounded-2xl border border-cyan-400/40 backdrop-blur-sm" />
-              <div className="absolute w-[90px] h-[90px] bg-gradient-to-br from-cyan-400/30 to-blue-500/30 rotate-[30deg] rounded-xl border border-cyan-300/50" />
-              {/* 中心标识 */}
-              <div className="relative text-6xl drop-shadow-[0_0_30px_rgba(34,211,238,0.6)]">🦉</div>
-              {/* 发光粒子 */}
-              <motion.div
-                animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.7, 0.3] }}
-                transition={{ duration: 3, repeat: Infinity }}
-                className="absolute w-[200px] h-[200px] bg-cyan-500/10 rounded-full blur-[60px]"
-              />
-            </div>
+            <img
+              src="/assets/images/hero-core-v2.png"
+              className="w-[420px] drop-shadow-[0_60px_100px_rgba(34,211,238,0.3)] filter contrast-125"
+              alt="FeedVerse Command Core"
+            />
           </motion.div>
         </motion.div>
       </div>
@@ -152,7 +127,7 @@ const CosmicHero: React.FC<{ springX: MotionValue<number>; springY: MotionValue<
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center"
           >
-            <h2 className="text-[160px] font-black font-orbitron tracking-tighter italic uppercase text-white leading-none drop-shadow-[0_30px_60px_rgba(0,0,0,1)] selection:bg-cyan-500">
+            <h2 className="text-[100px] md:text-[120px] font-black font-orbitron tracking-tighter italic uppercase text-white leading-none drop-shadow-[0_30px_60px_rgba(0,0,0,1)] selection:bg-cyan-500">
               OWL<span className="text-cyan-400 glow-cyan">VERSE</span>
             </h2>
             <div className="flex items-center gap-10 w-full max-w-4xl opacity-40">
@@ -163,7 +138,7 @@ const CosmicHero: React.FC<{ springX: MotionValue<number>; springY: MotionValue<
           </motion.div>
         </div>
 
-        <div className="flex flex-col md:flex-row items-center justify-center gap-32">
+        <div className="flex flex-col md:flex-row items-center justify-center gap-16 md:gap-32">
           <DigitCounter label="Global Hash Power" value="2122520" colorClass="text-cyan-400" />
           <DigitCounter label="Total XTTA Secured" value="2565336" colorClass="text-amber-500" icon="T" />
         </div>
@@ -185,7 +160,7 @@ const QuestHallView: React.FC<{
   const { t } = useTranslation();
 
   return (
-    <div onMouseMove={onMouseMove} className="space-y-24 max-w-7xl mx-auto pb-40 relative">
+    <div onMouseMove={onMouseMove} className="space-y-12 max-w-7xl mx-auto pb-40 relative">
       <CosmicHero springX={springX} springY={springY} />
 
       <section className="flex flex-col lg:flex-row lg:items-center justify-between gap-12 px-14">
@@ -199,22 +174,22 @@ const QuestHallView: React.FC<{
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-14 py-6 rounded-[2.8rem] text-[11px] font-black uppercase tracking-[0.4em] transition-all flex items-center gap-5 group relative z-10 ${activeTab === tab.id
+              className={`px-8 py-4 rounded-[2.8rem] text-[10px] font-black uppercase tracking-[0.3em] transition-all flex items-center gap-3 group relative z-10 ${activeTab === tab.id
                 ? `${tab.activeColor} scale-105`
                 : 'text-slate-500 hover:text-cyan-400'
                 }`}
             >
-              <span className="text-2xl group-hover:scale-125 transition-transform">{tab.icon}</span>
+              <span className="text-lg group-hover:scale-125 transition-transform">{tab.icon}</span>
               {tab.label}
             </button>
           ))}
         </div>
 
         <div className="flex gap-8">
-          <button onClick={() => setShowPrefs(true)} className="w-24 h-24 rounded-[3.5rem] bg-black/60 border border-white/10 flex items-center justify-center text-3xl hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-all group relative overflow-hidden">
+          <button onClick={() => setShowPrefs(true)} className="w-16 h-16 rounded-[2.5rem] bg-black/60 border border-white/10 flex items-center justify-center text-xl hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-all group relative overflow-hidden">
             <span className="group-hover:rotate-180 transition-transform duration-700 relative z-10">⚙️</span>
           </button>
-          <button className="px-16 py-6 rounded-[3.5rem] bg-cyan-500 text-black font-black font-orbitron text-[13px] uppercase tracking-[0.4em] italic shadow-[0_30px_60px_rgba(34,211,238,0.4)] hover:bg-cyan-400 hover:scale-105 active:scale-95 transition-all relative overflow-hidden group">
+          <button className="px-10 py-4 rounded-[2.5rem] bg-cyan-500 text-black font-black font-orbitron text-[11px] uppercase tracking-[0.3em] italic shadow-[0_30px_60px_rgba(34,211,238,0.4)] hover:bg-cyan-400 hover:scale-105 active:scale-95 transition-all relative overflow-hidden group">
             Initiate Neural Scan
           </button>
         </div>
@@ -257,7 +232,7 @@ const QuestHallView: React.FC<{
       <div className="px-14">
         <AnimatePresence mode="popLayout">
           {filteredOrders.length > 0 ? (
-            <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-16">
+            <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
               {filteredOrders.map(order => (
                 <motion.div
                   key={order.orderId}

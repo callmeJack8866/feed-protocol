@@ -1,5 +1,14 @@
 # Feed Engine 开发进度
 
+## [2026-02-11 18:45] UI 布局优化 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - `App.tsx`: Hero 区域高度 750→580px，标题 160→120px 响应式，统计数字 8xl→5xl/6xl，Tab 按钮和主按钮尺寸缩小
+  - `DashboardView.tsx`: 圆环仪表 280→220，容器 padding 和 Grid 间距全面收紧
+  - `OrderCard.tsx`: 卡片高度 560→480px，新增 `onError` 图片 fallback（渐变替代）
+- **[Next Step]**: 其他页面视觉打磨或功能开发
+
 ## [2026-02-11 14:15] 前端钱包登录流程打通 ✅
 
 - **[Status]**: Done
