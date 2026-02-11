@@ -109,13 +109,60 @@ const CosmicHero: React.FC<{ springX: MotionValue<number>; springY: MotionValue<
           <motion.div
             animate={{ y: [0, -20, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="relative z-10"
+            className="relative z-10 w-[320px] h-[320px]"
           >
-            <img
-              src="/assets/images/hero-core-v2.png"
-              className="w-[420px] drop-shadow-[0_60px_100px_rgba(34,211,238,0.3)] filter contrast-125"
-              alt="FeedVerse Command Core"
+            {/* Outer rotating ring */}
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-[-20px] rounded-full border-2 border-cyan-500/20"
+              style={{ borderTopColor: 'rgba(34,211,238,0.6)', borderRightColor: 'rgba(34,211,238,0.3)' }}
             />
+            {/* Middle counter-rotating ring */}
+            <motion.div
+              animate={{ rotate: -360 }}
+              transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+              className="absolute inset-[10px] rounded-full border border-cyan-400/15"
+              style={{ borderBottomColor: 'rgba(6,182,212,0.5)', borderLeftColor: 'rgba(6,182,212,0.2)' }}
+            />
+            {/* Inner pulsing ring */}
+            <motion.div
+              animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.7, 0.3] }}
+              transition={{ duration: 3, repeat: Infinity }}
+              className="absolute inset-[30px] rounded-full border border-cyan-300/30"
+            />
+            {/* Core glow */}
+            <div className="absolute inset-[50px] rounded-full bg-gradient-to-br from-cyan-500/20 via-cyan-400/10 to-transparent blur-[30px]" />
+            {/* Central energy core */}
+            <motion.div
+              animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
+              transition={{ duration: 2.5, repeat: Infinity }}
+              className="absolute inset-[70px] rounded-full bg-gradient-to-br from-cyan-400/40 via-cyan-500/60 to-cyan-600/40 shadow-[0_0_80px_rgba(34,211,238,0.4),inset_0_0_40px_rgba(34,211,238,0.3)]"
+            />
+            {/* Inner bright core */}
+            <motion.div
+              animate={{ scale: [1.1, 0.9, 1.1] }}
+              transition={{ duration: 2, repeat: Infinity }}
+              className="absolute inset-[100px] rounded-full bg-gradient-to-br from-white/30 via-cyan-300/50 to-cyan-500/30 shadow-[0_0_40px_rgba(34,211,238,0.6)]"
+            />
+            {/* Owl emblem in center */}
+            <div className="absolute inset-[110px] rounded-full flex items-center justify-center">
+              <span className="text-4xl select-none" role="img" aria-label="owl">🦉</span>
+            </div>
+            {/* Decorative dots on ring */}
+            {[0, 60, 120, 180, 240, 300].map((deg) => (
+              <motion.div
+                key={deg}
+                animate={{ opacity: [0.3, 1, 0.3] }}
+                transition={{ duration: 2, repeat: Infinity, delay: deg / 360 }}
+                className="absolute w-2 h-2 bg-cyan-400 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.8)]"
+                style={{
+                  top: `${50 - 45 * Math.cos((deg * Math.PI) / 180)}%`,
+                  left: `${50 + 45 * Math.sin((deg * Math.PI) / 180)}%`,
+                  transform: 'translate(-50%, -50%)',
+                }}
+              />
+            ))}
           </motion.div>
         </motion.div>
       </div>

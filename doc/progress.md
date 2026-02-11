@@ -1,5 +1,14 @@
 # Feed Engine 开发进度
 
+## [2026-02-11 20:12] Hero 区域改为纯 CSS 动画 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - `App.tsx`: Hero 核心图片替换为纯 CSS + framer-motion 动画（旋转光环 + 脉冲发光核心 + 猫头鹰标志 + 装饰光点）
+  - 解决了 PNG 图片透明度问题（白色/黑色背景无法完美融入深色主题）
+  - 静态资源目录修正：创建 `public/assets/images/` 供 Vite 正确提供静态文件
+- **[Next Step]**: 确认 CSS 动画效果，后续可考虑其他视图的图片素材优化
+
 ## [2026-02-11 18:45] UI 布局优化 ✅
 
 - **[Status]**: Done

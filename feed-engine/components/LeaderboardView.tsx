@@ -207,7 +207,7 @@ const LeaderboardView: React.FC = () => {
                 </div>
                 <div className="col-span-4 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center overflow-hidden border border-white/10">
-                    <img src="/assets/images/owl-mascot-v2.png" alt="avatar" />
+                    <img src="/assets/images/owl-mascot-v3.png" alt="avatar" />
                   </div>
                   <div>
                     <p className="font-bold text-lg group-hover:text-white transition-colors">{user.nickname || 'Anonymous'}</p>

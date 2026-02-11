@@ -161,7 +161,7 @@ const ArbitrationView: React.FC = () => {
                            <div className="flex -space-x-3">
                               {[1, 2, 3, 4].map(i => (
                                  <div key={i} className="w-10 h-10 rounded-full border-2 border-slate-900 overflow-hidden">
-                                    <img src="/assets/images/owl-mascot-v2.png" alt="judges" />
+                                    <img src="/assets/images/owl-mascot-v3.png" alt="judges" />
                                  </div>
                               ))}
                               <div className="w-10 h-10 rounded-full bg-rose-500/20 border-2 border-slate-900 flex items-center justify-center text-[10px] font-black text-rose-500">+8</div>

@@ -83,7 +83,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, onGrab }) => {
 
         {/* Floating Mascot Avatar */}
         <div className="absolute bottom-[-50px] left-12 w-28 h-28 rounded-[2.5rem] bg-[#0A0F1E] border-4 border-cyan-500/20 shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex items-center justify-center overflow-hidden z-20 group-hover:border-cyan-400 group-hover:scale-110 transition-all duration-500">
-          <img src="/assets/images/owl-mascot-v2.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100" alt="mascot" />
+          <img src="/assets/images/owl-mascot-v3.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100" alt="mascot" />
           <div className="absolute inset-0 bg-cyan-500/5 mix-blend-overlay" />
         </div>
 
