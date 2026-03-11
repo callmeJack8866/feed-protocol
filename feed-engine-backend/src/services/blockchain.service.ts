@@ -18,6 +18,10 @@ export const CONTRACT_ADDRESSES = {
     FEED_CONSENSUS: process.env.FEED_CONSENSUS_CONTRACT || '0x7fd163c3E3aACFa9c80C68194535DFC8A6604703',
     REWARD_PENALTY: process.env.REWARD_PENALTY_CONTRACT || '0x02D83c59E2348C70FAE6BbD96dDB67d0A46BbabA',
     FEED_ENGINE: process.env.FEED_ENGINE_CONTRACT || '0x4E5b9EB72419e7B49F9E6Ab67311fC7705c92420',
+    // NST Options 协议合约（外部客户协议）
+    NST_OPTIONS_CORE: process.env.NST_OPTIONS_CORE_CONTRACT || '',
+    // NST FeedProtocol 合约（喂价请求来源）
+    NST_FEED_PROTOCOL: process.env.NST_FEED_PROTOCOL_CONTRACT || '',
 };
 
 // ============ ABI 定义 ============
@@ -134,6 +138,16 @@ const FEED_ENGINE_ABI = [
     'event RankUpgraded(address indexed feeder, uint8 newRank)',
 ];
 
+/** NST OptionsCore（外部客户协议 - 仅事件监听 + 回调） */
+const NST_OPTIONS_CORE_ABI = [
+    // 回调写入
+    'function processFeedCallback(uint256 orderId, uint8 feedType, uint256 finalPrice)',
+    // 查询
+    'function getOrder(uint256 orderId) view returns (tuple(uint256 orderId, address buyer, address seller, string underlyingName, string underlyingCode, string market, string country, string refPrice, uint8 direction, uint256 notionalUSDT, uint256 strikePrice, uint256 expiryTimestamp, uint256 premiumRate, uint256 premiumAmount, uint256 initialMargin, uint256 currentMargin, uint256 minMarginRate, uint8 liquidationRule, uint8 consecutiveDays, uint8 dailyLimitPercent, uint8 exerciseDelay, uint8 sellerType, address designatedSeller, uint256 arbitrationWindow, uint256 marginCallDeadline, bool dividendAdjustment, uint8 feedRule, uint8 status, uint256 createdAt, uint256 matchedAt, uint256 settledAt, uint256 lastFeedPrice, uint256 dividendAmount))',
+    // 事件
+    'event FeedRequestEmitted(uint256 indexed orderId, string underlyingCode, string market, string country, uint8 feedType, uint8 tier, address indexed requester, uint256 notionalAmount, uint256 timestamp)',
+];
+
 // ============ Provider & Wallet ============
 let provider: ethers.JsonRpcProvider | null = null;
 let wallet: ethers.Wallet | null = null;
@@ -196,6 +210,12 @@ export function getRewardPenaltyContract(): ethers.Contract | null {
 export function getFeedEngineContract(): ethers.Contract | null {
     if (!provider) return null;
     return new ethers.Contract(CONTRACT_ADDRESSES.FEED_ENGINE, FEED_ENGINE_ABI, wallet || provider);
+}
+
+/** 获取 NST OptionsCore 合约（外部客户协议） */
+export function getNstOptionsCoreContract(): ethers.Contract | null {
+    if (!provider || !CONTRACT_ADDRESSES.NST_OPTIONS_CORE) return null;
+    return new ethers.Contract(CONTRACT_ADDRESSES.NST_OPTIONS_CORE, NST_OPTIONS_CORE_ABI, wallet || provider);
 }
 
 // ============ 链上操作 ============

@@ -166,6 +166,7 @@ model Order {
   
   // 来源协议
   sourceProtocol    String?   // NST 或其他协议
+  externalOrderId   String?   // 外部协议订单ID（如 NST orderId）
   callbackUrl       String?   // 回调地址
   
   createdAt         DateTime  @default(now())

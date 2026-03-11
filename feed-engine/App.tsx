@@ -11,8 +11,10 @@ import TrainingView from './components/TrainingView';
 import StakingView from './components/StakingView';
 import ArbitrationView from './components/ArbitrationView';
 import PreferencesModal from './components/PreferencesModal';
-import { FeederRank, FeedOrder } from './types';
+import { FeederRank, FeedOrder, OrderStatus } from './types';
 import { MOCK_ORDERS, MOCK_HISTORY } from './constants';
+import * as api from './services/api';
+import { transformOrder } from './services/transform';
 import { motion, AnimatePresence, useTransform, useMotionValue, useSpring, MotionValue } from 'framer-motion';
 import { useTranslation } from './i18n';
 import { useFeederStore, useUIStore } from './store';
@@ -351,6 +353,25 @@ const App: React.FC = () => {
     if (orders.length === 0) {
       useFeederStore.getState().setOrders(MOCK_ORDERS);
     }
+    // 从后端 API 加载真实订单
+    (async () => {
+      try {
+        const res = await api.getOrders();
+        if (res.success && res.orders?.length > 0) {
+          const realOrders = res.orders.map(transformOrder);
+          const store = useFeederStore.getState();
+          // 合并：保留 mock 数据 + 添加真实 API 订单
+          const existingIds = new Set(store.orders.map((o: FeedOrder) => o.orderId));
+          const newOrders = realOrders.filter((o: FeedOrder) => !existingIds.has(o.orderId));
+          if (newOrders.length > 0) {
+            store.setOrders([...store.orders, ...newOrders]);
+            console.log(`📡 从后端加载 ${newOrders.length} 个真实订单`);
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ 无法从后端加载订单，使用 mock 数据:', err);
+      }
+    })();
   }, []);
 
   // Parallax Values - Correctly placed at top level
@@ -389,6 +410,8 @@ const App: React.FC = () => {
         (activeTab === 'master' && order.notionalAmount >= 1000000);
 
       if (!matchesTab) return false;
+      // NST 外部协议的订单不受偏好过滤限制，直接显示
+      if ((order as any).sourceProtocol === 'NST') return true;
       return prefs.countries.includes(order.country) && prefs.exchanges.includes(order.exchange) && prefs.assets.includes(order.market);
     });
   }, [orders, activeTab, prefs]);

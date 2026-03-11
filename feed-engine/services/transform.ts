@@ -17,7 +17,7 @@ import {
 /**
  * 转换后端订单数据到前端 FeedOrder 类型
  */
-export function transformOrder(backendOrder: any): FeedOrder {
+export function transformOrder(backendOrder: any): FeedOrder & { sourceProtocol?: string } {
     return {
         orderId: backendOrder.id,
         symbol: backendOrder.symbol,
@@ -32,6 +32,7 @@ export function transformOrder(backendOrder: any): FeedOrder {
         rewardAmount: backendOrder.rewardAmount,
         status: mapOrderStatus(backendOrder.status),
         timeRemaining: calculateTimeRemaining(backendOrder.expiresAt),
+        sourceProtocol: backendOrder.sourceProtocol || undefined,
     };
 }
 

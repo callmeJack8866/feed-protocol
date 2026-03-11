@@ -3,7 +3,7 @@ import prisma from '../config/database';
 import { calculateReward, updateFeederRank, updateFeederStats } from './rank.service';
 import { detectAndUnlockAchievements } from './achievement-detection.service';
 import { evaluateAndExecutePenalty } from './penalty.service';
-import { getFeedConsensusContract, getRewardPenaltyContract } from './blockchain.service';
+import { getFeedConsensusContract, getRewardPenaltyContract, getNstOptionsCoreContract } from './blockchain.service';
 import { sendConsensusCallback, buildCallbackPayload } from './nst-callback.service';
 
 /**
@@ -233,6 +233,15 @@ export async function processOrderConsensus(orderId: string): Promise<ConsensusR
     }
 
     // ============================
+    // NST 链上回写：调用 OptionsCore.processFeedCallback()
+    // ============================
+    if ((order as any).sourceProtocol === 'NST' && (order as any).externalOrderId) {
+        writebackToNstContract((order as any).externalOrderId, order.feedType, consensusPrice).catch((err: any) => {
+            console.error(`⚠️ NST on-chain writeback failed for order ${orderId}:`, err);
+        });
+    }
+
+    // ============================
     // 链上同步：共识提交 + 奖励分配 (70/10/10/10)
     // ============================
     distributeRewardsOnChain(orderId, order, deviations, consensusPrice).catch(err => {
@@ -367,5 +376,59 @@ async function distributeRewardsOnChain(
     } catch (error) {
         console.error(`⚠️ RewardPenalty distribution failed (non-fatal):`, error);
         // 链上分配失败不影响数据库已完成的结算
+    }
+}
+
+/**
+ * NST 链上回写：将共识价格写回 NST OptionsCore 合约
+ *
+ * 调用 OptionsCore.processFeedCallback(orderId, feedType, finalPrice)
+ * - orderId: NST 订单 ID（uint256）
+ * - feedType: 0=Initial, 1=Dynamic, 2=Final, 3=Arbitration
+ * - finalPrice: 共识价格（18 decimals）
+ *
+ * @param nstOrderId NST 外部订单 ID
+ * @param feedType 喂价类型字符串 (INITIAL/DYNAMIC/FINAL/ARBITRATION)
+ * @param consensusPrice 共识价格（浮点数）
+ */
+async function writebackToNstContract(
+    nstOrderId: string,
+    feedType: string,
+    consensusPrice: number
+): Promise<void> {
+    const nstContract = getNstOptionsCoreContract();
+    if (!nstContract) {
+        console.warn('⚠️ NST OptionsCore contract not configured, skipping writeback');
+        return;
+    }
+
+    // 映射 FeedType 字符串 → NST 枚举值
+    const FEED_TYPE_ENUM: Record<string, number> = {
+        'INITIAL': 0,
+        'DYNAMIC': 1,
+        'FINAL': 2,
+        'SETTLEMENT': 2,  // 兼容
+        'ARBITRATION': 3,
+    };
+
+    const feedTypeEnum = FEED_TYPE_ENUM[feedType] ?? 0;
+
+    // NST 使用 18 decimals 精度
+    const priceWei = ethers.parseUnits(consensusPrice.toFixed(8), 18);
+
+    try {
+        console.log(`🔗 [NST Writeback] orderId=${nstOrderId}, feedType=${feedType}(${feedTypeEnum}), price=${consensusPrice}`);
+
+        const tx = await nstContract.processFeedCallback(
+            BigInt(nstOrderId),
+            feedTypeEnum,
+            priceWei
+        );
+        const receipt = await tx.wait();
+
+        console.log(`✅ [NST Writeback] Success! tx=${receipt.hash}`);
+    } catch (error: any) {
+        console.error(`❌ [NST Writeback] Failed:`, error?.reason || error?.message || error);
+        throw error;
     }
 }

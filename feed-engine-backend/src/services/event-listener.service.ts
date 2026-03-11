@@ -53,6 +53,16 @@ const FEED_ENGINE_EVENTS = [
     'event RankUpgraded(address indexed feeder, uint8 newRank)',
 ];
 
+// NST Options 协议事件（外部客户协议）
+const NST_OPTIONS_CORE_EVENTS = [
+    'event FeedRequestEmitted(uint256 indexed orderId, string underlyingCode, string market, string country, uint8 feedType, uint8 tier, address indexed requester, uint256 notionalAmount, uint256 timestamp)',
+];
+
+// NST FeedProtocol 合约事件（requestFeedPublic 调用后 emit）
+const NST_FEED_PROTOCOL_EVENTS = [
+    'event FeedRequested(uint256 indexed requestId, uint256 indexed orderId, string underlyingName, string underlyingCode, string market, string country, uint8 feedType, uint8 liquidationRule, uint8 consecutiveDays, uint8 exerciseDelay, uint256 timestamp)',
+];
+
 /**
  * 初始化事件监听
  */
@@ -92,7 +102,32 @@ export function initEventListener(): void {
         setupFeedEngineListeners();
         setupFeederLicenseListeners();
 
-        console.log('📡 Event listeners started for all 5 contracts');
+        // NST 外部协议监听 — OptionsCore
+        if (CONTRACT_ADDRESSES.NST_OPTIONS_CORE) {
+            contracts.nstOptionsCore = new ethers.Contract(
+                CONTRACT_ADDRESSES.NST_OPTIONS_CORE, NST_OPTIONS_CORE_EVENTS, provider
+            );
+            setupNstListeners();
+            console.log('   🔗 NST OptionsCore: ' + CONTRACT_ADDRESSES.NST_OPTIONS_CORE);
+        } else {
+            console.log('   ⚠️ NST OptionsCore: 未配置 (跳过监听)');
+        }
+
+        // NST FeedProtocol 监听（requestFeedPublic 的 FeedRequested 事件）
+        if (CONTRACT_ADDRESSES.NST_FEED_PROTOCOL) {
+            contracts.nstFeedProtocol = new ethers.Contract(
+                CONTRACT_ADDRESSES.NST_FEED_PROTOCOL, NST_FEED_PROTOCOL_EVENTS, provider
+            );
+            setupNstFeedProtocolListeners();
+            console.log('   🔗 NST FeedProtocol: ' + CONTRACT_ADDRESSES.NST_FEED_PROTOCOL);
+
+            // 启动时扫描历史事件补漏（最近 5000 个区块）
+            scanHistoricalFeedRequests(contracts.nstFeedProtocol, provider!);
+        } else {
+            console.log('   ⚠️ NST FeedProtocol: 未配置 (跳过监听)');
+        }
+
+        console.log('📡 Event listeners started for all contracts');
         Object.entries(CONTRACT_ADDRESSES).forEach(([name, addr]) => {
             console.log(`   ${name}: ${addr}`);
         });
@@ -361,6 +396,285 @@ function setupFeederLicenseListeners(): void {
             console.error('Error handling LicenseMinted:', error);
         }
     });
+}
+
+// ============ NST Options 协议事件 ============
+
+const FEED_TYPE_MAP: Record<number, string> = { 0: 'INITIAL', 1: 'DYNAMIC', 2: 'FINAL', 3: 'ARBITRATION' };
+const FEED_TIER_MAP: Record<number, string> = { 0: 'TIER_5_3', 1: 'TIER_7_5', 2: 'TIER_10_7' };
+
+function setupNstListeners(): void {
+    const c = contracts.nstOptionsCore;
+    if (!c) return;
+
+    /** NST 喂价请求事件 — 创建 FeedEngine 内部订单 */
+    c.on('FeedRequestEmitted', async (
+        orderId: bigint,
+        underlyingCode: string,
+        market: string,
+        country: string,
+        feedType: number,
+        tier: number,
+        requester: string,
+        notionalAmount: bigint,
+        timestamp: bigint,
+        event: any
+    ) => {
+        const feedTypeName = FEED_TYPE_MAP[feedType] || 'UNKNOWN';
+        const tierName = FEED_TIER_MAP[tier] || 'TIER_5_3';
+        console.log(`\n🔗 [NST] FeedRequestEmitted:`);
+        console.log(`   orderId=${orderId}, symbol=${underlyingCode}, type=${feedTypeName}, tier=${tierName}`);
+        console.log(`   requester=${requester}, notional=${ethers.formatUnits(notionalAmount, 6)} USDT`);
+
+        try {
+            // 创建 FeedEngine 内部订单
+            const quorumMap: Record<string, number> = { 'TIER_5_3': 3, 'TIER_7_5': 5, 'TIER_10_7': 7 };
+            const requiredFeedersMap: Record<string, number> = { 'TIER_5_3': 5, 'TIER_7_5': 7, 'TIER_10_7': 10 };
+
+            const order = await prisma.order.create({
+                data: {
+                    symbol: underlyingCode,
+                    market: market || 'UNKNOWN',
+                    country: country || 'UNKNOWN',
+                    exchange: market || 'UNKNOWN',
+                    feedType: feedTypeName,
+                    notionalAmount: parseFloat(ethers.formatUnits(notionalAmount, 6)),
+                    requiredFeeders: requiredFeedersMap[tierName] || 5,
+                    consensusThreshold: `${quorumMap[tierName] || 3}/${requiredFeedersMap[tierName] || 5}`,
+                    rewardAmount: 10,
+                    status: 'OPEN',
+                    expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30分钟超时
+                    sourceProtocol: 'NST',
+                    externalOrderId: orderId.toString(),
+                    callbackUrl: '',
+                    txHash: event.log?.transactionHash || '',
+                }
+            });
+
+            console.log(`   ✅ FeedEngine 订单已创建: ${order.id}`);
+
+            // WebSocket 广播给喂价员前端
+            io.emit('nst:feedRequest', {
+                feedEngineOrderId: order.id,
+                nstOrderId: orderId.toString(),
+                symbol: underlyingCode,
+                market,
+                country,
+                feedType: feedTypeName,
+                tier: tierName,
+                notionalAmount: parseFloat(ethers.formatUnits(notionalAmount, 6)),
+                requester,
+                txHash: event.log?.transactionHash || '',
+            });
+
+        } catch (error) {
+            console.error('❌ [NST] Failed to create FeedEngine order from NST event:', error);
+        }
+    });
+}
+
+// ============ NST FeedProtocol 事件 ============
+
+/**
+ * 监听 FeedProtocol 合约的 FeedRequested 事件
+ * 这是 requestFeedPublic 调用后 emit 的实际事件
+ */
+function setupNstFeedProtocolListeners(): void {
+    const c = contracts.nstFeedProtocol;
+    if (!c) return;
+
+    c.on('FeedRequested', async (
+        requestId: bigint,
+        orderId: bigint,
+        underlyingName: string,
+        underlyingCode: string,
+        market: string,
+        country: string,
+        feedType: number,
+        liquidationRule: number,
+        consecutiveDays: number,
+        exerciseDelay: number,
+        timestamp: bigint,
+        event: any
+    ) => {
+        const feedTypeName = FEED_TYPE_MAP[feedType] || 'UNKNOWN';
+        console.log(`\n🔗 [NST FeedProtocol] FeedRequested:`);
+        console.log(`   requestId=${requestId}, orderId=${orderId}, symbol=${underlyingCode || underlyingName || 'N/A'}, type=${feedTypeName}`);
+
+        try {
+            // 尝试从 OptionsCore 获取订单详情
+            let symbol = underlyingCode || underlyingName || 'UNKNOWN';
+            let orderMarket = market || 'UNKNOWN';
+            let orderCountry = country || 'UNKNOWN';
+            let notionalAmount = 0;
+
+            if (CONTRACT_ADDRESSES.NST_OPTIONS_CORE) {
+                try {
+                    const optionsCoreAbi = [
+                        'function getOrder(uint256 orderId) view returns (tuple(uint256 orderId, address buyer, address seller, string underlyingName, string underlyingCode, string market, string country, string refPrice, uint8 direction, uint256 notionalUSDT, uint256 strikePrice, uint256 expiryTimestamp, uint256 premiumRate, uint256 premiumAmount, uint256 initialMargin, uint256 currentMargin, uint256 minMarginRate, uint8 liquidationRule, uint8 consecutiveDays, uint8 dailyLimitPercent, uint8 exerciseDelay, uint8 sellerType, address designatedSeller, uint256 arbitrationWindow, uint256 marginCallDeadline, bool dividendAdjustment, uint8 feedRule, uint8 status, uint256 createdAt, uint256 matchedAt, uint256 settledAt, uint256 lastFeedPrice, uint256 dividendAmount))'
+                    ];
+                    const optionsCore = new ethers.Contract(CONTRACT_ADDRESSES.NST_OPTIONS_CORE, optionsCoreAbi, provider!);
+                    const order = await optionsCore.getOrder(orderId);
+                    symbol = order.underlyingName || order.underlyingCode || symbol;
+                    orderMarket = order.market || orderMarket;
+                    orderCountry = order.country || orderCountry;
+                    notionalAmount = parseFloat(ethers.formatUnits(order.notionalUSDT, 18));
+                    console.log(`   📋 订单详情: ${symbol}, market=${orderMarket}, notional=${notionalAmount}`);
+                } catch (err) {
+                    console.warn('   ⚠️ 无法获取 OptionsCore 订单详情，使用事件数据');
+                }
+            }
+
+            // 创建 FeedEngine 内部订单
+            const order = await prisma.order.create({
+                data: {
+                    symbol: symbol,
+                    market: orderMarket,
+                    country: orderCountry,
+                    exchange: orderMarket,
+                    feedType: feedTypeName,
+                    notionalAmount: notionalAmount,
+                    requiredFeeders: 1,  // 测试模式: Tier_5_3 只需1人
+                    consensusThreshold: '1/1',
+                    rewardAmount: 2.7,  // 2.7 USDT feeder reward
+                    status: 'OPEN',
+                    expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+                    sourceProtocol: 'NST',
+                    externalOrderId: orderId.toString(),
+                    callbackUrl: '',
+                    txHash: event.log?.transactionHash || '',
+                }
+            });
+
+            console.log(`   ✅ FeedEngine 订单已创建: ${order.id} (from FeedProtocol event)`);
+
+            // WebSocket 广播给喂价员前端
+            io.emit('nst:feedRequest', {
+                feedEngineOrderId: order.id,
+                nstOrderId: orderId.toString(),
+                nstRequestId: requestId.toString(),
+                symbol: symbol,
+                market: orderMarket,
+                country: orderCountry,
+                feedType: feedTypeName,
+                notionalAmount: notionalAmount,
+                txHash: event.log?.transactionHash || '',
+            });
+
+        } catch (error) {
+            console.error('❌ [NST FeedProtocol] Failed to create FeedEngine order:', error);
+        }
+    });
+}
+
+// ============ 启动时历史事件扫描 ============
+
+/**
+ * 扫描历史 FeedRequested 事件，补漏后端重启期间错过的喂价请求
+ * 检查最近 5000 个区块，对比数据库去重
+ */
+async function scanHistoricalFeedRequests(
+    contract: ethers.Contract,
+    provider: ethers.JsonRpcProvider
+): Promise<void> {
+    console.log('\n🔍 [Catch-up] 扫描历史 FeedRequested 事件...');
+
+    try {
+        const currentBlock = await provider.getBlockNumber();
+        const fromBlock = Math.max(0, currentBlock - 5000);
+        console.log(`   扫描区块范围: ${fromBlock} → ${currentBlock}`);
+
+        const filter = contract.filters.FeedRequested();
+        const events = await contract.queryFilter(filter, fromBlock, currentBlock);
+
+        console.log(`   找到 ${events.length} 个历史 FeedRequested 事件`);
+
+        if (events.length === 0) return;
+
+        for (const event of events) {
+            const log = event as ethers.EventLog;
+            const args = log.args;
+            if (!args) continue;
+
+            const [requestId, orderId, underlyingName, underlyingCode, market, country, feedType] = args;
+            const feedTypeName = FEED_TYPE_MAP[Number(feedType)] || 'UNKNOWN';
+
+            // 检查数据库是否已有该订单
+            const existing = await prisma.order.findFirst({
+                where: {
+                    sourceProtocol: 'NST',
+                    externalOrderId: orderId.toString(),
+                }
+            });
+
+            if (existing) {
+                console.log(`   ⏭️ orderId=${orderId} 已存在 (FeedEngine #${existing.id}), 跳过`);
+                continue;
+            }
+
+            // 从 OptionsCore 获取订单详情
+            let symbol = underlyingCode || underlyingName || 'UNKNOWN';
+            let orderMarket = market || 'UNKNOWN';
+            let orderCountry = country || 'UNKNOWN';
+            let notionalAmount = 0;
+
+            if (CONTRACT_ADDRESSES.NST_OPTIONS_CORE) {
+                try {
+                    const optionsCoreAbi = [
+                        'function getOrder(uint256 orderId) view returns (tuple(uint256 orderId, address buyer, address seller, string underlyingName, string underlyingCode, string market, string country, string refPrice, uint8 direction, uint256 notionalUSDT, uint256 strikePrice, uint256 expiryTimestamp, uint256 premiumRate, uint256 premiumAmount, uint256 initialMargin, uint256 currentMargin, uint256 minMarginRate, uint8 liquidationRule, uint8 consecutiveDays, uint8 dailyLimitPercent, uint8 exerciseDelay, uint8 sellerType, address designatedSeller, uint256 arbitrationWindow, uint256 marginCallDeadline, bool dividendAdjustment, uint8 feedRule, uint8 status, uint256 createdAt, uint256 matchedAt, uint256 settledAt, uint256 lastFeedPrice, uint256 dividendAmount))'
+                    ];
+                    const optionsCore = new ethers.Contract(CONTRACT_ADDRESSES.NST_OPTIONS_CORE, optionsCoreAbi, provider);
+                    const order = await optionsCore.getOrder(orderId);
+                    symbol = order.underlyingName || order.underlyingCode || symbol;
+                    orderMarket = order.market || orderMarket;
+                    orderCountry = order.country || orderCountry;
+                    notionalAmount = parseFloat(ethers.formatUnits(order.notionalUSDT, 18));
+                } catch (err) {
+                    console.warn(`   ⚠️ 无法获取 OptionsCore 订单 ${orderId} 详情`);
+                }
+            }
+
+            // 创建 FeedEngine 订单
+            const newOrder = await prisma.order.create({
+                data: {
+                    symbol: symbol,
+                    market: orderMarket,
+                    country: orderCountry,
+                    exchange: orderMarket,
+                    feedType: feedTypeName,
+                    notionalAmount: notionalAmount,
+                    requiredFeeders: 1,
+                    consensusThreshold: '1/1',
+                    rewardAmount: 2.7,
+                    status: 'OPEN',
+                    expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+                    sourceProtocol: 'NST',
+                    externalOrderId: orderId.toString(),
+                    callbackUrl: '',
+                    txHash: log.transactionHash || '',
+                }
+            });
+
+            console.log(`   ✅ 补漏创建: orderId=${orderId}, symbol=${symbol} → FeedEngine #${newOrder.id}`);
+
+            // WebSocket 广播
+            io.emit('nst:feedRequest', {
+                feedEngineOrderId: newOrder.id,
+                nstOrderId: orderId.toString(),
+                nstRequestId: requestId.toString(),
+                symbol: symbol,
+                market: orderMarket,
+                country: orderCountry,
+                feedType: feedTypeName,
+                notionalAmount: notionalAmount,
+                txHash: log.transactionHash || '',
+            });
+        }
+
+        console.log('✅ [Catch-up] 历史事件扫描完成');
+    } catch (error) {
+        console.error('❌ [Catch-up] 历史事件扫描失败:', error);
+    }
 }
 
 /**

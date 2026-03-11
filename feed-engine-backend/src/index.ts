@@ -36,16 +36,23 @@ const app = express();
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, {
     cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+        origin: process.env.FRONTEND_URL
+            ? process.env.FRONTEND_URL.split(',')
+            : ['http://localhost:5173', 'http://localhost:5174'],
         methods: ['GET', 'POST']
     }
 });
 
-// 中间件
-app.use(helmet());
+// 中间件 - CORS 必须在 helmet 之前，否则 preflight 请求会被阻止
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL
+        ? process.env.FRONTEND_URL.split(',')
+        : ['http://localhost:5173', 'http://localhost:5174'],
     credentials: true
+}));
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    crossOriginOpenerPolicy: false,
 }));
 app.use(express.json());
 

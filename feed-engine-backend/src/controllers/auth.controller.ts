@@ -180,14 +180,18 @@ router.get('/nonce', async (req: Request, res: Response) => {
         // 预构造 EIP-4361 消息
         const now = new Date();
         const expiresAt = new Date(now.getTime() + NONCE_TTL * 1000);
-        const domain = process.env.FRONTEND_URL ? new URL(process.env.FRONTEND_URL).host : 'localhost:5173';
+        // FRONTEND_URL 可能是逗号分隔的多个 URL，取第一个用于 SIWE 消息构造
+        const primaryFrontendUrl = process.env.FRONTEND_URL
+            ? process.env.FRONTEND_URL.split(',')[0].trim()
+            : 'http://localhost:5173';
+        const domain = new URL(primaryFrontendUrl).host;
 
         const message = buildSiweMessage({
             address: ethers.getAddress(address), // checksummed
             nonce,
             chainId: 56, // BSC
             domain,
-            uri: process.env.FRONTEND_URL || 'http://localhost:5173',
+            uri: primaryFrontendUrl,
             issuedAt: now.toISOString(),
             expirationTime: expiresAt.toISOString(),
         });
