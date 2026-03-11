@@ -1,5 +1,19 @@
 # Feed Engine 开发进度
 
+## [2026-03-11 21:28] FeedEngine_优化方案 全量执行 ✅
+
+- **[Status]**: Done
+- **[Changes]**:
+  - **P0-1 NST 链上回调**：`writebackToNstContract` 改用 `FeedProtocol.submitFeed(requestId, price)` 替代直接调用 `OptionsCore.processFeedCallback`；Prisma 添加 `externalRequestId` 字段；`.env` 配置 EOA 提交钱包私钥
+  - **P0-2 前端去 MOCK**：`App.tsx` 改为 API 优先加载订单，后端不可用时降级 demo 数据
+  - **P0-3 feedType 统一**：`nst.controller.ts` 对齐为 INITIAL/DYNAMIC/FINAL/ARBITRATION
+  - **P1-1 类型修正**：`types.ts` FeedOrder 添加 `sourceProtocol` 字段，移除 `as any` 类型转换
+  - **P1-2 移除无用监听**：OptionsCore FeedRequestEmitted 不再监听（NST 实际走 FeedProtocol）
+  - **P1-3 WebSocket 补全**：`nst:feedRequest` → `order:new` 事件转换 + 断线重连自动刷新
+  - **P2 增强**：历史扫描补漏也存储 requestId
+  - Prisma db push 成功，数据库同步
+- **[Next Step]**: 重启后端服务验证编译；NST 侧需将提交钱包注册为 FeedProtocol 喂价员
+
 ## [2026-02-11 20:12] Hero 区域改为纯 CSS 动画 ✅
 
 - **[Status]**: Done

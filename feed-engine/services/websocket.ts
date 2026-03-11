@@ -23,10 +23,17 @@ export function initWebSocket(): void {
 
     socket.on('connect', () => {
         console.log('🔌 WebSocket connected');
+        // 重连后触发数据刷新
+        emit('ws:reconnected', {});
     });
 
     socket.on('disconnect', () => {
         console.log('🔌 WebSocket disconnected');
+    });
+
+    socket.on('reconnect', () => {
+        console.log('🔌 WebSocket reconnected — 触发数据刷新');
+        emit('ws:reconnected', {});
     });
 
     // 设置事件转发
@@ -93,6 +100,22 @@ function setupEventForwarding(): void {
     socket.on('chain:consensusReached', (data) => emit('chain:consensusReached', data));
     socket.on('chain:staked', (data) => emit('chain:staked', data));
     socket.on('chain:slashed', (data) => emit('chain:slashed', data));
+
+    // NST 外部协议事件
+    socket.on('nst:feedRequest', (data) => {
+        // 将 NST 订单事件转换为标准 order:new 事件格式
+        const order: Partial<FeedOrder> = {
+            orderId: data.feedEngineOrderId,
+            symbol: data.symbol,
+            market: data.market,
+            country: data.country,
+            feedType: data.feedType,
+            notionalAmount: data.notionalAmount,
+            status: 'OPEN' as any,
+            sourceProtocol: 'NST',
+        };
+        emit('order:new', order);
+    });
 }
 
 /**

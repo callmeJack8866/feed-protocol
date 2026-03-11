@@ -235,8 +235,8 @@ export async function processOrderConsensus(orderId: string): Promise<ConsensusR
     // ============================
     // NST 链上回写：调用 OptionsCore.processFeedCallback()
     // ============================
-    if ((order as any).sourceProtocol === 'NST' && (order as any).externalOrderId) {
-        writebackToNstContract((order as any).externalOrderId, order.feedType, consensusPrice).catch((err: any) => {
+    if ((order as any).sourceProtocol === 'NST' && (order as any).externalRequestId) {
+        writebackToNstContract((order as any).externalRequestId, consensusPrice).catch((err: any) => {
             console.error(`⚠️ NST on-chain writeback failed for order ${orderId}:`, err);
         });
     }
@@ -380,55 +380,60 @@ async function distributeRewardsOnChain(
 }
 
 /**
- * NST 链上回写：将共识价格写回 NST OptionsCore 合约
+ * NST 链上回写：将共识价格通过 FeedProtocol.submitFeed 写回 NST
  *
- * 调用 OptionsCore.processFeedCallback(orderId, feedType, finalPrice)
- * - orderId: NST 订单 ID（uint256）
- * - feedType: 0=Initial, 1=Dynamic, 2=Final, 3=Arbitration
- * - finalPrice: 共识价格（18 decimals）
+ * 流程: FeedProtocol.submitFeed(requestId, price)
+ *   → FeedProtocol.finalizeFeed() (自动)
+ *   → OptionsCore.processFeedCallback() (自动回调)
  *
- * @param nstOrderId NST 外部订单 ID
- * @param feedType 喂价类型字符串 (INITIAL/DYNAMIC/FINAL/ARBITRATION)
+ * 使用 NST_FEED_SUBMITTER_PRIVATE_KEY 配置的 EOA 钱包签名交易
+ * 该钱包必须在 FeedProtocol 合约上注册为活跃喂价员
+ *
+ * @param nstRequestId NST FeedProtocol 的 requestId
  * @param consensusPrice 共识价格（浮点数）
  */
 async function writebackToNstContract(
-    nstOrderId: string,
-    feedType: string,
+    nstRequestId: string,
     consensusPrice: number
 ): Promise<void> {
-    const nstContract = getNstOptionsCoreContract();
-    if (!nstContract) {
-        console.warn('⚠️ NST OptionsCore contract not configured, skipping writeback');
+    const feedProtocolAddress = process.env.NST_FEED_PROTOCOL_CONTRACT;
+    const submitterKey = process.env.NST_FEED_SUBMITTER_PRIVATE_KEY;
+    const rpcUrl = process.env.BSC_TESTNET_RPC_URL || 'https://bsc-testnet-rpc.publicnode.com';
+
+    if (!feedProtocolAddress) {
+        console.warn('⚠️ NST FeedProtocol address not configured, skipping writeback');
+        return;
+    }
+    if (!submitterKey) {
+        console.warn('⚠️ NST_FEED_SUBMITTER_PRIVATE_KEY not configured, skipping writeback');
         return;
     }
 
-    // 映射 FeedType 字符串 → NST 枚举值
-    const FEED_TYPE_ENUM: Record<string, number> = {
-        'INITIAL': 0,
-        'DYNAMIC': 1,
-        'FINAL': 2,
-        'SETTLEMENT': 2,  // 兼容
-        'ARBITRATION': 3,
-    };
-
-    const feedTypeEnum = FEED_TYPE_ENUM[feedType] ?? 0;
-
-    // NST 使用 18 decimals 精度
-    const priceWei = ethers.parseUnits(consensusPrice.toFixed(8), 18);
+    // submitFeed ABI
+    const FEED_PROTOCOL_ABI = [
+        'function submitFeed(uint256 requestId, uint256 price) external',
+    ];
 
     try {
-        console.log(`🔗 [NST Writeback] orderId=${nstOrderId}, feedType=${feedType}(${feedTypeEnum}), price=${consensusPrice}`);
+        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const wallet = new ethers.Wallet(submitterKey, provider);
+        const feedProtocol = new ethers.Contract(feedProtocolAddress, FEED_PROTOCOL_ABI, wallet);
 
-        const tx = await nstContract.processFeedCallback(
-            BigInt(nstOrderId),
-            feedTypeEnum,
+        // NST 使用 18 decimals 精度
+        const priceWei = ethers.parseUnits(consensusPrice.toFixed(8), 18);
+
+        console.log(`🔗 [NST Writeback] requestId=${nstRequestId}, price=${consensusPrice}, submitter=${wallet.address}`);
+
+        const tx = await feedProtocol.submitFeed(
+            BigInt(nstRequestId),
             priceWei
         );
         const receipt = await tx.wait();
 
-        console.log(`✅ [NST Writeback] Success! tx=${receipt.hash}`);
+        console.log(`✅ [NST Writeback] FeedProtocol.submitFeed success! tx=${receipt.hash}`);
     } catch (error: any) {
         console.error(`❌ [NST Writeback] Failed:`, error?.reason || error?.message || error);
         throw error;
     }
 }
+

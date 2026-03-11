@@ -99,8 +99,8 @@ router.post('/request-feed', requireApiKey, async (req: Request, res: Response) 
             });
         }
 
-        // 验证 feedType
-        const validFeedTypes = ['SETTLEMENT', 'EXERCISE', 'MARGIN_CALL', 'DYNAMIC'];
+        // 验证 feedType（与 NST 合约 FeedType enum 保持一致）
+        const validFeedTypes = ['INITIAL', 'DYNAMIC', 'FINAL', 'ARBITRATION'];
         if (!validFeedTypes.includes(feedType)) {
             return res.status(400).json({
                 success: false,

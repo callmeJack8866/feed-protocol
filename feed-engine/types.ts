@@ -59,6 +59,7 @@ export interface FeedOrder {
   rewardAmount: number;
   status: OrderStatus;
   timeRemaining: number; // seconds
+  sourceProtocol?: string; // 来源协议 (NST, etc.)
 }
 
 export interface ArbitrationCase extends FeedOrder {

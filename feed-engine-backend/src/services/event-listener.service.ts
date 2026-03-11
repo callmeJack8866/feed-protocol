@@ -102,13 +102,14 @@ export function initEventListener(): void {
         setupFeedEngineListeners();
         setupFeederLicenseListeners();
 
-        // NST 外部协议监听 — OptionsCore
+        // NST OptionsCore — 仅用于回退查询订单详情，不做事件监听
+        // (NST 前端实际调用 FeedProtocol.requestFeedPublic，OptionsCore 的 FeedRequestEmitted 不会触发)
         if (CONTRACT_ADDRESSES.NST_OPTIONS_CORE) {
             contracts.nstOptionsCore = new ethers.Contract(
                 CONTRACT_ADDRESSES.NST_OPTIONS_CORE, NST_OPTIONS_CORE_EVENTS, provider
             );
-            setupNstListeners();
-            console.log('   🔗 NST OptionsCore: ' + CONTRACT_ADDRESSES.NST_OPTIONS_CORE);
+            // 不再调用 setupNstListeners()，改为仅保留实例供查询用
+            console.log('   🔗 NST OptionsCore (查询用): ' + CONTRACT_ADDRESSES.NST_OPTIONS_CORE);
         } else {
             console.log('   ⚠️ NST OptionsCore: 未配置 (跳过监听)');
         }
@@ -541,6 +542,7 @@ function setupNstFeedProtocolListeners(): void {
                     expiresAt: new Date(Date.now() + 30 * 60 * 1000),
                     sourceProtocol: 'NST',
                     externalOrderId: orderId.toString(),
+                    externalRequestId: requestId.toString(),
                     callbackUrl: '',
                     txHash: event.log?.transactionHash || '',
                 }
@@ -650,6 +652,7 @@ async function scanHistoricalFeedRequests(
                     expiresAt: new Date(Date.now() + 30 * 60 * 1000),
                     sourceProtocol: 'NST',
                     externalOrderId: orderId.toString(),
+                    externalRequestId: requestId.toString(),
                     callbackUrl: '',
                     txHash: log.transactionHash || '',
                 }

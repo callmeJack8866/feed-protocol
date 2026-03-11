@@ -333,8 +333,10 @@ const App: React.FC = () => {
   const setActiveTab = useUIStore((s) => s.setActiveTab);
   const grabAndFeed = useUIStore((s) => s.grabAndFeed);
 
-  // 初始化 mock 数据（仅在 store 为空时设置）
+  // 初始化数据：优先从后端 API 加载，API 不可用时降级为 demo 数据
+  const [dataLoading, setDataLoading] = React.useState(true);
   React.useEffect(() => {
+    // Profile: 钱包连接后应从 API 获取，暂用 mock
     if (!profile) {
       useFeederStore.getState().setProfile({
         address: '0x71C...3a21',
@@ -350,26 +352,30 @@ const App: React.FC = () => {
         stakeType: 'USDT',
       });
     }
-    if (orders.length === 0) {
-      useFeederStore.getState().setOrders(MOCK_ORDERS);
-    }
-    // 从后端 API 加载真实订单
+
+    // Orders: 优先从后端 API 加载
     (async () => {
       try {
         const res = await api.getOrders();
         if (res.success && res.orders?.length > 0) {
           const realOrders = res.orders.map(transformOrder);
-          const store = useFeederStore.getState();
-          // 合并：保留 mock 数据 + 添加真实 API 订单
-          const existingIds = new Set(store.orders.map((o: FeedOrder) => o.orderId));
-          const newOrders = realOrders.filter((o: FeedOrder) => !existingIds.has(o.orderId));
-          if (newOrders.length > 0) {
-            store.setOrders([...store.orders, ...newOrders]);
-            console.log(`📡 从后端加载 ${newOrders.length} 个真实订单`);
+          useFeederStore.getState().setOrders(realOrders);
+          console.log(`📡 从后端加载 ${realOrders.length} 个真实订单`);
+        } else {
+          // 后端返回空数据，使用 demo 数据
+          if (orders.length === 0) {
+            useFeederStore.getState().setOrders(MOCK_ORDERS);
+            console.log('📋 使用 demo 数据（后端无订单）');
           }
         }
       } catch (err) {
-        console.warn('⚠️ 无法从后端加载订单，使用 mock 数据:', err);
+        // 后端不可用，降级使用 demo 数据
+        if (orders.length === 0) {
+          useFeederStore.getState().setOrders(MOCK_ORDERS);
+          console.warn('⚠️ 后端不可用，降级使用 demo 数据:', err);
+        }
+      } finally {
+        setDataLoading(false);
       }
     })();
   }, []);
@@ -411,7 +417,7 @@ const App: React.FC = () => {
 
       if (!matchesTab) return false;
       // NST 外部协议的订单不受偏好过滤限制，直接显示
-      if ((order as any).sourceProtocol === 'NST') return true;
+      if (order.sourceProtocol === 'NST') return true;
       return prefs.countries.includes(order.country) && prefs.exchanges.includes(order.exchange) && prefs.assets.includes(order.market);
     });
   }, [orders, activeTab, prefs]);
