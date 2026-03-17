@@ -525,6 +525,140 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
             </motion.div>
           )}
 
+          {/* ========== "无法喂价" Report 步骤 — 方案 §6.6 ========== */}
+          {step === 'report' && (
+            <motion.div key="report" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-16 space-y-10">
+              <div className="flex justify-between items-start">
+                <div className="space-y-2">
+                  <h2 className="text-4xl font-black font-orbitron text-white uppercase italic tracking-tighter">REPORT ANOMALY</h2>
+                  <p className="text-xs text-slate-500 font-black uppercase tracking-[0.5em]">{order.symbol} // Unable to Feed</p>
+                </div>
+                <button onClick={() => setStep('input')} className="w-14 h-14 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-500 transition-colors">✕</button>
+              </div>
+
+              <p className="text-sm text-slate-400 leading-relaxed">
+                如果您无法为此订单提供价格数据，请选择原因。系统将审核后决定是否重新分配。
+              </p>
+
+              <div className="grid grid-cols-1 gap-4">
+                {[
+                  { key: 'SUSPENSION', icon: '⏸️', label: '标的停牌', desc: '该标的目前处于停牌状态' },
+                  { key: 'NO_DATA', icon: '📭', label: '数据源无数据', desc: '无法从数据源获取价格信息' },
+                  { key: 'INVALID_CODE', icon: '❌', label: '代码错误/不存在', desc: '标的代码有误或已退市' },
+                  { key: 'MARKET_CLOSED', icon: '🏛️', label: '市场休市', desc: '相关交易所当前未开盘' },
+                  { key: 'OTHER', icon: '📝', label: '其他原因', desc: '请在下一步提供详细说明' },
+                ].map(reason => (
+                  <motion.button
+                    key={reason.key}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => { setReportReason(reason.key); setStep('evidence'); }}
+                    className={`p-6 rounded-[2rem] border text-left transition-all flex items-center gap-5 ${
+                      reportReason === reason.key
+                        ? 'border-amber-500/40 bg-amber-500/10'
+                        : 'border-white/5 bg-white/[0.02] hover:border-white/10'
+                    }`}
+                  >
+                    <span className="text-3xl">{reason.icon}</span>
+                    <div>
+                      <p className="text-white font-bold text-sm">{reason.label}</p>
+                      <p className="text-slate-500 text-xs mt-1">{reason.desc}</p>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {/* ========== 证据截图步骤 ========== */}
+          {step === 'evidence' && (
+            <motion.div key="evidence" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-16 space-y-10">
+              <div className="flex justify-between items-start">
+                <div className="space-y-2">
+                  <h2 className="text-4xl font-black font-orbitron text-white uppercase italic tracking-tighter">EVIDENCE</h2>
+                  <p className="text-xs text-slate-500 font-black uppercase tracking-[0.5em]">Submit proof for review</p>
+                </div>
+                <button onClick={() => setStep('report')} className="w-14 h-14 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-500 transition-colors">←</button>
+              </div>
+
+              <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/20">
+                <p className="text-xs text-amber-400 font-bold uppercase tracking-widest">选择的原因</p>
+                <p className="text-white font-bold mt-2">
+                  {reportReason === 'SUSPENSION' ? '⏸️ 标的停牌' :
+                   reportReason === 'NO_DATA' ? '📭 数据源无数据' :
+                   reportReason === 'INVALID_CODE' ? '❌ 代码错误/不存在' :
+                   reportReason === 'MARKET_CLOSED' ? '🏛️ 市场休市' : '📝 其他原因'}
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-xs text-slate-400 font-bold uppercase tracking-widest">补充说明（可选）</label>
+                <textarea
+                  rows={3}
+                  placeholder="请描述具体情况..."
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm text-white placeholder:text-slate-600 focus:border-cyan-500 outline-none transition-all resize-none"
+                  id="report-description"
+                />
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-xs text-slate-400 font-bold uppercase tracking-widest">截图证据（可选）</label>
+                <div className="p-8 rounded-2xl border-2 border-dashed border-white/10 text-center hover:border-cyan-500/30 transition-colors cursor-pointer">
+                  <p className="text-3xl mb-3">📸</p>
+                  <p className="text-sm text-slate-400">点击上传截图或拖拽文件到此处</p>
+                  <p className="text-xs text-slate-600 mt-2">支持 PNG / JPG / WEBP，最大 5MB</p>
+                </div>
+              </div>
+
+              {error && (
+                <p className="text-rose-500 text-xs font-bold bg-rose-500/5 py-3 px-6 rounded-xl border border-rose-500/10">{error}</p>
+              )}
+
+              <div className="flex gap-6">
+                <button onClick={() => setStep('report')} className="flex-1 py-8 rounded-[2.5rem] bg-white/5 border border-white/5 text-slate-500 font-black text-xs uppercase tracking-[0.3em] hover:bg-white/10 transition-colors">
+                  BACK
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      setError(null);
+                      const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:3001') + '/api';
+                      const walletAddr = wallet.address || getWalletAddress() || '';
+                      const headers: Record<string, string> = {
+                        'Content-Type': 'application/json',
+                        'x-wallet-address': walletAddr,
+                      };
+                      const jwtToken = getAuthToken();
+                      if (jwtToken) headers['Authorization'] = `Bearer ${jwtToken}`;
+
+                      const descEl = document.getElementById('report-description') as HTMLTextAreaElement | null;
+                      const desc = descEl?.value || '';
+
+                      const res = await fetch(`${API_BASE}/orders/${order.id}/unable-to-feed`, {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({ reason: reportReason, description: desc }),
+                      });
+
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+                        throw new Error(err.error || 'Report failed');
+                      }
+
+                      // 报告成功 → 直接关闭
+                      onComplete(0, 0);
+                    } catch (err: any) {
+                      setError(err.message || '提交失败');
+                    }
+                  }}
+                  className="flex-[2] py-8 rounded-[3rem] bg-amber-500 text-black font-black font-orbitron text-2xl shadow-[0_25px_50px_rgba(245,158,11,0.3)] active:scale-95 transition-all uppercase italic"
+                >
+                  SUBMIT REPORT
+                </button>
+              </div>
+            </motion.div>
+          )}
+
           {step === 'consensus' && (
             <motion.div key="consensus" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-16 space-y-12">
               <div className="text-center space-y-4">

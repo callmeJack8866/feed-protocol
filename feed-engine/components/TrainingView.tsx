@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as api from '../services/api';
+import { useTranslation } from '../i18n';
 
 interface Course {
   id: string;
@@ -24,6 +25,7 @@ interface Exam {
 }
 
 const TrainingView: React.FC = () => {
+  const { t } = useTranslation();
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -96,18 +98,18 @@ const TrainingView: React.FC = () => {
   };
 
   const getStatusDisplay = (status?: string, examPassed?: boolean) => {
-    if (examPassed) return { text: '已通过', color: 'text-emerald-400', icon: '✅' };
-    if (status === 'COMPLETED') return { text: '已完成', color: 'text-emerald-400', icon: '✅' };
-    if (status === 'IN_PROGRESS') return { text: '学习中', color: 'text-amber-400', icon: '📚' };
-    return { text: '未开始', color: 'text-slate-400', icon: '📖' };
+    if (examPassed) return { text: t.training.passed, color: 'text-emerald-400', icon: '✅' };
+    if (status === 'COMPLETED') return { text: t.training.completed, color: 'text-emerald-400', icon: '✅' };
+    if (status === 'IN_PROGRESS') return { text: t.training.studying, color: 'text-amber-400', icon: '📚' };
+    return { text: t.training.notStarted, color: 'text-slate-400', icon: '📖' };
   };
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
-      'ONBOARDING': '入门必修',
-      'MONTHLY': '月度专题',
-      'MARKET_SPECIFIC': '市场专项',
-      'ADVANCED': '高级进阶'
+      'ONBOARDING': t.training.categoryOnboarding,
+      'MONTHLY': t.training.categoryMonthly,
+      'MARKET_SPECIFIC': t.training.categoryMarketSpecific,
+      'ADVANCED': t.training.categoryAdvanced
     };
     return labels[category] || category;
   };
@@ -123,17 +125,17 @@ const TrainingView: React.FC = () => {
   return (
     <div className="space-y-12">
       <header className="space-y-2">
-        <h2 className="text-4xl font-black font-orbitron tracking-tighter uppercase">TRAINING ACADEMY</h2>
-        <p className="text-slate-500">提升喂价技能，解锁精英任务区域</p>
+        <h2 className="text-4xl font-black font-orbitron tracking-tighter uppercase">{t.training.title}</h2>
+        <p className="text-slate-500">{t.training.subtitle}</p>
       </header>
 
       {/* 进度统计 */}
       <div className="grid grid-cols-4 gap-6">
         {[
-          { label: '总课程', value: stats.total, icon: '📚' },
-          { label: '已完成', value: stats.completed, icon: '✅' },
-          { label: '进行中', value: stats.inProgress, icon: '📖' },
-          { label: '考试通过', value: stats.examsPassed, icon: '🎓' }
+          { label: t.training.totalCourses, value: stats.total, icon: '📚' },
+          { label: t.training.completed, value: stats.completed, icon: '✅' },
+          { label: t.training.inProgress, value: stats.inProgress, icon: '📖' },
+          { label: t.training.examsPassed, value: stats.examsPassed, icon: '🎓' }
         ].map((stat, i) => (
           <div key={i} className="glass-panel rounded-2xl p-6 text-center">
             <span className="text-2xl">{stat.icon}</span>
@@ -170,7 +172,7 @@ const TrainingView: React.FC = () => {
                 {course.progress !== undefined && course.progress > 0 && (
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs text-slate-500">
-                      <span>学习进度</span>
+                      <span>{t.training.learningProgress}</span>
                       <span>{course.progress}%</span>
                     </div>
                     <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
@@ -185,7 +187,7 @@ const TrainingView: React.FC = () => {
 
               <div className="mt-8 flex items-center justify-between">
                 <div className="flex flex-col">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">完成奖励</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{t.training.completionReward}</span>
                   <span className="text-lg font-black font-orbitron text-amber-400">+{course.xpReward} XP</span>
                 </div>
                 <button
@@ -194,7 +196,7 @@ const TrainingView: React.FC = () => {
                       'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95'
                     }`}
                 >
-                  {course.examPassed ? '回顾课程' : course.status === 'IN_PROGRESS' ? '继续学习' : '开始学习'}
+                  {course.examPassed ? t.training.reviewCourse : course.status === 'IN_PROGRESS' ? t.training.continueStudy : t.training.startStudy}
                 </button>
               </div>
             </motion.div>
@@ -220,15 +222,15 @@ const TrainingView: React.FC = () => {
                 </span>
                 <h2 className="text-3xl font-black font-orbitron text-cyan-400 tracking-tighter uppercase">{selectedCourse.title}</h2>
                 <div className="flex gap-6 text-sm text-slate-400">
-                  <span>⏱️ {selectedCourse.duration} 分钟</span>
+                  <span>⏱️ {selectedCourse.duration} {t.training.minutes}</span>
                   <span>🎁 +{selectedCourse.xpReward} XP</span>
-                  {selectedCourse.isRequired && <span className="text-amber-400">⚠️ 必修课程</span>}
+                  {selectedCourse.isRequired && <span className="text-amber-400">⚠️ {t.training.requiredCourse}</span>}
                 </div>
                 <p className="text-lg text-slate-300 leading-relaxed mt-4">{selectedCourse.description}</p>
               </div>
 
               <div className="bg-white/5 border border-white/10 rounded-3xl p-8 space-y-4">
-                <h3 className="text-lg font-bold">课程大纲</h3>
+                <h3 className="text-lg font-bold">{t.training.courseOutline}</h3>
                 <ul className="space-y-3 text-slate-400">
                   <li className="flex items-center gap-3"><span className="text-cyan-400">•</span> 理解喂价系统核心原理</li>
                   <li className="flex items-center gap-3"><span className="text-cyan-400">•</span> 掌握 Commit-Reveal 提交流程</li>
@@ -241,7 +243,7 @@ const TrainingView: React.FC = () => {
                 onClick={() => startExam(selectedCourse.id)}
                 className="w-full py-5 rounded-2xl bg-cyan-500 text-black font-black font-orbitron text-lg shadow-xl shadow-cyan-500/30 hover:scale-[1.02] transition-transform"
               >
-                {selectedCourse.examPassed ? '重新参加考试' : '开始课程考试'}
+                {selectedCourse.examPassed ? t.training.retakeExam : t.training.startExam}
               </button>
             </motion.div>
           </div>
@@ -263,8 +265,8 @@ const TrainingView: React.FC = () => {
                   <div className="space-y-2">
                     <h2 className="text-2xl font-black font-orbitron text-cyan-400">{exam.title}</h2>
                     <div className="flex gap-6 text-sm text-slate-400">
-                      <span>及格分数: {exam.passingScore}%</span>
-                      <span>时间限制: {exam.timeLimit} 分钟</span>
+                      <span>{t.training.passingScore}: {exam.passingScore}%</span>
+                      <span>{t.training.timeLimit}: {exam.timeLimit} {t.training.minutes}</span>
                     </div>
                   </div>
 
@@ -302,7 +304,7 @@ const TrainingView: React.FC = () => {
                     disabled={answers.includes(-1)}
                     className="w-full py-5 rounded-2xl bg-cyan-500 text-black font-black font-orbitron text-lg shadow-xl shadow-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    提交答案
+                    {t.training.submitAnswers}
                   </button>
                 </>
               ) : (
@@ -311,11 +313,11 @@ const TrainingView: React.FC = () => {
                     {examResult.passed ? '🎉' : '😔'}
                   </div>
                   <h2 className={`text-4xl font-black font-orbitron ${examResult.passed ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {examResult.passed ? '恭喜通过！' : '未能通过'}
+                    {examResult.passed ? t.training.congrats : t.training.notPassed}
                   </h2>
                   <div className="space-y-4">
-                    <p className="text-6xl font-black font-orbitron text-white">{examResult.score}分</p>
-                    <p className="text-slate-400">正确 {examResult.correctCount}/{examResult.totalQuestions} 题 · 及格线 {examResult.passingScore}分</p>
+                    <p className="text-6xl font-black font-orbitron text-white">{examResult.score}</p>
+                    <p className="text-slate-400">{t.training.correct} {examResult.correctCount}/{examResult.totalQuestions} · {t.training.passLine} {examResult.passingScore}</p>
                     {examResult.passed && (
                       <p className="text-2xl font-bold text-amber-400">+{examResult.xpEarned} XP</p>
                     )}
@@ -324,7 +326,7 @@ const TrainingView: React.FC = () => {
                     onClick={() => { setExam(null); setExamResult(null); setSelectedCourse(null); }}
                     className="px-12 py-4 rounded-2xl bg-cyan-500 text-black font-black font-orbitron"
                   >
-                    返回课程列表
+                    {t.training.backToCourses}
                   </button>
                 </div>
               )}

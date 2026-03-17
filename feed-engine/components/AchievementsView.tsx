@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as api from '../services/api';
+import { useTranslation } from '../i18n/I18nContext';
 
 interface Achievement {
     id: string;
@@ -23,6 +24,7 @@ const AchievementsView: React.FC = () => {
     const [stats, setStats] = useState({ total: 0, unlocked: 0, byCategory: {} as Record<string, number> });
     const [newlyUnlocked, setNewlyUnlocked] = useState<any[]>([]);
     const [showUnlockAnimation, setShowUnlockAnimation] = useState(false);
+    const { t } = useTranslation();
 
     /**
      * 解锁音效 — Web Audio 升调和弦
@@ -51,11 +53,11 @@ const AchievementsView: React.FC = () => {
     }, [showUnlockAnimation, playUnlockSound]);
 
     const categories = [
-        { key: 'ALL', label: '全部', icon: '🏆' },
-        { key: 'MILESTONE', label: '里程碑', icon: '🏅' },
-        { key: 'PRECISION', label: '精准', icon: '🎯' },
-        { key: 'SPEED', label: '速度', icon: '⚡' },
-        { key: 'SPECIAL', label: '特殊', icon: '🌟' }
+        { key: 'ALL', label: t.achievements.allCategory, icon: '🏆' },
+        { key: 'MILESTONE', label: t.achievements.milestoneCategory, icon: '🏅' },
+        { key: 'PRECISION', label: t.achievements.precisionCategory, icon: '🎯' },
+        { key: 'SPEED', label: t.achievements.speedCategory, icon: '⚡' },
+        { key: 'SPECIAL', label: t.achievements.specialCategory, icon: '🌟' }
     ];
 
     const rarityColors: Record<string, string> = {
@@ -66,10 +68,10 @@ const AchievementsView: React.FC = () => {
     };
 
     const rarityLabels: Record<string, string> = {
-        'COMMON': '普通',
-        'RARE': '稀有',
-        'EPIC': '史诗',
-        'LEGENDARY': '传奇'
+        'COMMON': t.achievements.rarityCommon,
+        'RARE': t.achievements.rarityRare,
+        'EPIC': t.achievements.rarityEpic,
+        'LEGENDARY': t.achievements.rarityLegendary
     };
 
     useEffect(() => {
@@ -130,14 +132,14 @@ const AchievementsView: React.FC = () => {
         <div className="space-y-12">
             <header className="flex justify-between items-start">
                 <div className="space-y-2">
-                    <h2 className="text-4xl font-black font-orbitron tracking-tighter uppercase">ACHIEVEMENTS</h2>
-                    <p className="text-slate-500">收集徽章，展示你的喂价荣耀</p>
+                    <h2 className="text-4xl font-black font-orbitron tracking-tighter uppercase">{t.achievements.title}</h2>
+                    <p className="text-slate-500">{t.achievements.subtitle}</p>
                 </div>
                 <button
                     onClick={checkForNewAchievements}
                     className="px-6 py-3 rounded-xl bg-amber-500/20 text-amber-400 font-bold hover:bg-amber-500/30 transition-colors"
                 >
-                    ✨ 检查新成就
+                    {t.achievements.checkNew}
                 </button>
             </header>
 
@@ -146,7 +148,7 @@ const AchievementsView: React.FC = () => {
                 <div className="flex justify-between items-center">
                     <div>
                         <p className="text-5xl font-black font-orbitron text-cyan-400">{stats.unlocked}/{stats.total}</p>
-                        <p className="text-slate-500 mt-1">成就已解锁</p>
+                        <p className="text-slate-500 mt-1">{t.achievements.unlocked}</p>
                     </div>
                     <div className="w-32 h-32 relative">
                         <svg className="w-full h-full transform -rotate-90">
@@ -239,7 +241,7 @@ const AchievementsView: React.FC = () => {
 
                             {achievement.unlocked && achievement.unlockedAt && (
                                 <p className="text-xs text-slate-500">
-                                    解锁于 {new Date(achievement.unlockedAt).toLocaleDateString()}
+                                    {t.achievements.unlockedAtLabel} {new Date(achievement.unlockedAt).toLocaleDateString()}
                                 </p>
                             )}
                         </div>
@@ -335,7 +337,7 @@ const AchievementsView: React.FC = () => {
                                         transition={{ delay: 0.3 }}
                                         className="text-2xl font-bold text-amber-400 uppercase tracking-widest"
                                     >
-                                        🏆 成就解锁!
+                                        {t.achievements.achievementUnlocked}
                                     </motion.h2>
                                     <motion.h3
                                         initial={{ opacity: 0, y: 20 }}
@@ -381,7 +383,7 @@ const AchievementsView: React.FC = () => {
                                     onClick={() => setShowUnlockAnimation(false)}
                                     className="px-12 py-4 rounded-2xl bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-black font-orbitron shadow-[0_20px_60px_rgba(251,191,36,0.3)] hover:shadow-[0_25px_70px_rgba(251,191,36,0.5)] transition-shadow"
                                 >
-                                    太棒了！
+                                    {t.achievements.awesome}
                                 </motion.button>
                             </motion.div>
                         </div>

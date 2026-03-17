@@ -1,8 +1,11 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from '../i18n/I18nContext';
 
 const InventoryView: React.FC = () => {
+  const { t } = useTranslation();
+
   const items = [
     { name: 'S-CLASS LICENSE', type: 'LICENSE', id: 'LIC-9921', color: 'rose', rarity: 'LEGENDARY', desc: 'Full access to Master Zone and Arbitration rights.' },
     { name: 'US STOCKS AUTHORITY', type: 'MARKET', id: 'MKT-112', color: 'cyan', rarity: 'RARE', desc: 'Verified status for NYSE and NASDAQ oracle queries.' },
@@ -15,16 +18,16 @@ const InventoryView: React.FC = () => {
     <div className="space-y-12">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <h2 className="text-4xl font-black font-orbitron tracking-tighter italic uppercase">PROTOCOL VAULT</h2>
-          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Digital Licenses & Reputation Signatures</p>
+          <h2 className="text-4xl font-black font-orbitron tracking-tighter italic uppercase">{t.inventory.protocolVault}</h2>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{t.inventory.vaultSubtitle}</p>
         </div>
         <div className="flex gap-4">
            <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-center">
-              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Total Value</p>
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{t.inventory.totalValue}</p>
               <p className="text-sm font-black font-orbitron">12.5k FEED</p>
            </div>
            <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-center">
-              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Assets</p>
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{t.inventory.assets}</p>
               <p className="text-sm font-black font-orbitron">5 / 20</p>
            </div>
         </div>
@@ -84,7 +87,7 @@ const InventoryView: React.FC = () => {
                 </div>
                 <p className="text-[10px] text-slate-500 leading-relaxed font-medium">{item.desc}</p>
                 <button className="w-full py-3 rounded-xl bg-white/5 border border-white/5 text-[9px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-colors">
-                  View Signature
+                  {t.inventory.viewSignature}
                 </button>
              </div>
           </motion.div>
@@ -95,7 +98,7 @@ const InventoryView: React.FC = () => {
            <div className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center group-hover:scale-110 transition-transform">
               <span className="text-3xl text-slate-700 group-hover:text-slate-500 transition-colors">＋</span>
            </div>
-           <span className="text-[10px] font-black uppercase tracking-widest text-slate-700 group-hover:text-slate-500">Mint Credential</span>
+           <span className="text-[10px] font-black uppercase tracking-widest text-slate-700 group-hover:text-slate-500">{t.inventory.mintCredential}</span>
         </button>
       </div>
     </div>

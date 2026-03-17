@@ -34,24 +34,67 @@ function calculateConsensusConfig(notionalAmount: number): {
     requiredFeeders: number;
     consensusThreshold: string;
 } {
-    if (notionalAmount >= 1000000) {
+    if (notionalAmount >= 5000000) {
+        // >500万U — 方案 §6.4
+        return { requiredFeeders: 10, consensusThreshold: '7/10' };
+    } else if (notionalAmount >= 1000000) {
+        // 100万-500万U
         return { requiredFeeders: 7, consensusThreshold: '5/7' };
     } else if (notionalAmount >= 100000) {
+        // 10万-100万U
         return { requiredFeeders: 5, consensusThreshold: '3/5' };
     } else {
+        // <10万U
         return { requiredFeeders: 3, consensusThreshold: '2/3' };
     }
 }
 
 /**
- * 根据名义本金计算奖励
+ * 喂价类型奖励倍数 — 方案 §6.4
+ * INITIAL=1x, DYNAMIC=1x, SETTLEMENT=2x, ARBITRATION=3x
+ */
+const FEED_TYPE_REWARD_MULTIPLIER: Record<string, number> = {
+    'INITIAL': 1,
+    'DYNAMIC': 1.5,    // 方案 §6.2: 动态喂价 1.5x
+    'SETTLEMENT': 2,
+    'FINAL': 2,        // FINAL 与 SETTLEMENT 同义
+    'ARBITRATION': 3,
+};
+
+/**
+ * 方案 §6.5: 动态超时配置（按订单类型）
+ * grabTimeout: 抢单超时(秒), feedTimeout: 喂价超时(秒), orderTTL: 订单有效期(秒)
+ */
+const FEED_TYPE_TIMEOUT: Record<string, { grabTimeout: number; feedTimeout: number; orderTTL: number }> = {
+    'INITIAL':     { grabTimeout: 300,  feedTimeout: 600,  orderTTL: 3600 },  // 5分/10分/1小时
+    'DYNAMIC':     { grabTimeout: 120,  feedTimeout: 300,  orderTTL: 1800 },  // 2分/5分/30分钟
+    'SETTLEMENT':  { grabTimeout: 180,  feedTimeout: 480,  orderTTL: 3600 },  // 3分/8分/1小时
+    'FINAL':       { grabTimeout: 180,  feedTimeout: 480,  orderTTL: 3600 },  // 同 SETTLEMENT
+    'ARBITRATION': { grabTimeout: 600,  feedTimeout: 1800, orderTTL: 7200 },  // 10分/30分/2小时
+};
+
+/**
+ * 方案 §11.3: 喂价费用定价（按订单类型）
+ */
+const FEED_TYPE_FEE: Record<string, number> = {
+    'INITIAL':     5,   // 基础费用
+    'DYNAMIC':     5,   // 基础费用
+    'SETTLEMENT':  10,  // 责任更高
+    'FINAL':       10,  // 同 SETTLEMENT
+    'ARBITRATION': 20,  // 最高责任
+};
+
+/**
+ * 根据名义本金和喂价类型计算奖励
  * @param notionalAmount 名义本金 (USDT)
+ * @param feedType 喂价类型（可选，默认 INITIAL）
  * @returns 奖励金额 (FEED)
  */
-function calculateReward(notionalAmount: number): number {
+function calculateReward(notionalAmount: number, feedType?: string): number {
     const baseReward = 10; // 10 FEED
     const bonusRate = 0.0001; // 名义本金的 0.01%
-    return baseReward + notionalAmount * bonusRate;
+    const multiplier = FEED_TYPE_REWARD_MULTIPLIER[feedType || 'INITIAL'] || 1;
+    return (baseReward + notionalAmount * bonusRate) * multiplier;
 }
 
 // ============ API 端点 ============
@@ -100,7 +143,7 @@ router.post('/request-feed', requireApiKey, async (req: Request, res: Response) 
         }
 
         // 验证 feedType（与 NST 合约 FeedType enum 保持一致）
-        const validFeedTypes = ['INITIAL', 'DYNAMIC', 'FINAL', 'ARBITRATION'];
+        const validFeedTypes = ['INITIAL', 'DYNAMIC', 'SETTLEMENT', 'FINAL', 'ARBITRATION'];
         if (!validFeedTypes.includes(feedType)) {
             return res.status(400).json({
                 success: false,
@@ -132,9 +175,13 @@ router.post('/request-feed', requireApiKey, async (req: Request, res: Response) 
         // 计算共识配置
         const { requiredFeeders, consensusThreshold } = calculateConsensusConfig(amount);
 
-        // 计算过期时间
+        // 计算动态超时（方案 §6.5: 按订单类型区分）
+        const typeKey = feedType || 'SETTLEMENT';
+        const defaultTimeout = FEED_TYPE_TIMEOUT[typeKey] || FEED_TYPE_TIMEOUT['INITIAL'];
+        const finalGrabTimeout = grabTimeout || defaultTimeout.grabTimeout;
+        const finalFeedTimeout = feedTimeout || defaultTimeout.feedTimeout;
         const expiresAt = new Date();
-        expiresAt.setSeconds(expiresAt.getSeconds() + (grabTimeout || 300));
+        expiresAt.setSeconds(expiresAt.getSeconds() + defaultTimeout.orderTTL);
 
         // 创建订单
         const order = await prisma.order.create({
@@ -148,10 +195,10 @@ router.post('/request-feed', requireApiKey, async (req: Request, res: Response) 
                 requiredFeeders,
                 consensusThreshold,
                 specialConditions: specialConditions || [],
-                rewardAmount: rewardAmount || calculateReward(amount),
-                feeAmount: 5,
-                grabTimeout: grabTimeout || 300,
-                feedTimeout: feedTimeout || 600,
+                rewardAmount: rewardAmount || calculateReward(amount, feedType),
+                feeAmount: FEED_TYPE_FEE[feedType || 'SETTLEMENT'] || 5,
+                grabTimeout: finalGrabTimeout,
+                feedTimeout: finalFeedTimeout,
                 expiresAt,
                 sourceProtocol: req.protocolName || 'NST',
                 callbackUrl: callbackUrl || null,

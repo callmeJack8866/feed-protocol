@@ -27,10 +27,10 @@ export function calculateReward(
 ): { reward: number; xp: number; penaltyReason?: string } {
     // 偏差容忍度
     if (deviation <= 0.05) {
-        // 极度精准：全额奖励 + 额外 XP
+        // 极度精准：全额奖励 + 额外 XP（方案 §4.6: +25 XP）
         return {
             reward: baseReward * 1.1,
-            xp: 30
+            xp: 25
         };
     } else if (deviation <= 0.1) {
         // 精准：全额奖励

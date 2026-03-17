@@ -401,7 +401,7 @@ function setupFeederLicenseListeners(): void {
 
 // ============ NST Options 协议事件 ============
 
-const FEED_TYPE_MAP: Record<number, string> = { 0: 'INITIAL', 1: 'DYNAMIC', 2: 'FINAL', 3: 'ARBITRATION' };
+const FEED_TYPE_MAP: Record<number, string> = { 0: 'INITIAL', 1: 'DYNAMIC', 2: 'SETTLEMENT', 3: 'ARBITRATION' };
 const FEED_TIER_MAP: Record<number, string> = { 0: 'TIER_5_3', 1: 'TIER_7_5', 2: 'TIER_10_7' };
 
 function setupNstListeners(): void {

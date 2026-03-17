@@ -95,7 +95,8 @@ export async function matchOrdersForFeeder(feederId: string): Promise<Order[]> {
 }
 
 /**
- * 为订单匹配合适的喂价员（内存过滤版本）
+ * 为订单匹配合适的喂价员（带权重排序 — 方案 §5.2）
+ * 优先级权重：准确率 40% + 响应速度 30% + 等级 30%
  */
 export async function matchFeedersForOrder(orderId: string): Promise<Feeder[]> {
     const order = await prisma.order.findUnique({
@@ -108,17 +109,13 @@ export async function matchFeedersForOrder(orderId: string): Promise<Feeder[]> {
 
     // 获取所有非禁用喂价员
     const allFeeders = await prisma.feeder.findMany({
-        where: { isBanned: false },
-        orderBy: [
-            { accuracyRate: 'desc' },
-            { totalFeeds: 'desc' }
-        ]
+        where: { isBanned: false }
     });
 
     // 在内存中过滤
     const requiredRank = getRequiredRank(order.notionalAmount);
 
-    return allFeeders.filter(feeder => {
+    const qualified = allFeeders.filter(feeder => {
         const countries = toStringArray(feeder.countries);
         const exchanges = toStringArray(feeder.exchanges);
         const assetTypes = toStringArray(feeder.assetTypes);
@@ -144,7 +141,23 @@ export async function matchFeedersForOrder(orderId: string): Promise<Feeder[]> {
         }
 
         return true;
-    }).slice(0, 100);
+    });
+
+    // === 方案 §5.2: 权重排序 ===
+    // 准确率 40% + 响应速度(totalFeeds作代理) 30% + 等级 30%
+    const maxFeeds = Math.max(...qualified.map(f => f.totalFeeds), 1);
+
+    const scored = qualified.map(feeder => {
+        const accuracyScore = (feeder.accuracyRate / 100) * 0.4;               // 40% 准确率
+        const speedScore = (feeder.totalFeeds / maxFeeds) * 0.3;               // 30% 经验/速度
+        const rankScore = (getRankLevel(feeder.rank) / 7) * 0.3;              // 30% 等级
+        const totalScore = accuracyScore + speedScore + rankScore;
+        return { feeder, totalScore };
+    });
+
+    scored.sort((a, b) => b.totalScore - a.totalScore);
+
+    return scored.map(s => s.feeder).slice(0, 100);
 }
 
 /**

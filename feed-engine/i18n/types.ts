@@ -130,6 +130,25 @@ export interface TranslationKeys {
         noHistory: string;
         deviation: string;
         reward: string;
+        // 扩展 — DashboardView 组件
+        nodeTelemetry: string;
+        handshakeProtocol: string;
+        globalStatus: string;
+        synchronized: string;
+        linkAccuracy: string;
+        nodeIntegrity: string;
+        uptime: string;
+        latency: string;
+        sigsPerSec: string;
+        peers: string;
+        syncStability: string;
+        liveStream: string;
+        protocolVersion: string;
+        downloadCoreLogs: string;
+        rewardMultiplier: string;
+        stakeProtection: string;
+        activityStreak: string;
+        computingPower: string;
     };
 
     // ======== 质押 ========
@@ -144,6 +163,35 @@ export interface TranslationKeys {
         rewards: string;
         apr: string;
         stakeType: string;
+        // 扩展 — StakingView 组件
+        subtitle: string;
+        seasonEnd: string;
+        activeGuarantee: string;
+        protocolTrust: string;
+        marketStatus: string;
+        active: string;
+        withdrawalCooldown: string;
+        days: string;
+        initiateUnstake: string;
+        slashingRisk: string;
+        lowExposure: string;
+        safeZone: string;
+        riskDescription: string;
+        basicRequirement: string;
+        proRequirement: string;
+        eliteRequirement: string;
+        beginnerZoneAccess: string;
+        competitiveZoneAccess: string;
+        arbitrationRights: string;
+        deposit: string;
+        withdraw: string;
+        amountToStake: string;
+        amountToWithdraw: string;
+        available: string;
+        max: string;
+        collateralWarning: string;
+        initializeStake: string;
+        requestRelease: string;
     };
 
     // ======== 排行榜 ========
@@ -154,11 +202,25 @@ export interface TranslationKeys {
         feeds: string;
         accuracy: string;
         xp: string;
+        seasonTitle: string;
+        remaining: string;
+        poolTotal: string;
+        myRank: string;
+        overallRank: string;
+        feedCount: string;
+        accuracyRate: string;
+        tabOverall: string;
+        tabFeeds: string;
+        tabAccuracy: string;
+        seasonReward: string;
+        updatedHourly: string;
+        viewFullTop: string;
     };
 
     // ======== 培训 ========
     training: {
         title: string;
+        subtitle: string;
         courses: string;
         progress: string;
         startCourse: string;
@@ -166,6 +228,34 @@ export interface TranslationKeys {
         passed: string;
         failed: string;
         xpReward: string;
+        totalCourses: string;
+        completed: string;
+        inProgress: string;
+        examsPassed: string;
+        notStarted: string;
+        studying: string;
+        categoryOnboarding: string;
+        categoryMonthly: string;
+        categoryMarketSpecific: string;
+        categoryAdvanced: string;
+        learningProgress: string;
+        completionReward: string;
+        continueStudy: string;
+        reviewCourse: string;
+        startStudy: string;
+        minutes: string;
+        requiredCourse: string;
+        courseOutline: string;
+        retakeExam: string;
+        startExam: string;
+        passingScore: string;
+        timeLimit: string;
+        submitAnswers: string;
+        congrats: string;
+        notPassed: string;
+        correct: string;
+        passLine: string;
+        backToCourses: string;
     };
 
     // ======== 仲裁 ========
@@ -178,6 +268,28 @@ export interface TranslationKeys {
         support: string;
         oppose: string;
         pending: string;
+        // 扩展 — ArbitrationView 组件
+        judicialChamber: string;
+        asClassOnly: string;
+        disputeResolution: string;
+        activeConflict: string;
+        stakedBounty: string;
+        conflictRoot: string;
+        currentVotes: string;
+        untilLock: string;
+        arbitrationProtocol: string;
+        evidenceVsSignatures: string;
+        primaryEvidence: string;
+        disputeSummary: string;
+        aggregatedSubmissions: string;
+        feederId: string;
+        reportedPrice: string;
+        additionalNodesHalted: string;
+        waitingConsensus: string;
+        rejectValue: string;
+        affirmValue: string;
+        activeArbitrators: string;
+        criticalityTier: string;
     };
 
     // ======== 库存 ========
@@ -189,6 +301,64 @@ export interface TranslationKeys {
         empty: string;
         rarity: string;
         unlockedAt: string;
+        // 扩展 — InventoryView 组件
+        protocolVault: string;
+        vaultSubtitle: string;
+        totalValue: string;
+        assets: string;
+        viewSignature: string;
+        mintCredential: string;
+    };
+
+    // ======== 成就 ========
+    achievements: {
+        title: string;
+        subtitle: string;
+        checkNew: string;
+        unlocked: string;
+        achievementUnlocked: string;
+        awesome: string;
+        allCategory: string;
+        milestoneCategory: string;
+        precisionCategory: string;
+        speedCategory: string;
+        specialCategory: string;
+        rarityCommon: string;
+        rarityRare: string;
+        rarityEpic: string;
+        rarityLegendary: string;
+        unlockedAtLabel: string;
+    };
+
+    // ======== 订单详情 ========
+    orderDetail: {
+        liveMarketFlux: string;
+        riskExposure: string;
+        masterTierCoverage: string;
+        consensusTelemetry: string;
+        consensusThreshold: string;
+        nodesCommitted: string;
+        pendingBounties: string;
+        feedTokens: string;
+        rankExperience: string;
+        signalLifespan: string;
+        missionTier: string;
+        classAAccess: string;
+        engageDirective: string;
+        protocolBusy: string;
+        abortBriefing: string;
+        sigStrength: string;
+    };
+
+    // ======== 偏好设置 ========
+    preferences: {
+        title: string;
+        subtitle: string;
+        jurisdictionFocus: string;
+        assetSpecialties: string;
+        preferredGateways: string;
+        filterDescription: string;
+        saveParameters: string;
     };
 
     // ======== 钱包 ========

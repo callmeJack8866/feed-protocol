@@ -157,8 +157,8 @@ router.post('/orders', adminAuth, async (req: Request, res: Response) => {
                 requiredFeeders,
                 consensusThreshold,
                 specialConditions: specialConditions || [],
-                rewardAmount: rewardAmount || calculateReward(notionalAmount),
-                feeAmount: feeAmount || 5,
+                rewardAmount: rewardAmount || calculateReward(notionalAmount, feedType),
+                feeAmount: feeAmount || ({ 'INITIAL': 5, 'DYNAMIC': 5, 'SETTLEMENT': 10, 'FINAL': 10, 'ARBITRATION': 20 }[feedType] || 5),
                 grabTimeout: grabTimeout || 300,
                 feedTimeout: feedTimeout || 600,
                 expiresAt,
@@ -234,7 +234,7 @@ router.post('/orders/batch', adminAuth, async (req: Request, res: Response) => {
                     requiredFeeders,
                     consensusThreshold,
                     specialConditions: orderData.specialConditions || [],
-                    rewardAmount: orderData.rewardAmount || calculateReward(orderData.notionalAmount),
+                    rewardAmount: orderData.rewardAmount || calculateReward(orderData.notionalAmount, orderData.feedType),
                     feeAmount: orderData.feeAmount || 5,
                     grabTimeout: orderData.grabTimeout || 300,
                     feedTimeout: orderData.feedTimeout || 600,
@@ -430,26 +430,41 @@ router.post('/licenses/mint', adminAuth, async (req: Request, res: Response) => 
  * 根据名义本金计算共识配置
  */
 function calculateConsensusConfig(notionalAmount: number): { requiredFeeders: number; consensusThreshold: string } {
-    if (notionalAmount >= 1000000) {
-        // 100万U 以上
+    if (notionalAmount >= 5000000) {
+        // >500万U — 方案 §6.4
+        return { requiredFeeders: 10, consensusThreshold: '7/10' };
+    } else if (notionalAmount >= 1000000) {
+        // 100万-500万U
         return { requiredFeeders: 7, consensusThreshold: '5/7' };
     } else if (notionalAmount >= 100000) {
-        // 10万U - 100万U
+        // 10万-100万U
         return { requiredFeeders: 5, consensusThreshold: '3/5' };
     } else {
-        // 10万U 以下
+        // <10万U
         return { requiredFeeders: 3, consensusThreshold: '2/3' };
     }
 }
 
 /**
- * 根据名义本金计算奖励
+ * 喂价类型奖励倍数 — 方案 §6.4
  */
-function calculateReward(notionalAmount: number): number {
+const FEED_TYPE_REWARD_MULTIPLIER: Record<string, number> = {
+    'INITIAL': 1,
+    'DYNAMIC': 1.5,    // 方案 §6.2: 动态喂价 1.5x
+    'SETTLEMENT': 2,
+    'FINAL': 2,
+    'ARBITRATION': 3,
+};
+
+/**
+ * 根据名义本金和喂价类型计算奖励
+ */
+function calculateReward(notionalAmount: number, feedType?: string): number {
     // 基础奖励 + 按本金比例
     const baseReward = 10; // 10 FEED
     const bonusRate = 0.0001; // 0.01% 的名义本金
-    return baseReward + notionalAmount * bonusRate;
+    const multiplier = FEED_TYPE_REWARD_MULTIPLIER[feedType || 'INITIAL'] || 1;
+    return (baseReward + notionalAmount * bonusRate) * multiplier;
 }
 
 // ============ 无法喂价审核与重分配 ============

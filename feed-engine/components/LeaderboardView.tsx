@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import * as api from '../services/api';
+import { useTranslation } from '../i18n';
 
 const RANK_COLORS: Record<string, string> = {
   'S': 'text-amber-400',
@@ -32,6 +33,7 @@ interface LeaderboardEntry {
 }
 
 const LeaderboardView: React.FC = () => {
+  const { t } = useTranslation();
   const [season, setSeason] = useState<Season | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [myRank, setMyRank] = useState<{ overall: number; feeds: number; accuracy: number } | null>(null);
@@ -40,9 +42,9 @@ const LeaderboardView: React.FC = () => {
   const [rewards, setRewards] = useState<Record<string, any>>({});
 
   const tabs = [
-    { key: 'OVERALL', label: '综合排名', icon: '🏆' },
-    { key: 'FEEDS', label: '喂价数量', icon: '📊' },
-    { key: 'ACCURACY', label: '准确率', icon: '🎯' }
+    { key: 'OVERALL', label: t.leaderboard.tabOverall, icon: '🏆' },
+    { key: 'FEEDS', label: t.leaderboard.tabFeeds, icon: '📊' },
+    { key: 'ACCURACY', label: t.leaderboard.tabAccuracy, icon: '🎯' }
   ];
 
   useEffect(() => {
@@ -114,21 +116,21 @@ const LeaderboardView: React.FC = () => {
     const end = new Date(season.endDate);
     const now = new Date();
     const diff = end.getTime() - now.getTime();
-    if (diff <= 0) return '赛季已结束';
+    if (diff <= 0) return t.leaderboard.seasonTitle;
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    return `${days}天${hours}小时`;
+    return `${days}${t.training.minutes === '分钟' ? '天' : 'd'}${hours}${t.training.minutes === '分钟' ? '小时' : 'h'}`;
   };
 
   return (
     <div className="space-y-10">
       <header className="flex justify-between items-end">
         <div className="space-y-2">
-          <h2 className="text-4xl font-black font-orbitron tracking-tighter uppercase">SEASON LEADERBOARD</h2>
-          <p className="text-slate-500">{season?.name || '加载中...'} · 剩余 {getRemainingTime()}</p>
+          <h2 className="text-4xl font-black font-orbitron tracking-tighter uppercase">{t.leaderboard.seasonTitle}</h2>
+          <p className="text-slate-500">{season?.name || t.common.loading} · {t.leaderboard.remaining} {getRemainingTime()}</p>
         </div>
         <div className="px-6 py-3 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl">
-          <p className="text-[10px] text-cyan-500 font-black uppercase tracking-widest">奖池总额</p>
+          <p className="text-[10px] text-cyan-500 font-black uppercase tracking-widest">{t.leaderboard.poolTotal}</p>
           <p className="text-xl font-black font-orbitron text-white">250,000 <span className="text-sm">FEED</span></p>
         </div>
       </header>
@@ -136,19 +138,19 @@ const LeaderboardView: React.FC = () => {
       {/* 我的排名 */}
       {myRank && (
         <div className="glass-panel rounded-2xl p-6">
-          <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-4">我的赛季排名</p>
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mb-4">{t.leaderboard.myRank}</p>
           <div className="grid grid-cols-3 gap-6">
             <div className="text-center">
               <p className="text-4xl font-black font-orbitron text-cyan-400">#{myRank.overall}</p>
-              <p className="text-sm text-slate-400">综合排名</p>
+              <p className="text-sm text-slate-400">{t.leaderboard.overallRank}</p>
             </div>
             <div className="text-center">
               <p className="text-4xl font-black font-orbitron text-amber-400">#{myRank.feeds}</p>
-              <p className="text-sm text-slate-400">喂价数量</p>
+              <p className="text-sm text-slate-400">{t.leaderboard.feedCount}</p>
             </div>
             <div className="text-center">
               <p className="text-4xl font-black font-orbitron text-emerald-400">#{myRank.accuracy}</p>
-              <p className="text-sm text-slate-400">准确率</p>
+              <p className="text-sm text-slate-400">{t.leaderboard.accuracyRate}</p>
             </div>
           </div>
         </div>
@@ -174,11 +176,11 @@ const LeaderboardView: React.FC = () => {
       <div className="grid grid-cols-1 gap-4">
         {/* Header Row */}
         <div className="px-10 py-4 grid grid-cols-12 text-xs font-black text-slate-500 uppercase tracking-widest">
-          <div className="col-span-1">排名</div>
-          <div className="col-span-4">喂价员</div>
-          <div className="col-span-2">等级</div>
-          <div className="col-span-2">{activeTab === 'FEEDS' ? '喂价数' : activeTab === 'ACCURACY' ? '准确率' : 'XP'}</div>
-          <div className="col-span-3 text-right">赛季奖励</div>
+          <div className="col-span-1">{t.leaderboard.rank}</div>
+          <div className="col-span-4">{t.leaderboard.feeder}</div>
+          <div className="col-span-2">{t.leaderboard.rank}</div>
+          <div className="col-span-2">{activeTab === 'FEEDS' ? t.leaderboard.feedCount : activeTab === 'ACCURACY' ? t.leaderboard.accuracyRate : t.leaderboard.xp}</div>
+          <div className="col-span-3 text-right">{t.leaderboard.seasonReward}</div>
         </div>
 
         {/* User List */}
@@ -239,8 +241,8 @@ const LeaderboardView: React.FC = () => {
       </div>
 
       <footer className="p-10 rounded-[3rem] border-2 border-dashed border-white/5 flex flex-col items-center justify-center space-y-4">
-        <p className="text-slate-500 text-sm font-medium">排行榜每小时更新一次</p>
-        <button className="text-cyan-500 font-bold hover:underline">查看完整 TOP 1000</button>
+        <p className="text-slate-500 text-sm font-medium">{t.leaderboard.updatedHourly}</p>
+        <button className="text-cyan-500 font-bold hover:underline">{t.leaderboard.viewFullTop}</button>
       </footer>
     </div>
   );

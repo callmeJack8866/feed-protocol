@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { FeederProfile } from '../types';
 import { motion } from 'framer-motion';
+import { useTranslation } from '../i18n/I18nContext';
 
 const MechCorner = ({ position }: { position: 'tl' | 'tr' | 'bl' | 'br' }) => {
   const rotation = position === 'tl' ? 0 : position === 'tr' ? 90 : position === 'br' ? 180 : 270;
@@ -78,6 +79,8 @@ const TelemetryGraph = () => {
 };
 
 const DashboardView: React.FC<{ profile: FeederProfile }> = ({ profile }) => {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-20 relative">
       <header className="flex flex-col md:flex-row justify-between items-end gap-6 px-4">
@@ -85,15 +88,15 @@ const DashboardView: React.FC<{ profile: FeederProfile }> = ({ profile }) => {
           <div className="flex items-center gap-4">
             <div className="w-3 h-3 rounded-full bg-cyan-500 shadow-[0_0_15px_rgba(34,211,238,1)] animate-pulse" />
             <h2 className="text-4xl font-black font-orbitron tracking-tighter uppercase italic text-white leading-none">
-              NODE_<span className="text-cyan-400">TELEMETRY</span>
+              {t.dashboard.nodeTelemetry}
             </h2>
           </div>
-          <p className="text-slate-500 text-xs font-black uppercase tracking-[0.5em] italic ml-7">Handshake stability protocol V.4</p>
+          <p className="text-slate-500 text-xs font-black uppercase tracking-[0.5em] italic ml-7">{t.dashboard.handshakeProtocol}</p>
         </div>
         <div className="px-10 py-5 bg-black/60 border border-white/10 rounded-[2.5rem] backdrop-blur-3xl shadow-2xl flex items-center gap-8 relative group">
           <div className="text-right">
-            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Global Status</p>
-            <p className="text-lg font-black font-orbitron text-emerald-400 tracking-tighter italic uppercase">Synchronized</p>
+            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t.dashboard.globalStatus}</p>
+            <p className="text-lg font-black font-orbitron text-emerald-400 tracking-tighter italic uppercase">{t.dashboard.synchronized}</p>
           </div>
           <div className="w-px h-10 bg-white/10" />
           <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 flex items-center justify-center text-xl">📡</div>
@@ -108,17 +111,17 @@ const DashboardView: React.FC<{ profile: FeederProfile }> = ({ profile }) => {
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/hexellence.png')] opacity-[0.03] pointer-events-none" />
 
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-around gap-8">
-            <CircularGauge value={profile.accuracyRate} label="Link Accuracy" color="text-cyan-400" size={220} />
+            <CircularGauge value={profile.accuracyRate} label={t.dashboard.linkAccuracy} color="text-cyan-400" size={220} />
             <div className="w-px h-32 bg-white/5 hidden md:block" />
-            <CircularGauge value={88} label="Node Integrity" color="text-rose-500" size={220} />
+            <CircularGauge value={88} label={t.dashboard.nodeIntegrity} color="text-rose-500" size={220} />
           </div>
 
           <div className="mt-16 pt-12 border-t border-white/5 grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
-              { label: 'Uptime', val: '99.9%', color: 'text-emerald-400' },
-              { label: 'Latency', val: '12ms', color: 'text-cyan-400' },
-              { label: 'Sigs/Sec', val: '4.2', color: 'text-white' },
-              { label: 'Peers', val: '124', color: 'text-amber-400' }
+              { label: t.dashboard.uptime, val: '99.9%', color: 'text-emerald-400' },
+              { label: t.dashboard.latency, val: '12ms', color: 'text-cyan-400' },
+              { label: t.dashboard.sigsPerSec, val: '4.2', color: 'text-white' },
+              { label: t.dashboard.peers, val: '124', color: 'text-amber-400' }
             ].map(stat => (
               <div key={stat.label} className="space-y-1 text-center">
                 <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">{stat.label}</p>
@@ -133,19 +136,19 @@ const DashboardView: React.FC<{ profile: FeederProfile }> = ({ profile }) => {
           <MechCorner position="br" />
           <div className="space-y-6 relative z-10">
             <div className="flex justify-between items-center">
-              <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-500">Sync Stability</h3>
-              <span className="text-[9px] text-cyan-500 font-mono animate-pulse">LIVE_STREAM</span>
+              <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-500">{t.dashboard.syncStability}</h3>
+              <span className="text-[9px] text-cyan-500 font-mono animate-pulse">{t.dashboard.liveStream}</span>
             </div>
             <TelemetryGraph />
           </div>
 
           <div className="space-y-6 relative z-10">
             <div className="p-6 rounded-[2.5rem] bg-black/40 border border-white/5 space-y-2">
-              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Protocol Version</p>
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{t.dashboard.protocolVersion}</p>
               <p className="text-xl font-black font-orbitron text-white italic">FEED_OS_v3.42</p>
             </div>
             <button className="w-full py-6 rounded-[2.5rem] bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-[0.3em] hover:bg-cyan-500 hover:text-black hover:border-cyan-500 transition-all shadow-xl">
-              Download Core Logs
+              {t.dashboard.downloadCoreLogs}
             </button>
           </div>
         </div>
@@ -154,10 +157,10 @@ const DashboardView: React.FC<{ profile: FeederProfile }> = ({ profile }) => {
       {/* Hardware Matrix Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { icon: '💎', label: 'Reward Multiplier', val: '1.4x', color: 'text-cyan-400' },
-          { icon: '🛡️', label: 'Stake Protection', val: 'Shielded', color: 'text-emerald-400' },
-          { icon: '🔥', label: 'Activity Streak', val: '14 Days', color: 'text-rose-500' },
-          { icon: '⚡', label: 'Computing Power', val: '2.4 GH/s', color: 'text-amber-500' }
+          { icon: '💎', label: t.dashboard.rewardMultiplier, val: '1.4x', color: 'text-cyan-400' },
+          { icon: '🛡️', label: t.dashboard.stakeProtection, val: 'Shielded', color: 'text-emerald-400' },
+          { icon: '🔥', label: t.dashboard.activityStreak, val: '14 Days', color: 'text-rose-500' },
+          { icon: '⚡', label: t.dashboard.computingPower, val: '2.4 GH/s', color: 'text-amber-500' }
         ].map((item, i) => (
           <motion.div
             key={item.label}

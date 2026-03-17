@@ -353,6 +353,11 @@ router.post('/connect', async (req: Request, res: Response) => {
 });
 
 /**
+ * 方案 §4.5 支持的市场类型（完整枚举）
+ */
+const VALID_ASSET_TYPES = ['CRYPTO', 'US_STOCK', 'CN_STOCK', 'HK_STOCK', 'FOREX', 'COMMODITY'];
+
+/**
  * POST /api/auth/register
  * 喂价员注册（设置偏好），需要认证
  */
@@ -360,6 +365,17 @@ router.post('/register', requireAuth, async (req: Request, res: Response) => {
     try {
         const address = req.user!.address;
         const { nickname, countries, exchanges, assetTypes, stakeType } = req.body;
+
+        // 校验市场类型有效性
+        if (assetTypes && Array.isArray(assetTypes)) {
+            const invalid = assetTypes.filter((t: string) => !VALID_ASSET_TYPES.includes(t));
+            if (invalid.length > 0) {
+                return res.status(400).json({
+                    error: `Invalid asset types: ${invalid.join(', ')}`,
+                    validTypes: VALID_ASSET_TYPES
+                });
+            }
+        }
 
         const feeder = await prisma.feeder.upsert({
             where: { address },

@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { FeedOrder, ConditionType, OrderStatus, MarketType } from '../types';
 import { MARKET_ICONS, STATUS_CONFIG, getReferenceData } from '../constants';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from '../i18n/I18nContext';
 
 interface OrderDetailModalProps {
   order: FeedOrder;
@@ -68,6 +69,7 @@ const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClose, onG
   const [priceDirection, setPriceDirection] = useState<'up' | 'down' | 'stable'>('stable');
   const lastPriceRef = useRef<number | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const { t } = useTranslation();
 
   const currentStatus = STATUS_CONFIG[order.status] || STATUS_CONFIG[OrderStatus.OPEN];
   
@@ -226,7 +228,7 @@ const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClose, onG
                         transition={{ duration: 1.5, repeat: Infinity }}
                         className="w-2.5 h-2.5 rounded-full bg-cyan-500 shadow-[0_0_10px_rgba(34,211,238,0.8)]" 
                      />
-                     <span className="text-[10px] text-cyan-500 font-black uppercase tracking-widest">{signalStrength.toFixed(0)}% SIG STRENGTH</span>
+                     <span className="text-[10px] text-cyan-500 font-black uppercase tracking-widest">{signalStrength.toFixed(0)}% {t.orderDetail.sigStrength}</span>
                   </div>
                 </div>
               </div>
@@ -237,7 +239,7 @@ const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClose, onG
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             <div className="p-10 rounded-[3.5rem] bg-white/[0.02] border border-white/5 relative group overflow-hidden">
                <div className="absolute top-0 right-0 w-40 h-40 bg-cyan-500/10 blur-[60px]" />
-               <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.4em] mb-6">Live Market Flux</p>
+               <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.4em] mb-6">{t.orderDetail.liveMarketFlux}</p>
                <div className="space-y-2 h-20">
                   <Sparkline data={priceHistory} color={priceDirection === 'up' ? '#10b981' : priceDirection === 'down' ? '#f43f5e' : '#22d3ee'} />
                </div>
@@ -258,14 +260,14 @@ const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClose, onG
 
             <div className="p-10 rounded-[3.5rem] bg-white/[0.02] border border-white/5 flex flex-col justify-between">
                <div>
-                 <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.4em] mb-4">Risk Exposure</p>
+                 <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.4em] mb-4">{t.orderDetail.riskExposure}</p>
                  <p className="text-4xl font-black font-orbitron text-white tracking-tighter italic">
                     ${(order.notionalAmount).toLocaleString()} <span className="text-lg opacity-20">USDT</span>
                  </p>
                </div>
                <div className="flex items-center gap-3">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Master Tier Coverage Enabled</span>
+                   <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t.orderDetail.masterTierCoverage}</span>
                </div>
             </div>
           </div>
@@ -273,7 +275,7 @@ const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClose, onG
           {/* Protocol Anomaly Log */}
           <div className="space-y-6">
              <div className="flex items-center justify-between px-2">
-                <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.6em]">Consensus Telemetry</h3>
+                <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-[0.6em]">{t.orderDetail.consensusTelemetry}</h3>
                 <span className="text-[9px] text-slate-700 font-black uppercase tracking-widest">Buffer: 4.2 MB/s</span>
              </div>
              <div className="p-10 rounded-[3rem] bg-black/60 border border-white/5 font-mono text-[11px] text-slate-500 space-y-2.5 relative shadow-inner overflow-hidden h-60 flex flex-col justify-end">
@@ -297,12 +299,12 @@ const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClose, onG
             <div className="space-y-10">
                <div className="flex justify-between items-end">
                  <div className="space-y-2">
-                    <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em]">Consensus Threshold</h3>
+                     <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em]">{t.orderDetail.consensusThreshold}</h3>
                     <p className="text-3xl font-black font-orbitron text-white italic tracking-tighter">{order.consensusThreshold} SIGS</p>
                  </div>
                  <div className="text-right">
                     <p className="text-5xl font-black font-orbitron text-cyan-400 tracking-tighter">{committedCount}/{order.requiredFeeders}</p>
-                    <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">Nodes Committed</p>
+                     <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">{t.orderDetail.nodesCommitted}</p>
                  </div>
                </div>
                
@@ -334,14 +336,14 @@ const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClose, onG
 
             {/* Bounty Allocations */}
             <div className="space-y-6">
-               <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em]">Pending Bounties</h3>
+                <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-[0.5em]">{t.orderDetail.pendingBounties}</h3>
                <div className="space-y-4">
                   <div className="p-8 rounded-[2.5rem] bg-white/[0.03] border border-white/5 flex items-center justify-between">
                      <div className="flex items-center gap-6">
                         <span className="text-4xl">🪙</span>
                         <div>
                            <p className="text-2xl font-black font-orbitron text-cyan-400">{order.rewardAmount}</p>
-                           <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">FEED Tokens</p>
+                            <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">{t.orderDetail.feedTokens}</p>
                         </div>
                      </div>
                   </div>
@@ -350,7 +352,7 @@ const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClose, onG
                         <span className="text-4xl">⭐</span>
                         <div>
                            <p className="text-2xl font-black font-orbitron text-amber-400">+25</p>
-                           <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">Rank Experience</p>
+                            <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">{t.orderDetail.rankExperience}</p>
                         </div>
                      </div>
                   </div>
@@ -362,14 +364,14 @@ const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClose, onG
           <div className="mt-12 space-y-10 relative z-10">
              <div className="flex justify-between items-center bg-black/40 p-6 rounded-[2rem] border border-white/5">
                 <div className="space-y-1">
-                   <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">Signal Lifespan</p>
+                    <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">{t.orderDetail.signalLifespan}</p>
                    <p className="text-2xl font-black font-orbitron text-rose-500 italic tracking-tighter">
                       {Math.floor(order.timeRemaining / 60)}:{(order.timeRemaining % 60).toString().padStart(2, '0')}
                    </p>
                 </div>
                 <div className="text-right">
-                   <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">Mission Tier</p>
-                   <p className="text-[11px] font-black font-orbitron text-slate-400 uppercase italic">Class-A Access</p>
+                    <p className="text-[9px] text-slate-600 font-black uppercase tracking-widest">{t.orderDetail.missionTier}</p>
+                    <p className="text-[11px] font-black font-orbitron text-slate-400 uppercase italic">{t.orderDetail.classAAccess}</p>
                 </div>
              </div>
              
@@ -385,10 +387,10 @@ const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClose, onG
                    : 'bg-slate-900 text-slate-700 cursor-not-allowed border border-white/5'
                  }`}
                >
-                  {order.status === OrderStatus.OPEN ? 'ENGAGE DIRECTIVE' : 'PROTOCOL BUSY'}
+                   {order.status === OrderStatus.OPEN ? t.orderDetail.engageDirective : t.orderDetail.protocolBusy}
                </motion.button>
-               <button onClick={onClose} className="w-full text-slate-700 font-black hover:text-slate-400 transition-colors text-[10px] uppercase tracking-[0.6em] italic">
-                  Abort Briefing
+                <button onClick={onClose} className="w-full text-slate-700 font-black hover:text-slate-400 transition-colors text-[10px] uppercase tracking-[0.6em] italic">
+                   {t.orderDetail.abortBriefing}
                </button>
              </div>
           </div>
