@@ -19,6 +19,7 @@ import {
  */
 export function transformOrder(backendOrder: any): FeedOrder & { sourceProtocol?: string } {
     return {
+        id: backendOrder.id,
         orderId: backendOrder.id,
         symbol: backendOrder.symbol,
         market: backendOrder.market as MarketType,
@@ -33,6 +34,14 @@ export function transformOrder(backendOrder: any): FeedOrder & { sourceProtocol?
         status: mapOrderStatus(backendOrder.status),
         timeRemaining: calculateTimeRemaining(backendOrder.expiresAt),
         sourceProtocol: backendOrder.sourceProtocol || undefined,
+        // NST 订单详情扩展字段
+        underlyingName: backendOrder.underlyingName || backendOrder.symbol,
+        underlyingCode: backendOrder.underlyingCode || '',
+        direction: backendOrder.direction || '',
+        strikePrice: backendOrder.strikePrice || 0,
+        expiryTimestamp: backendOrder.expiryTimestamp ? new Date(backendOrder.expiryTimestamp).getTime() / 1000 : 0,
+        refPrice: backendOrder.refPrice || '',
+        externalOrderId: backendOrder.externalOrderId || '',
     };
 }
 

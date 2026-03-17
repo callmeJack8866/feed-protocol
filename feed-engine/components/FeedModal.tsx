@@ -5,6 +5,7 @@ import { getReferenceData } from '../constants';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
 import { useTranslation } from '../i18n';
 import { useWallet } from '../hooks';
+import { getAuthToken, getWalletAddress } from '../services/api';
 
 interface FeedModalProps {
   order: FeedOrder;
@@ -222,6 +223,16 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 检查钱包连接 — 优先从 api.ts 全局状态取（Layout 登录时 setWalletAddress）
+    const walletAddr = wallet.address || getWalletAddress();
+    if (!walletAddr) {
+      setError('请先连接钱包 (Connect wallet first)');
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 500);
+      return;
+    }
+
     const val = parseFloat(price);
     if (isNaN(val) || val < range.min || val > range.max) {
       setError(`Value must be within ±${range.tolerancePercent}% benchmark (${range.min.toFixed(2)} - ${range.max.toFixed(2)})`);
@@ -239,18 +250,28 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
 
     try {
       // 提交哈希到后端
-      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:3001') + '/api';
+
+      // 构建请求头 — 同时携带 JWT 和 wallet address
+      const walletAddr = wallet.address || getWalletAddress() || '';
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-wallet-address': walletAddr,
+      };
+      // 从内存获取 JWT token（由 Layout 登录时设置）
+      const jwtToken = getAuthToken();
+      if (jwtToken) {
+        headers['Authorization'] = `Bearer ${jwtToken}`;
+      }
+
       const commitRes = await fetch(`${API_BASE}/orders/${order.id}/submit`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-wallet-address': wallet.address || '',
-        },
+        headers,
         body: JSON.stringify({ priceHash: hash }),
       });
 
       if (!commitRes.ok) {
-        const err = await commitRes.json();
+        const err = await commitRes.json().catch(() => ({ error: `HTTP ${commitRes.status}` }));
         throw new Error(err.error || 'Commit failed');
       }
 
@@ -260,15 +281,12 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
 
       const revealRes = await fetch(`${API_BASE}/orders/${order.id}/reveal`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-wallet-address': wallet.address || '',
-        },
+        headers,
         body: JSON.stringify({ price: val.toString(), salt: newSalt }),
       });
 
       if (!revealRes.ok) {
-        const err = await revealRes.json();
+        const err = await revealRes.json().catch(() => ({ error: `HTTP ${revealRes.status}` }));
         throw new Error(err.error || 'Reveal failed');
       }
 
@@ -344,13 +362,63 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
       >
         <AnimatePresence mode="wait">
           {step === 'input' && (
-            <motion.div key="input" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className="p-16 space-y-12">
+            <motion.div key="input" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className="p-16 space-y-10">
               <div className="flex justify-between items-start">
                 <div className="space-y-2">
                   <h2 className="text-5xl font-black font-orbitron text-white uppercase italic tracking-tighter">ORACLE HANDSHAKE</h2>
                   <p className="text-xs text-slate-500 font-black uppercase tracking-[0.5em]">{order.symbol} // Reference Value: {range.ref}</p>
                 </div>
                 <button onClick={onClose} className="w-14 h-14 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-500 transition-colors">✕</button>
+              </div>
+
+              {/* 订单详情信息面板 */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {order.underlyingName && (
+                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">标的名称</p>
+                    <p className="text-sm text-white font-bold">{order.underlyingName}</p>
+                  </div>
+                )}
+                {order.underlyingCode && (
+                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">标的代码</p>
+                    <p className="text-sm text-cyan-400 font-mono font-bold">{order.underlyingCode}</p>
+                  </div>
+                )}
+                {order.direction && (
+                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">方向</p>
+                    <p className={`text-sm font-bold ${order.direction === 'Call' || order.direction === 'CALL' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {order.direction === 'Call' || order.direction === 'CALL' ? '📈 CALL' : '📉 PUT'}
+                    </p>
+                  </div>
+                )}
+                <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
+                  <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">名义本金</p>
+                  <p className="text-sm text-amber-400 font-bold font-orbitron">${order.notionalAmount?.toLocaleString() || '—'} <span className="text-[10px] text-slate-500">USDT</span></p>
+                </div>
+                {order.refPrice && (
+                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">参考价格</p>
+                    <p className="text-sm text-white font-bold font-orbitron">${order.refPrice}</p>
+                  </div>
+                )}
+                {order.strikePrice ? (
+                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">行权价</p>
+                    <p className="text-sm text-white font-bold font-orbitron">${order.strikePrice}</p>
+                  </div>
+                ) : null}
+                {order.expiryTimestamp ? (
+                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">到期日</p>
+                    <p className="text-sm text-white font-bold">{new Date(order.expiryTimestamp * 1000).toLocaleDateString()}</p>
+                  </div>
+                ) : null}
+                <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
+                  <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">喂价类型</p>
+                  <p className="text-sm text-cyan-400 font-bold">{order.feedType || 'INITIAL'}</p>
+                </div>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-12">

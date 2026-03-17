@@ -46,6 +46,7 @@ export enum FeederRank {
 }
 
 export interface FeedOrder {
+  id?: string;              // 后端 DB id
   orderId: string;
   symbol: string;
   market: MarketType;
@@ -60,6 +61,14 @@ export interface FeedOrder {
   status: OrderStatus;
   timeRemaining: number; // seconds
   sourceProtocol?: string; // 来源协议 (NST, etc.)
+  // NST 订单详情扩展字段
+  underlyingName?: string;   // 标的名称
+  underlyingCode?: string;   // 标的代码
+  direction?: string;        // 方向 (Call/Put)
+  strikePrice?: number;      // 行权价
+  expiryTimestamp?: number;  // 到期时间戳
+  refPrice?: string;         // 参考价格
+  externalOrderId?: string;  // NST 链上 orderId
 }
 
 export interface ArbitrationCase extends FeedOrder {
