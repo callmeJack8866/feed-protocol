@@ -1,183 +1,591 @@
-
-import React, { useState } from 'react';
-import { ArbitrationCase, MarketType, FeedType, OrderStatus } from '../types';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useTranslation } from '../i18n/I18nContext';
+import * as api from '../services/api';
+import { initWebSocket, off, on } from '../services/websocket';
 
-const MOCK_CASES: ArbitrationCase[] = [
-   {
-      orderId: 'ARB-8821',
-      symbol: '600519.SH',
-      market: MarketType.CN_STOCK,
-      country: 'CN',
-      exchange: 'SSE',
-      feedType: FeedType.ARBITRATION,
-      notionalAmount: 5000000,
-      requiredFeeders: 10,
-      consensusThreshold: '7/10',
-      specialConditions: [],
-      rewardAmount: 500,
-      status: OrderStatus.DISPUTED,
-      timeRemaining: 3600,
-      disputeReason: 'Reported price deviates >5% from secondary market benchmarks during limit-up lock.',
-      submittedPrices: [
-         { feeder: '0x123...456', price: 1820.5, timestamp: Date.now() - 50000 },
-         { feeder: '0xABC...DEF', price: 1821.0, timestamp: Date.now() - 40000 },
-      ],
-      evidenceUrl: '/assets/images/arbitration-evidence-v2.png',
-      votes: { up: 12, down: 2 }
-   }
-];
+interface ArbitrationCaseSummary {
+  id: string;
+  orderId: string;
+  disputeReason: string;
+  description: string;
+  evidenceUrls: string[];
+  caseType: 'NORMAL' | 'ADVANCED';
+  depositAmount: number;
+  depositPaid: boolean;
+  requiredVotes: number;
+  status: 'PENDING' | 'VOTING' | 'RESOLVED' | 'CANCELLED';
+  supportCount?: number;
+  rejectCount?: number;
+  votesCount?: number;
+  verdict?: string | null;
+  verdictReason?: string | null;
+  votingDeadline?: string | null;
+  createdAt: string;
+  appeals?: any[];
+  votes?: any[];
+}
+
+interface OrderOption {
+  id: string;
+  symbol: string;
+  market: string;
+  status: string;
+  rewardAmount: number;
+}
+
+const parseJsonArray = (value: unknown): string[] => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    } catch {
+      return value ? [value] : [];
+    }
+  }
+  return [];
+};
+
+const normalizeCase = (caseItem: any): ArbitrationCaseSummary => ({
+  ...caseItem,
+  evidenceUrls: parseJsonArray(caseItem.evidenceUrls),
+  appeals: caseItem.appeals ?? [],
+  votes: caseItem.votes ?? [],
+});
 
 const ArbitrationView: React.FC = () => {
-   const [selectedCase, setSelectedCase] = useState<ArbitrationCase | null>(null);
-   const { t } = useTranslation();
+  const { t } = useTranslation();
+  const [cases, setCases] = useState<ArbitrationCaseSummary[]>([]);
+  const [orders, setOrders] = useState<OrderOption[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState<string>('');
+  const [selectedCase, setSelectedCase] = useState<ArbitrationCaseSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [form, setForm] = useState({
+    orderId: '',
+    disputeReason: '',
+    description: '',
+    evidenceUrls: '',
+    appealReason: '',
+    daoFeedAmount: '100',
+  });
 
-   return (
-      <div className="space-y-12">
-         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-2">
-               <h2 className="text-4xl font-black font-orbitron tracking-tighter italic uppercase text-rose-500">{t.arbitration.judicialChamber}</h2>
-               <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{t.arbitration.asClassOnly}</p>
-            </div>
-            <div className="flex bg-rose-500/10 border border-rose-500/20 px-6 py-3 rounded-2xl items-center gap-4">
-               <span className="text-rose-500 animate-pulse">‚óè</span>
-               <span className="text-[10px] font-black uppercase tracking-widest text-rose-400">1 {t.arbitration.activeConflict}</span>
-            </div>
-         </header>
+  const loadCases = async (preserveSelection = true) => {
+    const res = await api.getArbitrationCases();
+    const nextCases = (res.cases ?? []).map(normalizeCase);
+    setCases(nextCases);
 
-         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-            {MOCK_CASES.map((item) => (
-               <motion.div
-                  key={item.orderId}
-                  layoutId={item.orderId}
-                  onClick={() => setSelectedCase(item)}
-                  className="p-8 rounded-[2.5rem] glass-panel border border-rose-500/20 hover:border-rose-500/40 cursor-pointer transition-all space-y-6 group bg-gradient-to-br from-rose-500/[0.02] to-transparent"
-               >
-                  <div className="flex justify-between items-start">
-                     <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center text-3xl">‚öñÔ∏è</div>
-                        <div>
-                           <h3 className="text-xl font-black font-orbitron group-hover:text-rose-400 transition-colors uppercase italic">{item.symbol}</h3>
-                           <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Case ID: {item.orderId}</p>
-                        </div>
-                     </div>
-                     <div className="text-right">
-                        <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">{t.arbitration.stakedBounty}</p>
-                        <p className="text-2xl font-black font-orbitron text-rose-500">{item.rewardAmount} FEED</p>
-                     </div>
-                  </div>
+    const nextSelectedId = preserveSelection ? selectedCaseId || nextCases[0]?.id || '' : nextCases[0]?.id || '';
+    setSelectedCaseId(nextSelectedId);
 
-                  <div className="p-5 rounded-2xl bg-black/40 border border-rose-500/10 space-y-2">
-                     <p className="text-[10px] text-rose-500 font-black uppercase tracking-widest">{t.arbitration.conflictRoot}</p>
-                     <p className="text-sm text-slate-300 font-medium leading-relaxed italic">"{item.disputeReason}"</p>
-                  </div>
+    if (nextSelectedId) {
+      const detailRes = await api.getArbitrationCase(nextSelectedId);
+      setSelectedCase(normalizeCase(detailRes.case));
+    } else {
+      setSelectedCase(null);
+    }
+  };
 
-                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-500">
-                     <div className="flex items-center gap-4">
-                        <span>{t.arbitration.currentVotes}:</span>
-                        <span className="text-emerald-400">‚úÖ {item.votes.up}</span>
-                        <span className="text-rose-400">‚ùå {item.votes.down}</span>
-                     </div>
-                     <span className="text-rose-500/60 font-orbitron">01:42:55 {t.arbitration.untilLock}</span>
-                  </div>
-               </motion.div>
-            ))}
-         </div>
+  const loadOrders = async () => {
+    const res = await api.getOrders();
+    setOrders((res.orders ?? []).slice(0, 20));
+  };
 
-         <AnimatePresence>
-            {selectedCase && (
-               <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-4">
-                  <motion.div
-                     layoutId={selectedCase.orderId}
-                     className="max-w-5xl w-full glass-panel rounded-[3.5rem] overflow-hidden border border-rose-500/30 flex flex-col h-[85vh]"
-                  >
-                     <div className="p-10 border-b border-rose-500/10 flex justify-between items-center bg-rose-500/[0.03]">
-                        <div className="space-y-1">
-                           <h2 className="text-3xl font-black font-orbitron text-rose-500 italic uppercase">{t.arbitration.arbitrationProtocol}</h2>
-                           <p className="text-[10px] text-slate-500 font-black tracking-widest uppercase">{t.arbitration.evidenceVsSignatures}</p>
-                        </div>
-                        <button onClick={() => setSelectedCase(null)} className="w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-xl transition-all">‚úï</button>
-                     </div>
+  const loadData = async (preserveSelection = true) => {
+    try {
+      setLoading(true);
+      setError('');
+      await Promise.all([loadCases(preserveSelection), loadOrders()]);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load arbitration data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-                     <div className="flex-1 overflow-y-auto p-12 custom-scrollbar grid grid-cols-1 lg:grid-cols-2 gap-12">
-                        {/* Left: Evidence & Details */}
-                        <div className="space-y-8">
-                           <section className="space-y-4">
-                              <h3 className="text-xs font-black text-rose-500 uppercase tracking-widest px-2">{t.arbitration.primaryEvidence}</h3>
-                              <div className="aspect-video rounded-3xl overflow-hidden border border-rose-500/20 shadow-2xl relative group">
-                                 <img src={selectedCase.evidenceUrl} alt="evidence" className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" />
-                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-                                 <div className="absolute bottom-6 left-6 flex items-center gap-3">
-                                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
-                                    <span className="text-[10px] font-mono text-white/80 uppercase">Timestamped Mkt_Capture_02.png</span>
-                                 </div>
-                              </div>
-                           </section>
+  useEffect(() => {
+    loadData(false);
+  }, []);
 
-                           <section className="space-y-4">
-                              <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest px-2">{t.arbitration.disputeSummary}</h3>
-                              <div className="p-6 rounded-3xl bg-rose-500/5 border border-rose-500/10 italic text-slate-400 text-sm leading-relaxed">
-                                 {selectedCase.disputeReason}
-                              </div>
-                           </section>
-                        </div>
+  useEffect(() => {
+    initWebSocket();
 
-                        {/* Right: Submission Audit */}
-                        <div className="space-y-8">
-                           <section className="space-y-4">
-                              <h3 className="text-xs font-black text-cyan-500 uppercase tracking-widest px-2">{t.arbitration.aggregatedSubmissions}</h3>
-                              <div className="space-y-3">
-                                 {selectedCase.submittedPrices.map((sub, i) => (
-                                    <div key={i} className="p-5 rounded-2xl border border-white/5 bg-white/5 flex justify-between items-center group hover:border-cyan-500/30 transition-all">
-                                       <div>
-                                          <p className="text-[9px] text-slate-500 font-mono uppercase">{t.arbitration.feederId}</p>
-                                          <p className="text-sm font-bold text-slate-300 font-mono">{sub.feeder}</p>
-                                       </div>
-                                       <div className="text-right">
-                                          <p className="text-[9px] text-slate-500 font-black uppercase mb-0.5">{t.arbitration.reportedPrice}</p>
-                                          <p className="text-xl font-black font-orbitron text-cyan-400">{sub.price}</p>
-                                       </div>
-                                    </div>
-                                 ))}
-                                 <div className="p-6 rounded-2xl border-2 border-dashed border-white/5 text-center flex flex-col items-center justify-center space-y-2 opacity-50">
-                                    <span className="text-xs font-black uppercase tracking-widest">8 {t.arbitration.additionalNodesHalted}</span>
-                                    <span className="text-[8px] font-mono uppercase">{t.arbitration.waitingConsensus}</span>
-                                 </div>
-                              </div>
-                           </section>
+    const refresh = () => loadData(true);
 
-                           <div className="pt-8 border-t border-white/5 flex gap-4">
-                              <button className="flex-1 py-6 rounded-3xl bg-rose-500 text-black font-black font-orbitron text-sm shadow-2xl shadow-rose-500/20 hover:bg-rose-400 transition-all uppercase italic">
-                                 {t.arbitration.rejectValue}
-                              </button>
-                              <button className="flex-1 py-6 rounded-3xl border border-white/10 text-white font-black font-orbitron text-sm hover:bg-white/5 transition-all uppercase italic">
-                                 {t.arbitration.affirmValue}
-                              </button>
-                           </div>
-                        </div>
-                     </div>
+    on('arbitration:new', refresh);
+    on('arbitration:vote', refresh);
+    on('arbitration:resolved', refresh);
+    on('arbitration:appeal', refresh);
+    on('appeal:resolved', refresh);
 
-                     <div className="p-8 border-t border-rose-500/10 flex items-center justify-between bg-black/40">
-                        <div className="flex items-center gap-6">
-                           <div className="flex -space-x-3">
-                              {[1, 2, 3, 4].map(i => (
-                                 <div key={i} className="w-10 h-10 rounded-full border-2 border-slate-900 overflow-hidden">
-                                    <img src="/assets/images/owl-mascot-v3.png" alt="judges" />
-                                 </div>
-                              ))}
-                              <div className="w-10 h-10 rounded-full bg-rose-500/20 border-2 border-slate-900 flex items-center justify-center text-[10px] font-black text-rose-500">+8</div>
-                           </div>
-                           <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">12 {t.arbitration.activeArbitrators}</p>
-                        </div>
-                        <p className="text-[10px] text-rose-500/60 font-black uppercase tracking-widest">{t.arbitration.criticalityTier}</p>
-                     </div>
-                  </motion.div>
-               </div>
-            )}
-         </AnimatePresence>
+    return () => {
+      off('arbitration:new', refresh);
+      off('arbitration:vote', refresh);
+      off('arbitration:resolved', refresh);
+      off('arbitration:appeal', refresh);
+      off('appeal:resolved', refresh);
+    };
+  }, [selectedCaseId]);
+
+  const votingCases = useMemo(() => cases.filter((item) => item.status === 'VOTING'), [cases]);
+  const resolvedCases = useMemo(() => cases.filter((item) => item.status === 'RESOLVED'), [cases]);
+
+  const updateForm = (field: string, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const evidenceUrls = useMemo(
+    () => form.evidenceUrls.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean),
+    [form.evidenceUrls],
+  );
+
+  const handleCreateCase = async () => {
+    if (!form.orderId || !form.disputeReason.trim()) {
+      setError('Order and dispute reason are required.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError('');
+      setMessage('');
+
+      const res = await api.createArbitrationCase({
+        orderId: form.orderId,
+        disputeReason: form.disputeReason.trim(),
+        description: form.description.trim(),
+        evidenceUrls,
+      });
+
+      if (res.success) {
+        setMessage('Arbitration case created. Pay the deposit to move it into voting.');
+        setForm((prev) => ({ ...prev, disputeReason: '', description: '', evidenceUrls: '' }));
+        await loadData(false);
+        if (res.case?.id) {
+          setSelectedCaseId(res.case.id);
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to create case');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSelectCase = async (caseId: string) => {
+    try {
+      setSelectedCaseId(caseId);
+      const res = await api.getArbitrationCase(caseId);
+      setSelectedCase(normalizeCase(res.case));
+    } catch (err: any) {
+      setError(err.message || 'Failed to load case detail');
+    }
+  };
+
+  const handlePayDeposit = async () => {
+    if (!selectedCase) return;
+
+    try {
+      setSubmitting(true);
+      setError('');
+      setMessage('');
+      const res = await api.payArbitrationDeposit(selectedCase.id);
+      if (res.success) {
+        setMessage('Deposit recorded. The case is now ready for arbitrator voting.');
+        await handleSelectCase(selectedCase.id);
+        await loadCases(true);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to pay deposit');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleVote = async (vote: api.ArbitrationVoteOption) => {
+    if (!selectedCase) return;
+
+    try {
+      setSubmitting(true);
+      setError('');
+      setMessage('');
+      const res = await api.voteArbitration(selectedCase.id, vote, selectedCase.description || selectedCase.disputeReason);
+      if (res.success) {
+        setMessage('Arbitration vote submitted.');
+        await handleSelectCase(selectedCase.id);
+        await loadCases(true);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit arbitration vote');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAppeal = async () => {
+    if (!selectedCase || !form.appealReason.trim()) {
+      setError('Appeal reason is required.');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError('');
+      setMessage('');
+      const res = await api.submitDAOAppeal(selectedCase.id, form.appealReason.trim());
+      if (res.success) {
+        setMessage('DAO appeal submitted.');
+        updateForm('appealReason', '');
+        await handleSelectCase(selectedCase.id);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit appeal');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDaoVote = async (appealId: string, vote: api.DAOVoteOption) => {
+    try {
+      setSubmitting(true);
+      setError('');
+      setMessage('');
+      const res = await api.voteDAOAppeal(appealId, vote, Number(form.daoFeedAmount) || 0);
+      if (res.success) {
+        setMessage('DAO vote submitted.');
+        if (selectedCase) {
+          await handleSelectCase(selectedCase.id);
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to submit DAO vote');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-rose-500"></div>
       </div>
-   );
+    );
+  }
+
+  return (
+    <div className="space-y-10">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-2">
+          <h2 className="text-4xl font-black font-orbitron tracking-tighter italic uppercase text-rose-500">{t.arbitration.judicialChamber}</h2>
+          <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{t.arbitration.asClassOnly}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="px-5 py-4 rounded-2xl bg-rose-500/10 border border-rose-500/20">
+            <p className="text-[10px] font-black uppercase tracking-widest text-rose-300">Voting</p>
+            <p className="text-2xl font-black font-orbitron text-white mt-1">{votingCases.length}</p>
+          </div>
+          <div className="px-5 py-4 rounded-2xl bg-white/5 border border-white/10">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Resolved</p>
+            <p className="text-2xl font-black font-orbitron text-white mt-1">{resolvedCases.length}</p>
+          </div>
+        </div>
+      </header>
+
+      {(message || error) && (
+        <div className={`rounded-2xl border px-6 py-4 text-sm ${error ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'}`}>
+          {error || message}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-[0.95fr_1.25fr] gap-8">
+        <div className="space-y-8">
+          <div className="p-8 rounded-[2.5rem] glass-panel border border-white/10 space-y-5">
+            <div>
+              <h3 className="text-lg font-black uppercase tracking-widest text-white">Create Arbitration Case</h3>
+              <p className="text-sm text-slate-500 mt-2">Use a real order, attach evidence URLs if available, and open a dispute for manual review.</p>
+            </div>
+
+            <div className="space-y-4">
+              <select
+                value={form.orderId}
+                onChange={(event) => updateForm('orderId', event.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-white outline-none focus:border-rose-500"
+              >
+                <option value="">Select order</option>
+                {orders.map((order) => (
+                  <option key={order.id} value={order.id}>
+                    {order.symbol} °§ {order.market} °§ {order.status}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                value={form.disputeReason}
+                onChange={(event) => updateForm('disputeReason', event.target.value)}
+                placeholder="Short dispute reason"
+                className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-white outline-none focus:border-rose-500"
+              />
+
+              <textarea
+                value={form.description}
+                onChange={(event) => updateForm('description', event.target.value)}
+                placeholder="Detailed description for arbitrators"
+                rows={4}
+                className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-white outline-none focus:border-rose-500 resize-none"
+              />
+
+              <textarea
+                value={form.evidenceUrls}
+                onChange={(event) => updateForm('evidenceUrls', event.target.value)}
+                placeholder="Evidence URLs, one per line"
+                rows={3}
+                className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-white outline-none focus:border-rose-500 resize-none"
+              />
+
+              <button
+                onClick={handleCreateCase}
+                disabled={submitting}
+                className="w-full py-4 rounded-2xl bg-rose-500 text-black font-black font-orbitron hover:bg-rose-400 transition-colors disabled:opacity-50"
+              >
+                {submitting ? t.common.loading : 'Open Case'}
+              </button>
+            </div>
+          </div>
+
+          <div className="p-8 rounded-[2.5rem] glass-panel border border-white/10 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-black uppercase tracking-widest text-white">Case Queue</h3>
+              <span className="text-sm text-slate-500">{cases.length} total</span>
+            </div>
+
+            <div className="space-y-3 max-h-[540px] overflow-y-auto pr-2">
+              {cases.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 px-6 py-10 text-center text-slate-500">
+                  No arbitration cases yet.
+                </div>
+              ) : (
+                cases.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleSelectCase(item.id)}
+                    className={`w-full text-left rounded-2xl border px-5 py-4 transition-colors ${selectedCaseId === item.id ? 'border-rose-500/40 bg-rose-500/10' : 'border-white/10 bg-black/30 hover:border-white/20'}`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-widest text-rose-300">{item.caseType}</p>
+                        <p className="text-base font-bold text-white mt-2">{item.disputeReason}</p>
+                        <p className="text-sm text-slate-500 mt-2 line-clamp-2">Order {item.orderId}</p>
+                      </div>
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full ${item.status === 'RESOLVED' ? 'bg-emerald-500/20 text-emerald-300' : item.status === 'VOTING' ? 'bg-cyan-500/20 text-cyan-300' : 'bg-amber-500/20 text-amber-300'}`}>
+                        {item.status}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 mt-4 text-xs text-slate-400">
+                      <span>Votes {item.votesCount ?? item.votes?.length ?? 0}/{item.requiredVotes}</span>
+                      <span>Support {item.supportCount ?? 0}</span>
+                      <span>Reject {item.rejectCount ?? 0}</span>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-8 rounded-[2.5rem] glass-panel border border-white/10 space-y-8 min-h-[680px]">
+          {!selectedCase ? (
+            <div className="h-full flex items-center justify-center text-slate-500">Select a case to inspect its workflow.</div>
+          ) : (
+            <>
+              <div className="flex items-start justify-between gap-6 flex-wrap">
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-black font-orbitron text-white">{selectedCase.disputeReason}</h3>
+                  <p className="text-sm text-slate-500">Order {selectedCase.orderId} °§ Created {new Date(selectedCase.createdAt).toLocaleString()}</p>
+                </div>
+                <div className="text-right space-y-2">
+                  <div className="text-xs font-black uppercase tracking-widest text-slate-500">Deposit</div>
+                  <div className="text-2xl font-black font-orbitron text-rose-400">{selectedCase.depositAmount} USDT</div>
+                  <div className={`text-xs font-bold ${selectedCase.depositPaid ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    {selectedCase.depositPaid ? 'Paid' : 'Pending'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-2xl border border-white/10 bg-black/30 px-5 py-4">
+                  <div className="text-xs uppercase tracking-widest text-slate-500 font-black">Status</div>
+                  <div className="text-xl font-black font-orbitron text-white mt-2">{selectedCase.status}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/30 px-5 py-4">
+                  <div className="text-xs uppercase tracking-widest text-slate-500 font-black">Required Votes</div>
+                  <div className="text-xl font-black font-orbitron text-white mt-2">{selectedCase.requiredVotes}</div>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/30 px-5 py-4">
+                  <div className="text-xs uppercase tracking-widest text-slate-500 font-black">Deadline</div>
+                  <div className="text-sm font-bold text-white mt-2">{selectedCase.votingDeadline ? new Date(selectedCase.votingDeadline).toLocaleString() : '--'}</div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/30 px-6 py-5 space-y-4">
+                <h4 className="text-sm font-black uppercase tracking-widest text-white">Description</h4>
+                <p className="text-sm text-slate-300 leading-relaxed">{selectedCase.description || 'No additional description provided.'}</p>
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/30 px-6 py-5 space-y-4">
+                <h4 className="text-sm font-black uppercase tracking-widest text-white">Evidence</h4>
+                {selectedCase.evidenceUrls.length === 0 ? (
+                  <p className="text-sm text-slate-500">No evidence links attached.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {selectedCase.evidenceUrls.map((url) => (
+                      <a key={url} href={url} target="_blank" rel="noreferrer" className="block text-sm text-cyan-300 hover:text-cyan-200 underline underline-offset-4 break-all">
+                        {url}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/30 px-6 py-5 space-y-4">
+                <h4 className="text-sm font-black uppercase tracking-widest text-white">Votes</h4>
+                {selectedCase.votes && selectedCase.votes.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedCase.votes.map((vote: any) => (
+                      <div key={vote.id} className="flex items-center justify-between gap-4 rounded-xl bg-white/5 px-4 py-3">
+                        <div>
+                          <div className="text-sm font-bold text-white">{vote.vote}</div>
+                          <div className="text-xs text-slate-500 mt-1">{vote.reason || 'No reason supplied'}</div>
+                        </div>
+                        <div className="text-xs text-slate-500">{new Date(vote.createdAt).toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">No votes recorded yet.</p>
+                )}
+              </div>
+
+              {!selectedCase.depositPaid && selectedCase.status === 'PENDING' && (
+                <button
+                  onClick={handlePayDeposit}
+                  disabled={submitting}
+                  className="w-full py-4 rounded-2xl bg-amber-500 text-black font-black font-orbitron hover:bg-amber-400 transition-colors disabled:opacity-50"
+                >
+                  {submitting ? t.common.loading : 'Pay Deposit and Start Voting'}
+                </button>
+              )}
+
+              {selectedCase.status === 'VOTING' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <button
+                    onClick={() => handleVote('SUPPORT_INITIATOR')}
+                    disabled={submitting}
+                    className="py-4 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-200 font-bold hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+                  >
+                    Support Initiator
+                  </button>
+                  <button
+                    onClick={() => handleVote('REJECT_INITIATOR')}
+                    disabled={submitting}
+                    className="py-4 rounded-2xl bg-rose-500/20 border border-rose-500/30 text-rose-200 font-bold hover:bg-rose-500/30 transition-colors disabled:opacity-50"
+                  >
+                    Reject Initiator
+                  </button>
+                  <button
+                    onClick={() => handleVote('ABSTAIN')}
+                    disabled={submitting}
+                    className="py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold hover:bg-white/10 transition-colors disabled:opacity-50"
+                  >
+                    Abstain
+                  </button>
+                </div>
+              )}
+
+              {selectedCase.status === 'RESOLVED' && (
+                <div className="space-y-6 rounded-2xl border border-white/10 bg-black/30 px-6 py-5">
+                  <div>
+                    <h4 className="text-sm font-black uppercase tracking-widest text-white">Resolution</h4>
+                    <p className="text-lg font-bold text-emerald-300 mt-3">{selectedCase.verdict || 'Resolved'}</p>
+                    <p className="text-sm text-slate-400 mt-2">{selectedCase.verdictReason || 'No verdict reason recorded.'}</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-500">Appeal reason</label>
+                    <textarea
+                      value={form.appealReason}
+                      onChange={(event) => updateForm('appealReason', event.target.value)}
+                      rows={3}
+                      className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-white outline-none focus:border-cyan-500 resize-none"
+                      placeholder="Explain why the resolved verdict should be reviewed by DAO voting"
+                    />
+                    <button
+                      onClick={handleAppeal}
+                      disabled={submitting}
+                      className="w-full py-4 rounded-2xl bg-cyan-500 text-black font-black font-orbitron hover:bg-cyan-400 transition-colors disabled:opacity-50"
+                    >
+                      {submitting ? t.common.loading : 'Submit DAO Appeal'}
+                    </button>
+                  </div>
+
+                  {selectedCase.appeals && selectedCase.appeals.length > 0 && (
+                    <div className="space-y-4 border-t border-white/10 pt-5">
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <h4 className="text-sm font-black uppercase tracking-widest text-white">DAO Appeals</h4>
+                        <input
+                          type="number"
+                          min="1"
+                          value={form.daoFeedAmount}
+                          onChange={(event) => updateForm('daoFeedAmount', event.target.value)}
+                          className="w-40 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-white outline-none focus:border-cyan-500"
+                        />
+                      </div>
+
+                      {selectedCase.appeals.map((appeal: any) => (
+                        <div key={appeal.id} className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 space-y-4">
+                          <div>
+                            <div className="flex items-center justify-between gap-4 flex-wrap">
+                              <p className="font-bold text-white">{appeal.status}</p>
+                              <p className="text-xs text-slate-500">{new Date(appeal.createdAt).toLocaleString()}</p>
+                            </div>
+                            <p className="text-sm text-slate-400 mt-2">{appeal.reason}</p>
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            Support {appeal.supportVotes} °§ Reject {appeal.rejectVotes} °§ Total voters {appeal.totalVoters}
+                          </div>
+                          {appeal.status === 'VOTING' && (
+                            <div className="grid grid-cols-2 gap-3">
+                              <button
+                                onClick={() => handleDaoVote(appeal.id, 'SUPPORT')}
+                                disabled={submitting}
+                                className="py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30 text-emerald-200 font-bold hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+                              >
+                                Support Appeal
+                              </button>
+                              <button
+                                onClick={() => handleDaoVote(appeal.id, 'REJECT')}
+                                disabled={submitting}
+                                className="py-3 rounded-xl bg-rose-500/20 border border-rose-500/30 text-rose-200 font-bold hover:bg-rose-500/30 transition-colors disabled:opacity-50"
+                              >
+                                Reject Appeal
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default ArbitrationView;

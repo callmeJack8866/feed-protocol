@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as api from '../services/api';
 import { useTranslation } from '../i18n';
@@ -24,6 +24,71 @@ interface Exam {
   questions: { id: number; question: string; options: string[] }[];
 }
 
+const fallbackCourses: Course[] = [
+  {
+    id: '1',
+    title: 'Oracle Fundamentals',
+    category: 'ONBOARDING',
+    xpReward: 100,
+    duration: 30,
+    isRequired: true,
+    status: 'NOT_STARTED',
+    description: 'Understand the feeder workflow, oracle roles, and the Commit-Reveal submission model.',
+  },
+  {
+    id: '2',
+    title: 'Equity Market Pricing Advanced',
+    category: 'MARKET_SPECIFIC',
+    xpReward: 200,
+    duration: 45,
+    isRequired: false,
+    status: 'NOT_STARTED',
+    description: 'Handle suspensions, corporate actions, and other special market conditions with confidence.',
+  },
+  {
+    id: '3',
+    title: 'Crypto Volatility Response',
+    category: 'ADVANCED',
+    xpReward: 300,
+    duration: 60,
+    isRequired: false,
+    status: 'NOT_STARTED',
+    description: 'Prepare for flash crashes, liquidity gaps, and other extreme crypto trading scenarios.',
+  },
+];
+
+const getOutlineItems = (course: Course): string[] => {
+  const shared = [
+    'Review the data sources and validation checks required before every submission.',
+    'Practice the Commit-Reveal flow from initial quote to final settlement.',
+    'Work through edge cases that commonly trigger arbitration or delayed consensus.',
+    'Complete the final assessment to unlock the associated XP reward.',
+  ];
+
+  if (course.category === 'ONBOARDING') {
+    return [
+      'Learn the core oracle mission, feeder responsibilities, and reward structure.',
+      ...shared.slice(1),
+    ];
+  }
+
+  if (course.category === 'MARKET_SPECIFIC') {
+    return [
+      'Study trading halts, dividend adjustments, and exchange-specific quote behavior.',
+      ...shared.slice(1),
+    ];
+  }
+
+  if (course.category === 'ADVANCED') {
+    return [
+      'Train for volatile sessions, thin liquidity, and fast-moving market dislocations.',
+      ...shared.slice(1),
+    ];
+  }
+
+  return shared;
+};
+
 const TrainingView: React.FC = () => {
   const { t } = useTranslation();
   const [courses, setCourses] = useState<Course[]>([]);
@@ -48,19 +113,20 @@ const TrainingView: React.FC = () => {
           ...p.course,
           status: p.status,
           progress: p.progress,
-          examPassed: p.examPassed
+          examPassed: p.examPassed,
         }));
         setCourses(mappedCourses);
         if (res.stats) setStats(res.stats);
       }
     } catch (error) {
       console.error('Load progress error:', error);
-      // 使用 mock 数据作为备用
-      setCourses([
-        { id: '1', title: 'Oracle 基础入门', category: 'ONBOARDING', xpReward: 100, duration: 30, isRequired: true, status: 'NOT_STARTED', description: '了解喂价机制和 Commit-Reveal 模式基础知识' },
-        { id: '2', title: '股票市场喂价进阶', category: 'MARKET_SPECIFIC', xpReward: 200, duration: 45, isRequired: false, status: 'NOT_STARTED', description: '处理涨跌停、除权除息等特殊情况' },
-        { id: '3', title: '加密货币高波动应对', category: 'ADVANCED', xpReward: 300, duration: 60, isRequired: false, status: 'NOT_STARTED', description: '应对闪崩、流动性缺失等极端场景' },
-      ]);
+      setCourses(fallbackCourses);
+      setStats({
+        total: fallbackCourses.length,
+        completed: 0,
+        inProgress: 0,
+        examsPassed: 0,
+      });
     } finally {
       setLoading(false);
     }
@@ -90,7 +156,7 @@ const TrainingView: React.FC = () => {
       const res = await api.submitExam(exam.id, answers, examStartTime);
       if (res.success) {
         setExamResult(res.result);
-        loadProgress(); // 刷新进度
+        loadProgress();
       }
     } catch (error) {
       console.error('Submit exam error:', error);
@@ -98,18 +164,18 @@ const TrainingView: React.FC = () => {
   };
 
   const getStatusDisplay = (status?: string, examPassed?: boolean) => {
-    if (examPassed) return { text: t.training.passed, color: 'text-emerald-400', icon: '✅' };
-    if (status === 'COMPLETED') return { text: t.training.completed, color: 'text-emerald-400', icon: '✅' };
-    if (status === 'IN_PROGRESS') return { text: t.training.studying, color: 'text-amber-400', icon: '📚' };
-    return { text: t.training.notStarted, color: 'text-slate-400', icon: '📖' };
+    if (examPassed) return { text: t.training.passed, color: 'text-emerald-400', icon: 'PASS' };
+    if (status === 'COMPLETED') return { text: t.training.completed, color: 'text-emerald-400', icon: 'DONE' };
+    if (status === 'IN_PROGRESS') return { text: t.training.studying, color: 'text-amber-400', icon: 'LIVE' };
+    return { text: t.training.notStarted, color: 'text-slate-400', icon: 'NEW' };
   };
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
-      'ONBOARDING': t.training.categoryOnboarding,
-      'MONTHLY': t.training.categoryMonthly,
-      'MARKET_SPECIFIC': t.training.categoryMarketSpecific,
-      'ADVANCED': t.training.categoryAdvanced
+      ONBOARDING: t.training.categoryOnboarding,
+      MONTHLY: t.training.categoryMonthly,
+      MARKET_SPECIFIC: t.training.categoryMarketSpecific,
+      ADVANCED: t.training.categoryAdvanced,
     };
     return labels[category] || category;
   };
@@ -129,23 +195,21 @@ const TrainingView: React.FC = () => {
         <p className="text-slate-500">{t.training.subtitle}</p>
       </header>
 
-      {/* 进度统计 */}
-      <div className="grid grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {[
-          { label: t.training.totalCourses, value: stats.total, icon: '📚' },
-          { label: t.training.completed, value: stats.completed, icon: '✅' },
-          { label: t.training.inProgress, value: stats.inProgress, icon: '📖' },
-          { label: t.training.examsPassed, value: stats.examsPassed, icon: '🎓' }
+          { label: t.training.totalCourses, value: stats.total, icon: 'CRS' },
+          { label: t.training.completed, value: stats.completed, icon: 'DONE' },
+          { label: t.training.inProgress, value: stats.inProgress, icon: 'LIVE' },
+          { label: t.training.examsPassed, value: stats.examsPassed, icon: 'PASS' },
         ].map((stat, i) => (
           <div key={i} className="glass-panel rounded-2xl p-6 text-center">
-            <span className="text-2xl">{stat.icon}</span>
-            <p className="text-3xl font-black font-orbitron text-cyan-400 mt-2">{stat.value}</p>
+            <span className="text-xs font-black uppercase tracking-widest text-cyan-300">{stat.icon}</span>
+            <p className="text-3xl font-black font-orbitron text-cyan-400 mt-3">{stat.value}</p>
             <p className="text-xs text-slate-500 uppercase tracking-wider mt-1">{stat.label}</p>
           </div>
         ))}
       </div>
 
-      {/* 课程列表 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {courses.map((course, idx) => {
           const statusInfo = getStatusDisplay(course.status, course.examPassed);
@@ -155,20 +219,20 @@ const TrainingView: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
-              className={`p-8 rounded-[2.5rem] glass-panel border flex flex-col justify-between group transition-all duration-300 ${course.examPassed ? 'border-emerald-500/30' : 'border-white/10 hover:border-cyan-500/30'
-                }`}
+              className={`p-8 rounded-[2.5rem] glass-panel border flex flex-col justify-between group transition-all duration-300 ${
+                course.examPassed ? 'border-emerald-500/30' : 'border-white/10 hover:border-cyan-500/30'
+              }`}
             >
               <div className="space-y-4">
-                <div className="flex justify-between items-start">
+                <div className="flex justify-between items-start gap-4">
                   <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/5 ${statusInfo.color}`}>
                     {getCategoryLabel(course.category)}
                   </span>
-                  <span className="text-xl">{statusInfo.icon}</span>
+                  <span className={`text-[10px] font-black uppercase tracking-widest ${statusInfo.color}`}>{statusInfo.icon}</span>
                 </div>
                 <h3 className="text-2xl font-bold font-orbitron">{course.title}</h3>
                 <p className="text-sm text-slate-500 leading-relaxed">{course.description}</p>
 
-                {/* 进度条 */}
                 {course.progress !== undefined && course.progress > 0 && (
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs text-slate-500">
@@ -185,16 +249,18 @@ const TrainingView: React.FC = () => {
                 )}
               </div>
 
-              <div className="mt-8 flex items-center justify-between">
+              <div className="mt-8 flex items-center justify-between gap-4">
                 <div className="flex flex-col">
                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{t.training.completionReward}</span>
                   <span className="text-lg font-black font-orbitron text-amber-400">+{course.xpReward} XP</span>
                 </div>
                 <button
                   onClick={() => setSelectedCourse(course)}
-                  className={`px-8 py-3 rounded-2xl font-black font-orbitron text-xs uppercase transition-all ${course.examPassed ? 'bg-emerald-500/10 text-emerald-500' :
-                      'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95'
-                    }`}
+                  className={`px-8 py-3 rounded-2xl font-black font-orbitron text-xs uppercase transition-all ${
+                    course.examPassed
+                      ? 'bg-emerald-500/10 text-emerald-500'
+                      : 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95'
+                  }`}
                 >
                   {course.examPassed ? t.training.reviewCourse : course.status === 'IN_PROGRESS' ? t.training.continueStudy : t.training.startStudy}
                 </button>
@@ -204,7 +270,6 @@ const TrainingView: React.FC = () => {
         })}
       </div>
 
-      {/* 课程详情弹窗 */}
       <AnimatePresence>
         {selectedCourse && !exam && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-md p-6">
@@ -214,17 +279,22 @@ const TrainingView: React.FC = () => {
               exit={{ scale: 0.9, opacity: 0 }}
               className="max-w-3xl w-full glass-panel rounded-[3rem] p-12 space-y-8 relative"
             >
-              <button onClick={() => setSelectedCourse(null)} className="absolute top-8 right-8 text-slate-500 hover:text-white text-2xl">✕</button>
+              <button
+                onClick={() => setSelectedCourse(null)}
+                className="absolute top-8 right-8 text-slate-500 hover:text-white text-2xl"
+              >
+                X
+              </button>
 
               <div className="space-y-4">
-                <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-cyan-500/10 text-cyan-400`}>
+                <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest bg-cyan-500/10 text-cyan-400">
                   {getCategoryLabel(selectedCourse.category)}
                 </span>
                 <h2 className="text-3xl font-black font-orbitron text-cyan-400 tracking-tighter uppercase">{selectedCourse.title}</h2>
-                <div className="flex gap-6 text-sm text-slate-400">
-                  <span>⏱️ {selectedCourse.duration} {t.training.minutes}</span>
-                  <span>🎁 +{selectedCourse.xpReward} XP</span>
-                  {selectedCourse.isRequired && <span className="text-amber-400">⚠️ {t.training.requiredCourse}</span>}
+                <div className="flex flex-wrap gap-6 text-sm text-slate-400">
+                  <span>TIME {selectedCourse.duration} {t.training.minutes}</span>
+                  <span>XP +{selectedCourse.xpReward}</span>
+                  {selectedCourse.isRequired && <span className="text-amber-400">REQ {t.training.requiredCourse}</span>}
                 </div>
                 <p className="text-lg text-slate-300 leading-relaxed mt-4">{selectedCourse.description}</p>
               </div>
@@ -232,10 +302,12 @@ const TrainingView: React.FC = () => {
               <div className="bg-white/5 border border-white/10 rounded-3xl p-8 space-y-4">
                 <h3 className="text-lg font-bold">{t.training.courseOutline}</h3>
                 <ul className="space-y-3 text-slate-400">
-                  <li className="flex items-center gap-3"><span className="text-cyan-400">•</span> 理解喂价系统核心原理</li>
-                  <li className="flex items-center gap-3"><span className="text-cyan-400">•</span> 掌握 Commit-Reveal 提交流程</li>
-                  <li className="flex items-center gap-3"><span className="text-cyan-400">•</span> 处理特殊市场情况</li>
-                  <li className="flex items-center gap-3"><span className="text-cyan-400">•</span> 完成最终考核</li>
+                  {getOutlineItems(selectedCourse).map((item) => (
+                    <li key={item} className="flex items-start gap-3">
+                      <span className="text-cyan-400 font-black">-</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
                 </ul>
               </div>
 
@@ -249,7 +321,6 @@ const TrainingView: React.FC = () => {
           </div>
         )}
 
-        {/* 考试界面 */}
         {exam && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-md p-6 overflow-y-auto">
             <motion.div
@@ -258,7 +329,15 @@ const TrainingView: React.FC = () => {
               exit={{ scale: 0.9, opacity: 0 }}
               className="max-w-4xl w-full glass-panel rounded-[3rem] p-12 space-y-8 relative my-8"
             >
-              <button onClick={() => { setExam(null); setExamResult(null); }} className="absolute top-8 right-8 text-slate-500 hover:text-white text-2xl">✕</button>
+              <button
+                onClick={() => {
+                  setExam(null);
+                  setExamResult(null);
+                }}
+                className="absolute top-8 right-8 text-slate-500 hover:text-white text-2xl"
+              >
+                X
+              </button>
 
               {!examResult ? (
                 <>
@@ -286,10 +365,11 @@ const TrainingView: React.FC = () => {
                                 newAnswers[qIdx] = optIdx;
                                 setAnswers(newAnswers);
                               }}
-                              className={`text-left px-6 py-4 rounded-xl border transition-all ${answers[qIdx] === optIdx
+                              className={`text-left px-6 py-4 rounded-xl border transition-all ${
+                                answers[qIdx] === optIdx
                                   ? 'bg-cyan-500/20 border-cyan-500 text-white'
                                   : 'bg-slate-900 border-white/5 hover:border-cyan-500/50 text-slate-300'
-                                }`}
+                              }`}
                             >
                               {String.fromCharCode(65 + optIdx)}. {opt}
                             </button>
@@ -309,21 +389,27 @@ const TrainingView: React.FC = () => {
                 </>
               ) : (
                 <div className="text-center space-y-8">
-                  <div className={`text-8xl ${examResult.passed ? 'animate-bounce' : ''}`}>
-                    {examResult.passed ? '🎉' : '😔'}
+                  <div className={`text-4xl font-black font-orbitron ${examResult.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {examResult.passed ? 'PASS' : 'FAIL'}
                   </div>
                   <h2 className={`text-4xl font-black font-orbitron ${examResult.passed ? 'text-emerald-400' : 'text-red-400'}`}>
                     {examResult.passed ? t.training.congrats : t.training.notPassed}
                   </h2>
                   <div className="space-y-4">
                     <p className="text-6xl font-black font-orbitron text-white">{examResult.score}</p>
-                    <p className="text-slate-400">{t.training.correct} {examResult.correctCount}/{examResult.totalQuestions} · {t.training.passLine} {examResult.passingScore}</p>
+                    <p className="text-slate-400">
+                      {t.training.correct} {examResult.correctCount}/{examResult.totalQuestions} | {t.training.passLine} {examResult.passingScore}
+                    </p>
                     {examResult.passed && (
                       <p className="text-2xl font-bold text-amber-400">+{examResult.xpEarned} XP</p>
                     )}
                   </div>
                   <button
-                    onClick={() => { setExam(null); setExamResult(null); setSelectedCourse(null); }}
+                    onClick={() => {
+                      setExam(null);
+                      setExamResult(null);
+                      setSelectedCourse(null);
+                    }}
                     className="px-12 py-4 rounded-2xl bg-cyan-500 text-black font-black font-orbitron"
                   >
                     {t.training.backToCourses}

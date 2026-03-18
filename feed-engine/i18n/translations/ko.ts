@@ -319,6 +319,17 @@ const ko: TranslationKeys = {
         engageNode: '노드 연결',
         connecting: '연결 중...',
         terminalLink: '터미널 링크',
+        chainUnknown: '체인 알 수 없음',
+        connectingWallet: '지갑 연결 중...',
+        requestingNonce: 'SIWE nonce 요청 중...',
+        signMessage: '지갑에서 SIWE 메시지에 서명해주세요...',
+        verifyingSignature: '서명 검증 중...',
+        installMetamask: 'MetaMask 지갑 확장 프로그램을 설치해주세요',
+        noWalletAddress: '지갑 주소를 가져올 수 없습니다',
+        nonceFailed: 'nonce 가져오기 실패',
+        signatureCancelled: '서명이 취소되었습니다',
+        verificationFailed: '서명 검증 실패',
+        loginFailed: '로그인 실패',
     },
 };
 

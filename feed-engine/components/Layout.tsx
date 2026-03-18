@@ -1,5 +1,5 @@
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FeederProfile, ViewType } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -34,30 +34,34 @@ const SystemMarquee = () => {
 
 const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNavigate }) => {
   const { t } = useTranslation();
+
+  const level = useMemo(() => Math.max(1, Math.floor(profile.xp / 1000) + 1), [profile.xp]);
+  const xpProgress = useMemo(() => ((profile.xp % 1000) / 1000) * 100, [profile.xp]);
+  const riskCollateralLabel = useMemo(() => `${profile.stakedAmount.toLocaleString()} ${profile.stakeType}`, [profile.stakedAmount, profile.stakeType]);
   const auth = useAuthStore();
   const wallet = useWallet();
   const [loginStatus, setLoginStatus] = useState<string>('');
 
-  /**
-   * ENGAGE NODE 完整登录流程:
-   * 1. 连接 MetaMask（EIP-1193）
-   * 2. 获取 SIWE nonce
-   * 3. 构造 EIP-4361 消息
-   * 4. 钱包签名
-   * 5. 后端验证签名 → 返回 JWT
-   * 6. 存入 Zustand AuthStore
-   */
+  /**
+   * ENGAGE NODE 完整登录流程:
+   * 1. 连接 MetaMask（EIP-1193）
+   * 2. 获取 SIWE nonce
+   * 3. 构造 EIP-4361 消息
+   * 4. 钱包签名
+   * 5. 后端验证签名  返回 JWT
+   * 6. 存入 Zustand AuthStore
+   */
   const handleEngageNode = useCallback(async () => {
     if (auth.isConnected) return; // 已连接则跳过
     auth.setConnecting(true);
     auth.setError(null);
-    setLoginStatus('正在连接钱包...');
+    setLoginStatus(t.layout.connectingWallet);
 
     try {
       // Step 0: 检查 MetaMask 是否安装
       const ethereum = (window as any).ethereum;
       if (!ethereum) {
-        throw new Error('请先安装 MetaMask 钱包扩展');
+        throw new Error(t.layout.installMetamask);
       }
 
       // Step 1: 连接 MetaMask
@@ -67,47 +71,45 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
       const chainId = parseInt(chainHex, 16);
 
       if (!address) {
-        throw new Error('未能获取钱包地址');
+        throw new Error(t.layout.noWalletAddress);
       }
 
-      // Step 2: 获取 SIWE nonce + 后端预构造消息
-      setLoginStatus('获取认证凭证...');
-      setWalletAddress(address); // 向后兼容 x-wallet-address header
+      setLoginStatus(t.layout.requestingNonce);
+      setWalletAddress(address);
       const nonceRes = await getNonce(address);
       if (!nonceRes.success || !nonceRes.nonce) {
-        throw new Error('获取 nonce 失败');
+        throw new Error(t.layout.nonceFailed);
       }
 
-      // Step 3: 使用后端预构造的 SIWE 消息（或本地构造作为 fallback）
       const message = nonceRes.message || buildSIWEMessage(address, nonceRes.nonce, chainId);
 
       // Step 4: 钱包签名
-      setLoginStatus('请在钱包中签名...');
+      setLoginStatus(t.layout.signMessage);
       const signature: string = await ethereum.request({
         method: 'personal_sign',
         params: [message, address],
       });
       if (!signature) {
-        throw new Error('用户取消签名');
+        throw new Error(t.layout.signatureCancelled);
       }
 
-      // Step 5: 后端验证签名 → JWT
-      setLoginStatus('验证签名...');
+      // Step 5: 后端验证签名  JWT
+
+      setLoginStatus(t.layout.verifyingSignature);
       const authRes = await verifySIWE(message, signature);
       if (!authRes.success || !authRes.token) {
-        throw new Error(authRes.message || '签名验证失败');
+        throw new Error(authRes.message || t.layout.verificationFailed);
       }
 
-      // Step 6: 存入全局状态
       auth.setToken(authRes.token);
       auth.setWallet(address, chainId);
       setAuthToken(authRes.token);
       setLoginStatus('');
 
-      console.log('✅ SIWE 登录成功:', address.slice(0, 10) + '...');
+      console.log('✅ SIWE login succeeded:', address.slice(0, 10) + '...');
     } catch (err: any) {
-      console.error('❌ 登录失败:', err);
-      auth.setError(err.message || '登录失败');
+      console.error('❌ Login failed:', err);
+      auth.setError(err.message || t.layout.loginFailed);
       auth.setConnecting(false);
       setLoginStatus('');
     }
@@ -124,13 +126,14 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
 
   /** 导航项：name 用于路由，label 用于国际化显示 */
   const menuItems: { name: ViewType; icon: string; label: string }[] = [
-    { name: 'Quest Hall', icon: '🏠', label: t.nav.questHall },
-    { name: 'Dashboard', icon: '📈', label: t.nav.dashboard },
-    { name: 'Leaderboard', icon: '🎯', label: t.nav.leaderboard },
-    { name: 'Inventory', icon: '💼', label: t.nav.inventory },
-    { name: 'Training Center', icon: '🎓', label: t.nav.trainingCenter },
-    { name: 'Staking', icon: '🛡️', label: t.nav.staking },
-    { name: 'Arbitration', icon: '⚖️', label: t.nav.arbitration }
+    { name: 'Quest Hall', icon: 'Q', label: t.nav.questHall },
+    { name: 'Dashboard', icon: 'D', label: t.nav.dashboard },
+    { name: 'Leaderboard', icon: 'L', label: t.nav.leaderboard },
+    { name: 'Inventory', icon: 'I', label: t.nav.inventory },
+    { name: 'Achievements', icon: 'A', label: t.achievements.title },
+    { name: 'Training Center', icon: 'T', label: t.nav.trainingCenter },
+    { name: 'Staking', icon: 'S', label: t.nav.staking },
+    { name: 'Arbitration', icon: 'R', label: t.nav.arbitration }
   ];
 
   return (
@@ -208,8 +211,8 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
               <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_10px_rgba(34,211,238,1)] animate-pulse" />
             </div>
             <div className="space-y-1 font-mono text-[9px] text-slate-600">
-              <p className="truncate">» ENCRYPT_SYNC: OK</p>
-              <p className="truncate">» LATENCY_12ms</p>
+              <p className="truncate">OK ENCRYPT_SYNC</p>
+              <p className="truncate">OK LATENCY_12ms</p>
             </div>
           </div>
         </div>
@@ -231,8 +234,8 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
 
           <div className="flex items-center gap-10">
             <div className="hidden md:flex flex-col items-end">
-              <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">BLOCK_HEIGHT</p>
-              <p className="text-[11px] font-mono font-black text-cyan-400">921,432.21</p>
+              <p className="text-[8px] font-black text-slate-600 uppercase tracking-widest">CHAIN</p>
+              <p className="text-[11px] font-mono font-black text-cyan-400">{auth.chainId ? `CHAIN_${auth.chainId}` : t.layout.chainUnknown}</p>
             </div>
             <div className="h-10 w-px bg-white/5" />
             <LanguageSwitcher />
@@ -249,8 +252,7 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
                   onClick={handleDisconnect}
                   className="bg-red-500/10 border border-red-500/30 text-red-400 text-[9px] font-black px-4 py-3 rounded-full hover:bg-red-500/20 transition-all uppercase tracking-wider"
                 >
-                  ✕
-                </button>
+                  EXIT                </button>
               </div>
             ) : (
               <button
@@ -290,7 +292,7 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
             <div className="p-12 space-y-16 relative z-10">
               <div className="flex justify-between items-center px-4">
                 <h2 className="text-[11px] font-black tracking-[0.8em] uppercase text-slate-500">{t.layout.systemLogs}</h2>
-                <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center cursor-pointer hover:bg-cyan-500/10 hover:text-cyan-400 transition-all text-sm border border-white/5">»</div>
+                <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center cursor-pointer hover:bg-cyan-500/10 hover:text-cyan-400 transition-all text-sm border border-white/5">LOG</div>
               </div>
 
               <div className="space-y-10">
@@ -303,7 +305,7 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
                       <div className="absolute inset-[-4px] rounded-[2.2rem] bg-gradient-to-tr from-cyan-500 to-amber-500 opacity-40 group-hover/avatar:opacity-100 transition-opacity blur-[2px]" />
                       <img src="/assets/images/owl-mascot-v3.png" className="w-24 h-24 rounded-[2rem] border-2 border-black relative z-10" alt="avatar" />
                       <div className="absolute -bottom-3 -right-3 bg-white text-black border border-white/10 px-4 py-1.5 rounded-xl text-[10px] font-black font-orbitron italic z-20 shadow-xl">
-                        LVL 42
+                        LVL {level}
                       </div>
                     </div>
                     <div>
@@ -323,7 +325,7 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
                     <div className="h-3 w-full bg-black/60 rounded-full overflow-hidden border border-white/10 p-0.5">
                       <motion.div
                         initial={{ width: 0 }}
-                        animate={{ width: "75%" }}
+                        animate={{ width: `${xpProgress}%` }}
                         className="h-full bg-gradient-to-r from-cyan-600 via-cyan-400 to-white shadow-[0_0_20px_rgba(34,211,238,0.4)] rounded-full"
                       />
                     </div>
@@ -336,8 +338,9 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
                   <div className="grid grid-cols-1 gap-5">
                     {[
                       { label: t.layout.integrityRating, val: profile.rank + ' CLASS', color: 'text-rose-500', bg: 'bg-rose-500/5' },
-                      { label: t.layout.syncEfficiency, val: profile.accuracyRate + '%', color: 'text-cyan-400', bg: 'bg-cyan-500/5' },
-                      { label: t.layout.riskCollateral, val: '$' + (profile.stakedAmount / 1000) + 'K', color: 'text-white', bg: 'bg-white/5' }
+                      { label: t.layout.syncEfficiency, val: profile.accuracyRate.toFixed(1) + '%', color: 'text-cyan-400', bg: 'bg-cyan-500/5' },
+                      { label: t.layout.riskCollateral, val: riskCollateralLabel, color: 'text-white', bg: 'bg-white/5' },
+                      { label: 'USDT', val: profile.balanceUSDT.toLocaleString(undefined, { maximumFractionDigits: 4 }), color: 'text-amber-400', bg: 'bg-amber-500/5' }
                     ].map(stat => (
                       <div key={stat.label} className={`p-8 rounded-[2.5rem] ${stat.bg} border border-white/5 flex justify-between items-center group hover:scale-[1.02] transition-all cursor-crosshair`}>
                         <span className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em]">{stat.label}</span>
@@ -362,3 +365,6 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
 };
 
 export default Layout;
+
+
+

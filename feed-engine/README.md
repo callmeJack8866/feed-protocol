@@ -1,20 +1,67 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Feed Engine Frontend
 
-# Run and deploy your AI Studio app
+Frontend application for the Feed Engine oracle workflow.
 
-This contains everything you need to run your app locally.
+## Stack
 
-View your app in AI Studio: https://ai.studio/apps/drive/1l-r7nverPfNccIuMcbEW58AUaCHl-VVj
+- React
+- TypeScript
+- Vite
+- Socket.IO client
+- ethers v6
+- Playwright smoke scripts
 
-## Run Locally
+## Local Setup
 
-**Prerequisites:**  Node.js
+```bash
+npm install
+copy .env.example .env.local
+npm run dev
+```
 
+Default local app URL: `http://127.0.0.1:5173`
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Environment Variables
+
+Create `F:\Unstandardized_Products\FeedEngine\feed-engine\.env.local` with:
+
+```env
+VITE_API_URL=http://127.0.0.1:3001
+VITE_WS_URL=http://127.0.0.1:3001
+```
+
+Use the same host style as the backend allowlist. If the backend is configured with `127.0.0.1`, do not switch the frontend to `localhost` unless both are present in `FRONTEND_URL`.
+
+## Scripts
+
+```bash
+npm run dev
+npm run build
+npm run preview
+npm run smoke:browser-realtime
+npm run smoke:browser-mainflow
+```
+
+## Smoke Verification
+
+`npm run smoke:browser-realtime`
+
+- verifies Dashboard refresh while the page stays open
+- verifies Quest Hall receives WebSocket order updates without a list refetch
+
+`npm run smoke:browser-mainflow`
+
+- opens the app in a real browser
+- injects login state
+- grabs an order from Quest Hall
+- enters FeedModal
+- submits price
+- completes commit / reveal / settlement
+- verifies Dashboard values update
+
+## Production Notes
+
+- Deploy the built `dist/` output behind a static server or reverse proxy.
+- `npm run preview` is only for local verification, not the production serving strategy.
+- Keep `VITE_API_URL` and `VITE_WS_URL` pointed at the same backend origin unless you intentionally split HTTP and WebSocket routing.
+- If browser smoke tests fail locally, confirm the backend is running and `FRONTEND_URL` includes the frontend origin.

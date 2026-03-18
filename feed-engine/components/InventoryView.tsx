@@ -1,106 +1,275 @@
-
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from '../i18n/I18nContext';
+import * as api from '../services/api';
+
+interface LicenseAsset {
+  id: string;
+  tokenId: string;
+  name: string;
+  tier: string;
+  maxRank: string;
+  dailyLimit: number;
+  feeDiscount: number;
+  isStaked: boolean;
+  ownerAddress?: string | null;
+}
+
+interface BadgeAsset {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  rarity: string;
+  unlockedAt?: string;
+}
+
+const rarityClasses: Record<string, string> = {
+  COMMON: 'border-slate-500/20 from-slate-500/10 to-transparent text-slate-200',
+  RARE: 'border-cyan-500/20 from-cyan-500/10 to-transparent text-cyan-200',
+  EPIC: 'border-amber-500/20 from-amber-500/10 to-transparent text-amber-200',
+  LEGENDARY: 'border-rose-500/25 from-rose-500/10 to-transparent text-rose-200',
+};
+
+const tierClasses: Record<string, string> = {
+  BRONZE: 'border-amber-700/30 from-amber-700/10 to-transparent text-amber-200',
+  SILVER: 'border-slate-400/30 from-slate-400/10 to-transparent text-slate-100',
+  GOLD: 'border-yellow-400/30 from-yellow-400/10 to-transparent text-yellow-100',
+  PLATINUM: 'border-cyan-400/30 from-cyan-400/10 to-transparent text-cyan-100',
+  DIAMOND: 'border-sky-300/30 from-sky-300/10 to-transparent text-sky-100',
+};
+
+const formatDate = (value?: string) => {
+  if (!value) return '--';
+  return new Date(value).toLocaleDateString();
+};
 
 const InventoryView: React.FC = () => {
   const { t } = useTranslation();
+  const [licenses, setLicenses] = useState<LicenseAsset[]>([]);
+  const [badges, setBadges] = useState<BadgeAsset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
-  const items = [
-    { name: 'S-CLASS LICENSE', type: 'LICENSE', id: 'LIC-9921', color: 'rose', rarity: 'LEGENDARY', desc: 'Full access to Master Zone and Arbitration rights.' },
-    { name: 'US STOCKS AUTHORITY', type: 'MARKET', id: 'MKT-112', color: 'cyan', rarity: 'RARE', desc: 'Verified status for NYSE and NASDAQ oracle queries.' },
-    { name: 'CRYPTO VETERAN', type: 'MARKET', id: 'MKT-004', color: 'emerald', rarity: 'UNCOMMON', desc: 'Expertise in high-volatility decentralized market data.' },
-    { name: 'ZENITH SEASON 11', type: 'BADGE', id: 'BDG-S11', color: 'purple', rarity: 'LIMITED', desc: 'Top 100 finish in Season 11 leaderboard.' },
-    { name: 'EARLY ADOPTER', type: 'BADGE', id: 'BDG-EA', color: 'amber', rarity: 'SPECIAL', desc: 'Founding member of the manual oracle network.' },
-  ];
+  const loadInventory = async (runSync = false) => {
+    try {
+      setLoading(true);
+      setError('');
+      setMessage('');
+
+      if (runSync) {
+        try {
+          await api.syncNFTs();
+          setMessage('On-chain NFT licenses synced.');
+        } catch (syncError: any) {
+          setError(syncError.message || 'Failed to sync NFTs');
+        }
+      }
+
+      const [licenseRes, achievementsRes] = await Promise.all([
+        api.getLicenseInfo(),
+        api.getMyAchievements(),
+      ]);
+
+      if (licenseRes.success) {
+        setLicenses((licenseRes.licenses ?? []) as LicenseAsset[]);
+      }
+
+      if (achievementsRes.success) {
+        setBadges(
+          (achievementsRes.achievements ?? [])
+            .filter((achievement: any) => achievement.unlocked)
+            .map((achievement: any) => ({
+              id: achievement.id,
+              code: achievement.code,
+              name: achievement.name,
+              description: achievement.description,
+              icon: achievement.icon,
+              category: achievement.category,
+              rarity: achievement.rarity,
+              unlockedAt: achievement.unlockedAt,
+            })),
+        );
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to load inventory');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadInventory(false);
+  }, []);
+
+  const totalAssets = licenses.length + badges.length;
+  const activeLicenses = useMemo(() => licenses.filter((license) => !license.isStaked), [licenses]);
+
+  const handleSync = async () => {
+    try {
+      setSyncing(true);
+      await loadInventory(true);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-10">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
           <h2 className="text-4xl font-black font-orbitron tracking-tighter italic uppercase">{t.inventory.protocolVault}</h2>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{t.inventory.vaultSubtitle}</p>
         </div>
-        <div className="flex gap-4">
-           <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-center">
-              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{t.inventory.totalValue}</p>
-              <p className="text-sm font-black font-orbitron">12.5k FEED</p>
-           </div>
-           <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-center">
-              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{t.inventory.assets}</p>
-              <p className="text-sm font-black font-orbitron">5 / 20</p>
-           </div>
+        <div className="flex flex-wrap gap-4">
+          <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-center min-w-[120px]">
+            <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{t.inventory.assets}</p>
+            <p className="text-sm font-black font-orbitron">{totalAssets}</p>
+          </div>
+          <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 text-center min-w-[120px]">
+            <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Licenses</p>
+            <p className="text-sm font-black font-orbitron">{activeLicenses.length}/{licenses.length}</p>
+          </div>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="px-5 py-3 rounded-2xl bg-cyan-500 text-black font-black uppercase tracking-widest text-[10px] hover:bg-cyan-400 transition-colors disabled:opacity-50"
+          >
+            {syncing ? t.common.loading : 'Sync NFTs'}
+          </button>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8">
-        {items.map((item, idx) => (
-          <motion.div 
-            key={item.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            whileHover={{ y: -12 }}
-            className={`group relative aspect-[3/4.5] rounded-[2.5rem] overflow-hidden border transition-all duration-500 bg-slate-900 shadow-2xl flex flex-col ${
-              item.color === 'rose' ? 'border-rose-500/30 hover:shadow-rose-500/20' : 
-              item.color === 'cyan' ? 'border-cyan-500/30 hover:shadow-cyan-500/20' :
-              item.color === 'emerald' ? 'border-emerald-500/30 hover:shadow-emerald-500/20' :
-              item.color === 'purple' ? 'border-purple-500/30 hover:shadow-purple-500/20' :
-              'border-white/10 hover:shadow-white/10'
-            }`}
-          >
-             {/* Holographic shimmer effect */}
-             <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.03] to-white/[0.08] opacity-0 group-hover:opacity-100 transition-opacity duration-700"></div>
-             
-             <div className="p-8 pb-0 flex justify-between items-start z-10">
-                <span className={`px-2 py-0.5 rounded-md text-[8px] font-black tracking-widest border border-white/10 bg-black/40 ${
-                  item.color === 'rose' ? 'text-rose-400 border-rose-500/20' : 'text-slate-400'
-                }`}>{item.rarity}</span>
-                <span className="text-[10px] font-mono text-slate-700">#{item.id.split('-')[1]}</span>
-             </div>
+      {(message || error) && (
+        <div className={`rounded-2xl border px-6 py-4 text-sm ${error ? 'border-rose-500/30 bg-rose-500/10 text-rose-300' : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'}`}>
+          {error || message}
+        </div>
+      )}
 
-             <div className="flex-1 flex flex-col items-center justify-center p-8 z-10">
-                <div className={`w-36 h-36 rounded-full flex items-center justify-center relative ${
-                  item.color === 'rose' ? 'bg-rose-500/10 shadow-[0_0_50px_rgba(244,63,94,0.1)]' :
-                  item.color === 'cyan' ? 'bg-cyan-500/10 shadow-[0_0_50px_rgba(34,211,238,0.1)]' :
-                  item.color === 'emerald' ? 'bg-emerald-500/10 shadow-[0_0_50px_rgba(16,185,129,0.1)]' :
-                  'bg-white/5'
-                }`}>
-                   <div className="text-5xl group-hover:scale-110 transition-transform duration-500">
-                     {item.type === 'LICENSE' ? '🎖️' : item.type === 'MARKET' ? '💹' : '🏅'}
-                   </div>
-                   {/* Animated rings */}
-                   <motion.div 
-                     animate={{ rotate: 360 }}
-                     transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                     className={`absolute inset-0 border border-dashed rounded-full ${
-                       item.color === 'rose' ? 'border-rose-500/20' : 'border-white/5'
-                     }`}
-                   />
-                </div>
-             </div>
+      <section className="space-y-5">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h3 className="text-lg font-black uppercase tracking-widest text-white">{t.inventory.licenses}</h3>
+            <p className="text-sm text-slate-500 mt-1">Real feeder licenses synced from backend ownership records.</p>
+          </div>
+          <div className="text-sm text-slate-500">{licenses.length} item(s)</div>
+        </div>
 
-             <div className="p-8 space-y-4 bg-black/20 backdrop-blur-md border-t border-white/5 z-10">
-                <div className="space-y-1">
-                   <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest">{item.type}</p>
-                   <h3 className="text-lg font-bold font-orbitron group-hover:text-white transition-colors">{item.name}</h3>
-                </div>
-                <p className="text-[10px] text-slate-500 leading-relaxed font-medium">{item.desc}</p>
-                <button className="w-full py-3 rounded-xl bg-white/5 border border-white/5 text-[9px] font-black uppercase tracking-[0.2em] hover:bg-white/10 transition-colors">
-                  {t.inventory.viewSignature}
-                </button>
-             </div>
-          </motion.div>
-        ))}
+        {licenses.length === 0 ? (
+          <div className="rounded-[2rem] border border-dashed border-white/10 px-6 py-12 text-center text-slate-500">
+            {t.inventory.empty}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {licenses.map((license, index) => {
+              const tone = tierClasses[license.tier] || tierClasses.SILVER;
+              return (
+                <motion.div
+                  key={license.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className={`rounded-[2rem] border bg-gradient-to-br ${tone} p-6 space-y-5 shadow-2xl`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-70">NFT License</p>
+                      <h4 className="text-xl font-black font-orbitron text-white mt-2">{license.name}</h4>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${license.isStaked ? 'bg-amber-500/20 text-amber-200' : 'bg-emerald-500/20 text-emerald-200'}`}>
+                      {license.isStaked ? 'Staked' : 'Available'}
+                    </span>
+                  </div>
 
-        {/* Add more button */}
-        <button className="aspect-[3/4.5] rounded-[2.5rem] border-2 border-dashed border-white/5 flex flex-col items-center justify-center space-y-4 hover:border-white/20 hover:bg-white/[0.01] transition-all group">
-           <div className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <span className="text-3xl text-slate-700 group-hover:text-slate-500 transition-colors">＋</span>
-           </div>
-           <span className="text-[10px] font-black uppercase tracking-widest text-slate-700 group-hover:text-slate-500">{t.inventory.mintCredential}</span>
-        </button>
-      </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-slate-500 text-[10px] uppercase tracking-widest font-black">Tier</p>
+                      <p className="text-white font-bold mt-1">{license.tier}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-[10px] uppercase tracking-widest font-black">Max Rank</p>
+                      <p className="text-white font-bold mt-1">{license.maxRank}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-[10px] uppercase tracking-widest font-black">Daily Limit</p>
+                      <p className="text-white font-bold mt-1">{license.dailyLimit}</p>
+                    </div>
+                    <div>
+                      <p className="text-slate-500 text-[10px] uppercase tracking-widest font-black">Fee Discount</p>
+                      <p className="text-white font-bold mt-1">{license.feeDiscount}%</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-black/30 border border-white/5 px-4 py-3 text-xs text-slate-400 font-mono break-all">
+                    Token #{license.tokenId}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-5">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h3 className="text-lg font-black uppercase tracking-widest text-white">{t.inventory.badges}</h3>
+            <p className="text-sm text-slate-500 mt-1">Unlocked achievements currently stored for the connected feeder.</p>
+          </div>
+          <div className="text-sm text-slate-500">{badges.length} item(s)</div>
+        </div>
+
+        {badges.length === 0 ? (
+          <div className="rounded-[2rem] border border-dashed border-white/10 px-6 py-12 text-center text-slate-500">
+            No unlocked badges yet.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {badges.map((badge, index) => {
+              const tone = rarityClasses[badge.rarity] || rarityClasses.COMMON;
+              return (
+                <motion.div
+                  key={badge.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className={`rounded-[2rem] border bg-gradient-to-br ${tone} p-6 space-y-5 shadow-2xl`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="text-5xl leading-none">{badge.icon || '??'}</div>
+                    <span className="px-3 py-1 rounded-full text-[10px] font-black uppercase bg-black/20 text-white/80">
+                      {badge.rarity}
+                    </span>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{badge.category}</p>
+                    <h4 className="text-xl font-black text-white mt-2">{badge.name}</h4>
+                    <p className="text-sm text-slate-300 mt-3 leading-relaxed">{badge.description}</p>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-slate-400 border-t border-white/10 pt-4">
+                    <span>{t.inventory.unlockedAt}</span>
+                    <span>{formatDate(badge.unlockedAt)}</span>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </section>
     </div>
   );
 };

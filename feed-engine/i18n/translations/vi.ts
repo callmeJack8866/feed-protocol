@@ -319,6 +319,17 @@ const vi: TranslationKeys = {
         engageNode: 'Kết Nối Nút',
         connecting: 'Đang kết nối...',
         terminalLink: 'Liên Kết Đầu Cuối',
+        chainUnknown: 'Chuỗi không xác định',
+        connectingWallet: 'Đang kết nối ví...',
+        requestingNonce: 'Đang yêu cầu SIWE nonce...',
+        signMessage: 'Ký thông điệp SIWE trong ví của bạn...',
+        verifyingSignature: 'Đang xác minh chữ ký...',
+        installMetamask: 'Vui lòng cài đặt tiện ích mở rộng ví MetaMask',
+        noWalletAddress: 'Không thể đọc địa chỉ ví',
+        nonceFailed: 'Không thể lấy nonce',
+        signatureCancelled: 'Chữ ký đã bị hủy',
+        verificationFailed: 'Xác minh chữ ký thất bại',
+        loginFailed: 'Đăng nhập thất bại',
     },
 };
 

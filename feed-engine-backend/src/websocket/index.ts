@@ -1,107 +1,118 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import prisma from '../config/database';
 
-/**
- * WebSocket 服务设置
- */
+function parseChannelPayload(payload: unknown, key: 'market' | 'orderId'): string | null {
+  if (typeof payload === 'string' && payload.trim()) {
+    return payload.trim();
+  }
+
+  if (payload && typeof payload === 'object' && key in (payload as Record<string, unknown>)) {
+    const value = (payload as Record<string, unknown>)[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
 export function setupWebSocket(io: SocketIOServer): void {
-    io.on('connection', (socket: Socket) => {
-        console.log(`🔌 Client connected: ${socket.id}`);
+  io.on('connection', (socket: Socket) => {
+    console.log(`WebSocket client connected: ${socket.id}`);
 
-        // 加入房间（按市场类型）
-        socket.on('join:market', (market: string) => {
-            socket.join(`market:${market}`);
-            console.log(`Client ${socket.id} joined market:${market}`);
-        });
+    const joinMarket = (payload: unknown) => {
+      const market = parseChannelPayload(payload, 'market');
+      if (!market) return;
+      socket.join(`market:${market}`);
+    };
 
-        // 离开房间
-        socket.on('leave:market', (market: string) => {
-            socket.leave(`market:${market}`);
-        });
+    const leaveMarket = (payload: unknown) => {
+      const market = parseChannelPayload(payload, 'market');
+      if (!market) return;
+      socket.leave(`market:${market}`);
+    };
 
-        // 订阅特定订单
-        socket.on('subscribe:order', (orderId: string) => {
-            socket.join(`order:${orderId}`);
-        });
+    const subscribeOrder = (payload: unknown) => {
+      const orderId = parseChannelPayload(payload, 'orderId');
+      if (!orderId) return;
+      socket.join(`order:${orderId}`);
+    };
 
-        // 取消订阅订单
-        socket.on('unsubscribe:order', (orderId: string) => {
-            socket.leave(`order:${orderId}`);
-        });
+    const unsubscribeOrder = (payload: unknown) => {
+      const orderId = parseChannelPayload(payload, 'orderId');
+      if (!orderId) return;
+      socket.leave(`order:${orderId}`);
+    };
 
-        // 喂价员上线
-        socket.on('feeder:online', async (address: string) => {
-            socket.data.address = address;
-            socket.join(`feeder:${address}`);
+    socket.on('join:market', joinMarket);
+    socket.on('subscribe:market', joinMarket);
+    socket.on('leave:market', leaveMarket);
+    socket.on('unsubscribe:market', leaveMarket);
+    socket.on('subscribe:order', subscribeOrder);
+    socket.on('unsubscribe:order', unsubscribeOrder);
 
-            // 通知其他用户
-            io.emit('feeder:status', { address, status: 'online' });
-        });
-
-        // 断开连接
-        socket.on('disconnect', () => {
-            console.log(`🔌 Client disconnected: ${socket.id}`);
-
-            if (socket.data.address) {
-                io.emit('feeder:status', {
-                    address: socket.data.address,
-                    status: 'offline'
-                });
-            }
-        });
+    socket.on('feeder:online', async (address: string) => {
+      socket.data.address = address;
+      socket.join(`feeder:${address}`);
+      io.emit('feeder:status', { address, status: 'online' });
     });
 
-    // 定时广播订单更新
-    setInterval(async () => {
-        try {
-            const orders = await prisma.order.findMany({
-                where: {
-                    status: { in: ['OPEN', 'GRABBED', 'FEEDING'] },
-                    expiresAt: { gt: new Date() }
-                },
-                select: {
-                    id: true,
-                    expiresAt: true,
-                    status: true
-                }
-            });
+    socket.on('disconnect', () => {
+      console.log(`WebSocket client disconnected: ${socket.id}`);
 
-            const now = Date.now();
-            orders.forEach(order => {
-                const timeRemaining = Math.max(0, Math.floor((order.expiresAt.getTime() - now) / 1000));
-                io.to(`order:${order.id}`).emit('order:countdown', {
-                    orderId: order.id,
-                    timeRemaining,
-                    status: order.status
-                });
-            });
-        } catch (error) {
-            console.error('Countdown broadcast error:', error);
-        }
-    }, 1000); // 每秒更新
+      if (socket.data.address) {
+        io.emit('feeder:status', {
+          address: socket.data.address,
+          status: 'offline',
+        });
+      }
+    });
+  });
 
-    console.log('📡 WebSocket server initialized');
+  setInterval(async () => {
+    try {
+      const orders = await prisma.order.findMany({
+        where: {
+          status: { in: ['OPEN', 'GRABBED', 'FEEDING'] },
+          expiresAt: { gt: new Date() },
+        },
+        select: {
+          id: true,
+          expiresAt: true,
+          status: true,
+        },
+      });
+
+      const now = Date.now();
+      orders.forEach((order) => {
+        const timeRemaining = Math.max(0, Math.floor((order.expiresAt.getTime() - now) / 1000));
+        io.to(`order:${order.id}`).emit('order:countdown', {
+          orderId: order.id,
+          timeRemaining,
+          status: order.status,
+        });
+      });
+    } catch (error) {
+      console.error('Countdown broadcast error:', error);
+    }
+  }, 1000);
+
+  console.log('WebSocket server initialized');
 }
 
-/**
- * 广播新订单
- */
 export function broadcastNewOrder(io: SocketIOServer, order: any): void {
-    io.emit('order:new', order);
-    io.to(`market:${order.market}`).emit('order:new', order);
+  io.emit('order:new', order);
+  io.to(`market:${order.market}`).emit('order:new', order);
 }
 
-/**
- * 广播订单状态更新
- */
 export function broadcastOrderUpdate(io: SocketIOServer, orderId: string, update: any): void {
-    io.to(`order:${orderId}`).emit('order:update', { orderId, ...update });
+  const payload = { orderId, ...update };
+  io.emit('order:update', payload);
+  io.to(`order:${orderId}`).emit('order:update', payload);
 }
 
-/**
- * 广播共识达成
- */
 export function broadcastConsensus(io: SocketIOServer, orderId: string, consensusPrice: number): void {
-    io.emit('order:consensus', { orderId, consensusPrice });
-    io.to(`order:${orderId}`).emit('order:consensus', { orderId, consensusPrice });
+  const payload = { orderId, consensusPrice, status: 'CONSENSUS' };
+  io.emit('order:consensus', payload);
+  io.to(`order:${orderId}`).emit('order:consensus', payload);
 }

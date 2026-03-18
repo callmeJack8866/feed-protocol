@@ -1,14 +1,15 @@
-import { useState, useCallback, useEffect } from 'react';
+﻿import { useState, useCallback, useEffect } from 'react';
+import { ethers } from 'ethers';
 
 /**
- * 钱包集成 Hook — 提供 MetaMask/WalletConnect 连接
- * 使用浏览器原生 window.ethereum (EIP-1193)
+ * 閽卞寘闆嗘垚 Hook 鈥?鎻愪緵 MetaMask/WalletConnect 杩炴帴
+ * 浣跨敤娴忚鍣ㄥ師鐢?window.ethereum (EIP-1193)
  * 
- * 功能:
- * - connectWallet() → 连接 MetaMask
- * - disconnectWallet() → 断开
- * - signMessage() → 签名消息
- * - address / chainId / isConnected 状态
+ * 鍔熻兘:
+ * - connectWallet() 鈫?杩炴帴 MetaMask
+ * - disconnectWallet() 鈫?鏂紑
+ * - signMessage() 鈫?绛惧悕娑堟伅
+ * - address / chainId / isConnected 鐘舵€?
  */
 
 interface WalletState {
@@ -19,14 +20,14 @@ interface WalletState {
     error: string | null;
 }
 
-/** BSC 链配置 */
+/** BSC 閾鹃厤缃?*/
 const BSC_CHAIN_ID = 56;
 const BSC_TESTNET_CHAIN_ID = 97;
 const SUPPORTED_CHAIN_IDS = [BSC_CHAIN_ID, BSC_TESTNET_CHAIN_ID];
 
 /**
- * 钱包连接 Hook
- * @returns 钱包状态 + 操作函数
+ * 閽卞寘杩炴帴 Hook
+ * @returns 閽卞寘鐘舵€?+ 鎿嶄綔鍑芥暟
  */
 export function useWallet() {
     const [state, setState] = useState<WalletState>({
@@ -38,18 +39,18 @@ export function useWallet() {
     });
 
     /**
-     * 检查 MetaMask 是否已安装
+     * 妫€鏌?MetaMask 鏄惁宸插畨瑁?
      */
     const hasEthereum = typeof window !== 'undefined' && !!(window as any).ethereum;
 
     /**
-     * 连接钱包
+     * 杩炴帴閽卞寘
      */
     const connectWallet = useCallback(async () => {
         if (!hasEthereum) {
             setState(prev => ({
                 ...prev,
-                error: '请安装 MetaMask 钱包',
+                error: 'Install MetaMask first',
             }));
             return;
         }
@@ -59,7 +60,7 @@ export function useWallet() {
         try {
             const ethereum = (window as any).ethereum;
 
-            // 请求账户授权
+            // 璇锋眰璐︽埛鎺堟潈
             const accounts: string[] = await ethereum.request({
                 method: 'eth_requestAccounts',
             });
@@ -72,7 +73,7 @@ export function useWallet() {
             if (accounts.length > 0) {
                 const address = accounts[0].toLowerCase();
 
-                // 持久化到 localStorage
+                // 鎸佷箙鍖栧埌 localStorage
                 localStorage.setItem('feed-engine-wallet', address);
 
                 setState({
@@ -83,22 +84,22 @@ export function useWallet() {
                     error: null,
                 });
 
-                // 检查链 ID
+                // 妫€鏌ラ摼 ID
                 if (!SUPPORTED_CHAIN_IDS.includes(chainId)) {
-                    console.warn(`⚠️ 当前链 ${chainId} 不是 BSC，请切换到 BSC Mainnet 或 Testnet`);
+                    console.warn(`Current chain ${chainId} is not BSC. Switch to BSC Mainnet or Testnet.`);
                 }
             }
         } catch (error: any) {
             setState(prev => ({
                 ...prev,
                 isConnecting: false,
-                error: error.message || '连接钱包失败',
+                error: error.message || 'Wallet connection failed',
             }));
         }
     }, [hasEthereum]);
 
     /**
-     * 断开钱包
+     * 鏂紑閽卞寘
      */
     const disconnectWallet = useCallback(() => {
         localStorage.removeItem('feed-engine-wallet');
@@ -112,7 +113,7 @@ export function useWallet() {
     }, []);
 
     /**
-     * 签名消息（用于身份验证）
+     * 绛惧悕娑堟伅锛堢敤浜庤韩浠介獙璇侊級
      */
     const signMessage = useCallback(async (message: string): Promise<string | null> => {
         if (!hasEthereum || !state.address) return null;
@@ -125,17 +126,17 @@ export function useWallet() {
             });
             return signature;
         } catch (error: any) {
-            console.error('签名失败:', error);
+            console.error('Message signing failed:', error);
             setState(prev => ({
                 ...prev,
-                error: error.message || '签名失败',
+                error: error.message || 'Message signing failed',
             }));
             return null;
         }
     }, [hasEthereum, state.address]);
 
     /**
-     * 切换到 BSC 链
+     * 鍒囨崲鍒?BSC 閾?
      */
     const switchToBSC = useCallback(async (testnet = false) => {
         if (!hasEthereum) return;
@@ -149,7 +150,7 @@ export function useWallet() {
                 params: [{ chainId: `0x${targetChainId.toString(16)}` }],
             });
         } catch (switchError: any) {
-            // 如果链未添加，尝试添加
+            // 濡傛灉閾炬湭娣诲姞锛屽皾璇曟坊鍔?
             if (switchError.code === 4902) {
                 try {
                     await ethereum.request({
@@ -167,35 +168,28 @@ export function useWallet() {
                         }],
                     });
                 } catch (addError) {
-                    console.error('添加 BSC 链失败:', addError);
+                    console.error('娣诲姞 BSC 閾惧け璐?', addError);
                 }
             }
         }
     }, [hasEthereum]);
 
     /**
-     * 计算 keccak256 哈希（用于 Commit-Reveal）
-     * @param price 价格
-     * @param salt 盐值
-     * @returns 哈希字符串
+     * 璁＄畻 keccak256 鍝堝笇锛堢敤浜?Commit-Reveal锛?
+     * @param price 浠锋牸
+     * @param salt 鐩愬€?
+     * @returns 鍝堝笇瀛楃涓?
      */
     const computePriceHash = useCallback((price: number, salt: string): string => {
-        // 使用 Web Crypto API 计算哈希
-        // 这里简化为模拟; 生产中应使用 ethers.js 的 keccak256
-        const priceWei = BigInt(Math.round(price * 1e18));
-        const message = `${priceWei.toString()}:${salt}`;
-        // 简单哈希（前端可替换为 ethers.keccak256）
-        let hash = 0;
-        for (let i = 0; i < message.length; i++) {
-            const char = message.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash |= 0;
-        }
-        return `0x${Math.abs(hash).toString(16).padStart(64, '0')}`;
+        const normalizedPrice = ethers.parseUnits(price.toString(), 18);
+        return ethers.solidityPackedKeccak256(
+            ['uint256', 'string'],
+            [normalizedPrice, salt]
+        );
     }, []);
 
     /**
-     * 监听账户和链变化
+     * 鐩戝惉璐︽埛鍜岄摼鍙樺寲
      */
     useEffect(() => {
         if (!hasEthereum) return;
@@ -223,7 +217,7 @@ export function useWallet() {
         ethereum.on('accountsChanged', handleAccountsChanged);
         ethereum.on('chainChanged', handleChainChanged);
 
-        // 自动恢复之前的连接
+        // 鑷姩鎭㈠涔嬪墠鐨勮繛鎺?
         const savedAddress = localStorage.getItem('feed-engine-wallet');
         if (savedAddress) {
             ethereum.request({ method: 'eth_accounts' }).then((accounts: string[]) => {
@@ -252,3 +246,4 @@ export function useWallet() {
         isBSC: state.chainId !== null && SUPPORTED_CHAIN_IDS.includes(state.chainId),
     };
 }
+

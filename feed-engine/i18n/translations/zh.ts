@@ -319,6 +319,17 @@ const zh: TranslationKeys = {
         engageNode: '接入节点',
         connecting: '连接中...',
         terminalLink: '终端链接',
+        chainUnknown: '链未知',
+        connectingWallet: '正在连接钱包...',
+        requestingNonce: '获取认证凭证...',
+        signMessage: '请在钱包中签名...',
+        verifyingSignature: '验证签名...',
+        installMetamask: '请先安装 MetaMask 钱包扩展',
+        noWalletAddress: '未能获取钱包地址',
+        nonceFailed: '获取 nonce 失败',
+        signatureCancelled: '用户取消签名',
+        verificationFailed: '签名验证失败',
+        loginFailed: '登录失败',
     },
 };
 

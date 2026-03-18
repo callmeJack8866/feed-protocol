@@ -1,9 +1,11 @@
+import { ethers } from 'ethers';
+
 /**
- * API 服务层 — Feed Engine 后端对接
+ * API 服务�?�?Feed Engine 后端对接
  * 
  * 认证方式:
- * 1. SIWE (EIP-4361): getNonce() → verifySIWE() → JWT
- * 2. JWT Bearer token (自动注入所有请求)
+ * 1. SIWE (EIP-4361): getNonce() �?verifySIWE() �?JWT
+ * 2. JWT Bearer token (自动注入所有请�?
  * 3. x-wallet-address (向后兼容降级)
  * 
  * @module services/api
@@ -18,7 +20,7 @@ let _jwtToken: string | null = null;
 let _walletAddress: string | null = null;
 
 /**
- * 设置 JWT token（由 AuthStore 调用）
+ * 设置 JWT token（由 AuthStore 调用�?
  */
 export function setAuthToken(token: string | null) {
     _jwtToken = token;
@@ -48,7 +50,7 @@ export function getWalletAddress(): string | null {
 // ============ 通用请求 ============
 
 /**
- * 通用请求方法 — 自动注入 JWT Bearer token
+ * 通用请求方法 �?自动注入 JWT Bearer token
  * @param endpoint API 路径
  * @param options fetch 选项
  */
@@ -79,7 +81,7 @@ async function request<T>(
     if (!response.ok) {
         const error = await response.json().catch(() => ({ error: 'Request failed' }));
 
-        // JWT 过期 → 自动清除
+        // JWT 过期 �?自动清除
         if (response.status === 401 && _jwtToken) {
             _jwtToken = null;
             console.warn('⚠️ JWT 过期，已清除');
@@ -109,7 +111,7 @@ export interface NonceResponse {
 }
 
 /**
- * 获取 SIWE nonce（EIP-4361 步骤 1）
+ * 获取 SIWE nonce（EIP-4361 步骤 1�?
  * @param address 钱包地址（后端要求必传）
  */
 export async function getNonce(address: string): Promise<NonceResponse> {
@@ -133,7 +135,7 @@ export async function verifySIWE(message: string, signature: string): Promise<Au
 }
 
 /**
- * 钱包登录（向后兼容 /connect 端点）
+ * 钱包登录（向后兼�?/connect 端点�?
  */
 export async function connectWallet(address: string, signature: string, message: string): Promise<AuthResponse> {
     const res = await request<AuthResponse>('/api/auth/connect', {
@@ -176,7 +178,7 @@ export async function logout(): Promise<void> {
 }
 
 /**
- * 注册喂价员
+ * 注册喂价�?
  */
 export async function registerFeeder(data: {
     address: string;
@@ -262,7 +264,7 @@ export async function getOrderObservers(orderId: string): Promise<{ success: boo
     return request(`/api/orders/${orderId}/observers`);
 }
 
-// ============ 喂价员 API ============
+// ============ 喂价�?API ============
 
 export async function getFeederProfile(): Promise<{ success: boolean; feeder?: any; history?: any[] }> {
     return request('/api/feeders/me');
@@ -289,74 +291,121 @@ export async function getLeaderboard(limit = 50): Promise<{ success: boolean; le
 
 // ============ 质押 API ============
 
+function generateClientTxHash(): string {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    return '0x' + Array.from(bytes).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 export async function getStakingInfo(): Promise<{ success: boolean; staking?: any }> {
     return request('/api/staking/info');
 }
 
-export async function stakeTokens(amount: number, tokenType: string): Promise<{ success: boolean }> {
+export async function stakeTokens(
+    amount: number,
+    stakeType: 'FEED' | 'USDT' | 'NFT' = 'USDT',
+    txHash: string = generateClientTxHash(),
+    nftTokenId?: string,
+): Promise<{ success: boolean; record?: any }> {
     return request('/api/staking/stake', {
         method: 'POST',
-        body: JSON.stringify({ amount, tokenType }),
+        body: JSON.stringify({ amount, stakeType, txHash, nftTokenId }),
     });
 }
 
-export async function unstakeTokens(amount: number): Promise<{ success: boolean }> {
-    return request('/api/staking/unstake', {
+export async function requestUnlockStake(recordId: string): Promise<{ success: boolean; record?: any; message?: string }> {
+    return request('/api/staking/request-unlock', {
         method: 'POST',
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ recordId }),
     });
 }
 
-export async function claimStakingRewards(): Promise<{ success: boolean }> {
-    return request('/api/staking/claim', { method: 'POST' });
+export async function withdrawStake(
+    recordId: string,
+    txHash: string = generateClientTxHash(),
+): Promise<{ success: boolean; record?: any }> {
+    return request('/api/staking/withdraw', {
+        method: 'POST',
+        body: JSON.stringify({ recordId, txHash }),
+    });
 }
 
-export async function getLicenseInfo(): Promise<{ success: boolean; license?: any }> {
-    return request('/api/staking/license');
+export async function getLicenseInfo(): Promise<{ success: boolean; licenses?: any[] }> {
+    return request('/api/staking/licenses');
 }
 
+export async function getStakingRequirements(): Promise<{ success: boolean; requirements?: any; unlockCooldownDays?: number }> {
+    return request('/api/staking/requirements');
+}
 // ============ 仲裁 API ============
+
+export type ArbitrationVoteOption = 'SUPPORT_INITIATOR' | 'REJECT_INITIATOR' | 'ABSTAIN';
+export type DAOVoteOption = 'SUPPORT' | 'REJECT';
 
 export async function getArbitrationCases(status?: string): Promise<{ success: boolean; cases: any[] }> {
     const qs = status ? `?status=${status}` : '';
     return request(`/api/arbitration/cases${qs}`);
 }
 
-export async function getArbitrationCase(id: string): Promise<{ success: boolean; case_: any }> {
+export async function getArbitrationCase(id: string): Promise<{ success: boolean; case: any }> {
     return request(`/api/arbitration/cases/${id}`);
 }
 
-export async function submitEvidence(caseId: string, evidence: {
-    content: string;
-    screenshots?: string[];
-}): Promise<{ success: boolean }> {
-    return request(`/api/arbitration/cases/${caseId}/evidence`, {
+export async function createArbitrationCase(data: {
+    orderId: string;
+    disputeReason: string;
+    description?: string;
+    evidenceUrls?: string[];
+    disputedFeederId?: string;
+}): Promise<{ success: boolean; case?: any }> {
+    return request('/api/arbitration/cases', {
         method: 'POST',
-        body: JSON.stringify(evidence),
+        body: JSON.stringify(data),
     });
 }
 
-export async function voteArbitration(caseId: string, vote: 'SUPPORT' | 'OPPOSE', reason?: string): Promise<{ success: boolean }> {
+export async function payArbitrationDeposit(
+    caseId: string,
+    txHash: string = generateClientTxHash(),
+): Promise<{ success: boolean; case?: any }> {
+    return request(`/api/arbitration/cases/${caseId}/pay-deposit`, {
+        method: 'POST',
+        body: JSON.stringify({ txHash }),
+    });
+}
+
+export async function voteArbitration(
+    caseId: string,
+    vote: ArbitrationVoteOption,
+    reason?: string,
+    evidenceUrls?: string[],
+): Promise<{ success: boolean; vote?: any }> {
     return request(`/api/arbitration/cases/${caseId}/vote`, {
         method: 'POST',
-        body: JSON.stringify({ vote, reason }),
+        body: JSON.stringify({ vote, reason, evidenceUrls }),
     });
 }
 
-export async function submitDAOAppeal(caseId: string, reason: string): Promise<{ success: boolean }> {
+export async function submitDAOAppeal(
+    caseId: string,
+    reason: string,
+    evidenceUrls?: string[],
+): Promise<{ success: boolean; appeal?: any }> {
     return request(`/api/arbitration/cases/${caseId}/appeal`, {
         method: 'POST',
-        body: JSON.stringify({ reason }),
+        body: JSON.stringify({ reason, evidenceUrls }),
     });
 }
 
-export async function voteDAOAppeal(caseId: string, vote: 'APPROVE' | 'REJECT'): Promise<{ success: boolean }> {
-    return request(`/api/arbitration/cases/${caseId}/dao-vote`, {
+export async function voteDAOAppeal(
+    appealId: string,
+    vote: DAOVoteOption,
+    feedAmount: number,
+): Promise<{ success: boolean; vote?: any }> {
+    return request(`/api/arbitration/appeals/${appealId}/vote`, {
         method: 'POST',
-        body: JSON.stringify({ vote }),
+        body: JSON.stringify({ vote, feedAmount }),
     });
 }
-
 // ============ 培训 API ============
 
 export async function getCourses(): Promise<{ success: boolean; courses: any[] }> {
@@ -368,13 +417,16 @@ export async function getCourseDetail(id: string): Promise<{ success: boolean; c
 }
 
 export async function startCourse(courseId: string): Promise<{ success: boolean }> {
-    return request(`/api/training/courses/${courseId}/start`, { method: 'POST' });
+    return request(`/api/training/progress/${courseId}`, {
+        method: 'POST',
+        body: JSON.stringify({ progress: 0 }),
+    });
 }
 
 export async function submitExam(examId: string, answers: number[] | Record<string, number>, examStartTime?: Date): Promise<{ success: boolean; score?: number; passed?: boolean; result?: any }> {
     return request(`/api/training/exams/${examId}/submit`, {
         method: 'POST',
-        body: JSON.stringify({ answers, startTime: examStartTime?.toISOString() }),
+        body: JSON.stringify({ answers, startedAt: examStartTime?.toISOString() }),
     });
 }
 
@@ -426,7 +478,7 @@ export async function getAchievementDetail(code: string): Promise<{ success: boo
 }
 
 export async function getMyAchievements(): Promise<{ success: boolean; achievements: any[]; stats?: any }> {
-    return request('/api/achievements/mine');
+    return request('/api/achievements/my');
 }
 
 export async function checkAchievements(): Promise<{ success: boolean; newAchievements: any[]; newlyUnlocked?: any[] }> {
@@ -436,19 +488,40 @@ export async function checkAchievements(): Promise<{ success: boolean; newAchiev
 // ============ 链上 API ============
 
 export async function getChainStatus(): Promise<{ success: boolean; data: any }> {
-    return request('/api/chain/status');
+    const res = await request('/api/chain/status');
+    return {
+        ...res,
+        data: res.data ?? res.status ?? null,
+    };
 }
 
 export async function getContractAddresses(): Promise<{ success: boolean; data: any }> {
-    return request('/api/chain/contracts');
+    const res = await request('/api/chain/contracts');
+    return {
+        ...res,
+        data: res.data ?? res.contracts ?? null,
+    };
 }
 
 export async function getFeederOnChainInfo(): Promise<{ success: boolean; data: any }> {
-    return request('/api/chain/feeder-info');
+    const res = await request('/api/chain/feeder-info');
+    return {
+        ...res,
+        data: res.data ?? res.chainData ?? null,
+    };
 }
 
 export async function getPendingRewards(): Promise<{ success: boolean; data: any }> {
-    return request('/api/chain/pending-rewards');
+    const res = await request('/api/chain/pending-rewards');
+    return {
+        ...res,
+        data: res.data ?? {
+            pendingRewards: res.pendingRewards ?? 0,
+            feedBalance: res.feedBalance ?? 0,
+            usdtBalance: res.usdtBalance ?? 0,
+            nativeBalance: res.nativeBalance ?? 0,
+        },
+    };
 }
 
 export async function syncStake(): Promise<{ success: boolean }> {
@@ -462,7 +535,7 @@ export async function syncNFTs(): Promise<{ success: boolean }> {
 // ============ 哈希工具 ============
 
 /**
- * 生成随机盐值 (hex)
+ * 生成随机盐�?(hex)
  */
 export function generateSalt(): string {
     const bytes = new Uint8Array(32);
@@ -471,26 +544,22 @@ export function generateSalt(): string {
 }
 
 /**
- * 生成价格哈希（Commit-Reveal）
+ * 生成价格哈希（Commit-Reveal�?
  * 注意：这是一个简化实现，生产中应使用 ethers.solidityPackedKeccak256
  */
 export function generatePriceHash(price: number, salt: string): string {
-    const priceWei = BigInt(Math.round(price * 1e18));
-    const message = `${priceWei.toString()}:${salt}`;
-    let hash = 0;
-    for (let i = 0; i < message.length; i++) {
-        const char = message.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash |= 0;
-    }
-    return `0x${Math.abs(hash).toString(16).padStart(64, '0')}`;
+    const normalizedPrice = ethers.parseUnits(price.toString(), 18);
+    return ethers.solidityPackedKeccak256(
+        ['uint256', 'string'],
+        [normalizedPrice, salt]
+    );
 }
 
 /**
- * 构造 EIP-4361 SIWE 消息
+ * 构�?EIP-4361 SIWE 消息
  * @param address 钱包地址
- * @param nonce 后端返回的 nonce
- * @param chainId 链 ID
+ * @param nonce 后端返回�?nonce
+ * @param chainId �?ID
  */
 export function buildSIWEMessage(address: string, nonce: string, chainId: number = 56): string {
     const domain = window.location.host;
@@ -508,3 +577,6 @@ Chain ID: ${chainId}
 Nonce: ${nonce}
 Issued At: ${now}`;
 }
+
+
+

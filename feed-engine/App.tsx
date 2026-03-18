@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useEffect, useMemo } from 'react';
 import Layout from './components/Layout';
 import OrderCard from './components/OrderCard';
@@ -7,17 +7,18 @@ import OrderDetailModal from './components/OrderDetailModal';
 import DashboardView from './components/DashboardView';
 import LeaderboardView from './components/LeaderboardView';
 import InventoryView from './components/InventoryView';
+import AchievementsView from './components/AchievementsView';
 import TrainingView from './components/TrainingView';
 import StakingView from './components/StakingView';
 import ArbitrationView from './components/ArbitrationView';
 import PreferencesModal from './components/PreferencesModal';
 import { FeederRank, FeedOrder, OrderStatus } from './types';
-import { MOCK_ORDERS, MOCK_HISTORY } from './constants';
 import * as api from './services/api';
-import { transformOrder } from './services/transform';
+import { transformFeeder, transformOrder } from './services/transform';
+import { closeWebSocket, initWebSocket, off, on } from './services/websocket';
 import { motion, AnimatePresence, useTransform, useMotionValue, useSpring, MotionValue } from 'framer-motion';
 import { useTranslation } from './i18n';
-import { useFeederStore, useUIStore } from './store';
+import { useAuthStore, useFeederStore, useUIStore } from './store';
 
 // Separate component for Orbital Rings to fix Hook violations
 const OrbitalRing: React.FC<{
@@ -149,7 +150,7 @@ const CosmicHero: React.FC<{ springX: MotionValue<number>; springY: MotionValue<
             />
             {/* Owl emblem in center */}
             <div className="absolute inset-[110px] rounded-full flex items-center justify-center">
-              <span className="text-4xl select-none" role="img" aria-label="owl">🦉</span>
+              <span className="text-4xl select-none" role="img" aria-label="owl">OWL</span>
             </div>
             {/* Decorative dots on ring */}
             {[0, 60, 120, 180, 240, 300].map((deg) => (
@@ -216,9 +217,9 @@ const QuestHallView: React.FC<{
         <div className="flex bg-black/80 p-3 rounded-[3.5rem] border border-white/5 backdrop-blur-3xl shadow-[0_30px_80px_rgba(0,0,0,0.8)] relative group overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
           {[
-            { id: 'beginner', label: 'Primary Sync', icon: '🌀', desc: '新手训练场 · F-D级 · <10万U', activeColor: 'bg-gradient-to-r from-cyan-500 to-blue-500 text-black shadow-[0_0_50px_rgba(34,211,238,0.4)]' },
-            { id: 'competitive', label: 'Combat Feed', icon: '🔥', desc: '竞技场 · C-B级 · 10万-100万U', activeColor: 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-[0_0_50px_rgba(249,115,22,0.4)]' },
-            { id: 'master', label: 'Zenith Oracle', icon: '💎', desc: '大师区 · A-S级 · >100万U', activeColor: 'bg-gradient-to-r from-amber-400 to-yellow-300 text-black shadow-[0_0_50px_rgba(251,191,36,0.4)]' }
+            { id: 'beginner', label: 'Primary Sync', icon: 'B1', desc: 'For F-D rank feeders · Notional below 100K', activeColor: 'bg-gradient-to-r from-cyan-500 to-blue-500 text-black shadow-[0_0_50px_rgba(34,211,238,0.4)]' },
+            { id: 'competitive', label: 'Combat Feed', icon: 'C2', desc: 'For C-B rank feeders · Notional 100K to 1M', activeColor: 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-[0_0_50px_rgba(249,115,22,0.4)]' },
+            { id: 'master', label: 'Zenith Oracle', icon: 'M3', desc: 'For A-S rank feeders · Notional above 1M', activeColor: 'bg-gradient-to-r from-amber-400 to-yellow-300 text-black shadow-[0_0_50px_rgba(251,191,36,0.4)]' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -236,7 +237,7 @@ const QuestHallView: React.FC<{
 
         <div className="flex gap-8">
           <button onClick={() => setShowPrefs(true)} className="w-16 h-16 rounded-[2.5rem] bg-black/60 border border-white/10 flex items-center justify-center text-xl hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-all group relative overflow-hidden">
-            <span className="group-hover:rotate-180 transition-transform duration-700 relative z-10">⚙️</span>
+            <span className="group-hover:rotate-180 transition-transform duration-700 relative z-10">CFG</span>
           </button>
           <button className="px-10 py-4 rounded-[2.5rem] bg-cyan-500 text-black font-black font-orbitron text-[11px] uppercase tracking-[0.3em] italic shadow-[0_30px_60px_rgba(34,211,238,0.4)] hover:bg-cyan-400 hover:scale-105 active:scale-95 transition-all relative overflow-hidden group">
             Initiate Neural Scan
@@ -244,7 +245,7 @@ const QuestHallView: React.FC<{
         </div>
       </section>
 
-      {/* 分区描述横幅 */}
+      {/* 分区描述横幅 */}
       <motion.div
         key={activeTab}
         initial={{ opacity: 0, y: -10 }}
@@ -256,7 +257,7 @@ const QuestHallView: React.FC<{
             'bg-amber-500/5 border-amber-500/10'
           }`}>
           <div className="flex items-center gap-6">
-            <span className="text-3xl">{activeTab === 'beginner' ? '🌀' : activeTab === 'competitive' ? '🔥' : '💎'}</span>
+            <span className="text-3xl">{activeTab === 'beginner' ? 'B1' : activeTab === 'competitive' ? 'C2' : 'M3'}</span>
             <div>
               <p className={`text-sm font-black uppercase tracking-widest ${activeTab === 'beginner' ? 'text-cyan-400' : activeTab === 'competitive' ? 'text-orange-400' : 'text-amber-400'
                 }`}>
@@ -301,8 +302,7 @@ const QuestHallView: React.FC<{
                 transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
                 className="text-[180px] filter drop-shadow-[0_0_80px_rgba(34,211,238,0.2)]"
               >
-                🛰️
-              </motion.div>
+                VOID              </motion.div>
               <p className="font-orbitron font-black text-4xl uppercase tracking-[0.8em] text-cyan-400 glow-cyan">VOID_DETECTED</p>
             </div>
           )}
@@ -313,13 +313,14 @@ const QuestHallView: React.FC<{
 };
 
 const App: React.FC = () => {
-  // ====== Zustand Stores ======
   const profile = useFeederStore((s) => s.profile);
   const orders = useFeederStore((s) => s.orders);
   const prefs = useFeederStore((s) => s.preferences);
   const setPrefs = useFeederStore((s) => s.setPreferences);
   const feederOnComplete = useFeederStore((s) => s.onFeedComplete);
   const removeOrder = useFeederStore((s) => s.removeOrder);
+  const authAddress = useAuthStore((s) => s.address);
+  const authToken = useAuthStore((s) => s.token);
 
   const activeView = useUIStore((s) => s.activeView);
   const setActiveView = useUIStore((s) => s.setActiveView);
@@ -333,54 +334,235 @@ const App: React.FC = () => {
   const setActiveTab = useUIStore((s) => s.setActiveTab);
   const grabAndFeed = useUIStore((s) => s.grabAndFeed);
 
-  // 初始化数据：优先从后端 API 加载，API 不可用时降级为 demo 数据
   const [dataLoading, setDataLoading] = React.useState(true);
-  React.useEffect(() => {
-    // Profile: 钱包连接后应从 API 获取，暂用 mock
-    if (!profile) {
-      useFeederStore.getState().setProfile({
-        address: '0x71C...3a21',
-        nickname: 'Sophia Lane',
-        rank: FeederRank.B,
-        xp: 12450,
-        totalFeeds: 342,
-        accuracyRate: 98.4,
-        balanceFEED: 1540,
-        balanceUSDT: 5000,
-        history: MOCK_HISTORY,
-        stakedAmount: 5000,
-        stakeType: 'USDT',
-      });
+
+  const buildFallbackProfile = React.useCallback((address?: string) => {
+    const currentProfile = useFeederStore.getState().profile;
+
+    return {
+      address: address || currentProfile?.address || '0x0000000000000000000000000000000000000000',
+      nickname: currentProfile?.nickname || 'Feed Operator',
+      rank: currentProfile?.rank || FeederRank.F,
+      xp: currentProfile?.xp ?? 0,
+      totalFeeds: currentProfile?.totalFeeds ?? 0,
+      accuracyRate: currentProfile?.accuracyRate ?? 0,
+      balanceFEED: currentProfile?.balanceFEED ?? 0,
+      balanceUSDT: currentProfile?.balanceUSDT ?? 0,
+      balanceNative: currentProfile?.balanceNative ?? 0,
+      history: currentProfile?.history ?? [],
+      stakedAmount: currentProfile?.stakedAmount ?? 0,
+      stakeType: currentProfile?.stakeType ?? 'USDT',
+    };
+  }, []);
+
+  const loadProfile = React.useCallback(async () => {
+    api.setAuthToken(authToken ?? null);
+    api.setWalletAddress(authAddress ?? null);
+
+    if (!authAddress) {
+      if (!useFeederStore.getState().profile) {
+        useFeederStore.getState().setProfile(buildFallbackProfile());
+      }
+      return;
     }
 
-    // Orders: 优先从后端 API 加载
+    try {
+      const [profileRes, pendingRewardsRes, stakingRes] = await Promise.all([
+        api.getFeederProfile(),
+        api.getPendingRewards(),
+        api.getStakingInfo(),
+      ]);
+
+      if (!profileRes.success || !profileRes.feeder) {
+        throw new Error('Failed to load feeder profile');
+      }
+
+      const pendingRewards = pendingRewardsRes.success ? pendingRewardsRes.data ?? {} : {};
+      const staking = stakingRes.success ? stakingRes.staking ?? {} : {};
+      const backendHistory = profileRes.feeder.history ?? profileRes.history ?? [];
+
+      const nextProfile = transformFeeder(
+        {
+          ...profileRes.feeder,
+          balanceFEED: pendingRewards.feedBalance ?? profileRes.feeder.balanceFEED ?? 0,
+          balanceUSDT: pendingRewards.usdtBalance ?? useFeederStore.getState().profile?.balanceUSDT ?? 0,
+          balanceNative: pendingRewards.nativeBalance ?? profileRes.feeder.balanceNative ?? 0,
+          stakedAmount: staking.currentStake ?? profileRes.feeder.stakedAmount,
+          stakeType: staking.stakeType ?? profileRes.feeder.stakeType,
+        },
+        backendHistory,
+      );
+
+      useFeederStore.getState().setProfile(nextProfile);
+    } catch (error) {
+      console.warn('Failed to load profile:', error);
+      useFeederStore.getState().setProfile(buildFallbackProfile(authAddress));
+    }
+  }, [authAddress, authToken, buildFallbackProfile]);
+
+  const loadOrders = React.useCallback(async () => {
+    try {
+      const res = await api.getOrders();
+      if (res.success) {
+        useFeederStore.getState().setOrders((res.orders ?? []).map(transformOrder));
+      }
+    } catch (error) {
+      console.warn('Failed to load orders:', error);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    api.setAuthToken(authToken ?? null);
+    api.setWalletAddress(authAddress ?? null);
+  }, [authAddress, authToken]);
+
+  React.useEffect(() => {
     (async () => {
       try {
-        const res = await api.getOrders();
-        if (res.success && res.orders?.length > 0) {
-          const realOrders = res.orders.map(transformOrder);
-          useFeederStore.getState().setOrders(realOrders);
-          console.log(`📡 从后端加载 ${realOrders.length} 个真实订单`);
-        } else {
-          // 后端返回空数据，使用 demo 数据
-          if (orders.length === 0) {
-            useFeederStore.getState().setOrders(MOCK_ORDERS);
-            console.log('📋 使用 demo 数据（后端无订单）');
-          }
-        }
-      } catch (err) {
-        // 后端不可用，降级使用 demo 数据
-        if (orders.length === 0) {
-          useFeederStore.getState().setOrders(MOCK_ORDERS);
-          console.warn('⚠️ 后端不可用，降级使用 demo 数据:', err);
-        }
+        await Promise.all([loadProfile(), loadOrders()]);
       } finally {
         setDataLoading(false);
       }
     })();
-  }, []);
+  }, [loadOrders, loadProfile]);
 
-  // Parallax Values - Correctly placed at top level
+  React.useEffect(() => {
+    if (!authAddress) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void loadProfile();
+    }, 8000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [authAddress, loadProfile]);
+
+  React.useEffect(() => {
+    const mapStatus = (status?: string): OrderStatus | undefined => {
+      switch (status) {
+        case 'OPEN':
+          return OrderStatus.OPEN;
+        case 'GRABBED':
+          return OrderStatus.GRABBED;
+        case 'COMMITTED':
+        case 'REVEALING':
+        case 'FEEDING':
+          return OrderStatus.FEEDING;
+        case 'CONSENSUS':
+          return OrderStatus.CONSENSUS;
+        case 'SETTLED':
+          return OrderStatus.SETTLED;
+        case 'DISPUTED':
+          return OrderStatus.DISPUTED;
+        default:
+          return undefined;
+      }
+    };
+
+    const toOrderUpdate = (payload: any): Partial<FeedOrder> => {
+      const updates: Partial<FeedOrder> = {};
+
+      const mappedStatus = mapStatus(payload?.status ?? payload?.newStatus);
+      if (mappedStatus) {
+        updates.status = mappedStatus;
+      }
+
+      if (typeof payload?.timeRemaining === 'number') {
+        updates.timeRemaining = payload.timeRemaining;
+      }
+
+      if (typeof payload?.rewardAmount === 'number') {
+        updates.rewardAmount = payload.rewardAmount;
+      }
+
+      if (typeof payload?.consensusPrice === 'number') {
+        updates.timeRemaining = 0;
+      }
+
+      return updates;
+    };
+
+    const handleNewOrder = (payload: any) => {
+      if (!payload?.id || !payload?.symbol || !payload?.market) {
+        loadOrders();
+        return;
+      }
+
+      const nextOrder = transformOrder(payload);
+      const state = useFeederStore.getState();
+      const exists = state.orders.some((order) => order.orderId === nextOrder.orderId);
+
+      if (exists) {
+        state.updateOrder(nextOrder.orderId, nextOrder);
+      } else {
+        state.setOrders([nextOrder, ...state.orders]);
+      }
+    };
+
+    const handleOrderMutation = (payload: any) => {
+      if (!payload?.orderId) {
+        return;
+      }
+
+      const state = useFeederStore.getState();
+      const existing = state.orders.find((order) => order.orderId === payload.orderId);
+      if (!existing) {
+        loadOrders();
+        return;
+      }
+
+      state.updateOrder(payload.orderId, toOrderUpdate(payload));
+    };
+
+    const handleOrderRemoval = (payload: any) => {
+      if (payload?.orderId) {
+        useFeederStore.getState().removeOrder(payload.orderId);
+      }
+    };
+
+    const handleReconnect = () => {
+      loadOrders();
+    };
+
+    const handleProfileRefresh = () => {
+      if (authAddress) {
+        void loadProfile();
+      }
+    };
+
+    initWebSocket();
+
+    on('order:new', handleNewOrder);
+    on('order:update', handleOrderMutation);
+    on('order:grabbed', handleOrderMutation);
+    on('order:committed', handleOrderMutation);
+    on('order:revealed', handleOrderMutation);
+    on('order:consensus', handleOrderMutation);
+    on('order:settled', handleOrderMutation);
+    on('order:consensus', handleProfileRefresh);
+    on('order:settled', handleProfileRefresh);
+    on('order:cancelled', handleOrderRemoval);
+    on('ws:reconnected', handleReconnect);
+
+    return () => {
+      off('order:new', handleNewOrder);
+      off('order:update', handleOrderMutation);
+      off('order:grabbed', handleOrderMutation);
+      off('order:committed', handleOrderMutation);
+      off('order:revealed', handleOrderMutation);
+      off('order:consensus', handleOrderMutation);
+      off('order:settled', handleOrderMutation);
+      off('order:consensus', handleProfileRefresh);
+      off('order:settled', handleProfileRefresh);
+      off('order:cancelled', handleOrderRemoval);
+      off('ws:reconnected', handleReconnect);
+      closeWebSocket();
+    };
+  }, [authAddress, loadOrders, loadProfile]);
+
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
   const springX = useSpring(mouseX, { damping: 50, stiffness: 200 });
@@ -393,10 +575,26 @@ const App: React.FC = () => {
     mouseY.set(clientY - innerHeight / 2);
   };
 
-  const handleGrab = (orderId: string) => {
-    const order = orders.find(o => o.orderId === orderId);
-    if (order) {
-      grabAndFeed(order);
+  const handleGrab = async (orderId: string) => {
+    const order = orders.find((o) => o.orderId === orderId);
+    if (!order) {
+      return;
+    }
+
+    try {
+      const result = await api.grabOrder(orderId);
+      const nextStatus =
+        result.newStatus === 'FEEDING'
+          ? OrderStatus.FEEDING
+          : result.newStatus === 'GRABBED'
+            ? OrderStatus.GRABBED
+            : order.status;
+
+      useFeederStore.getState().updateOrder(orderId, { status: nextStatus });
+      setViewingOrder(null);
+      grabAndFeed({ ...order, status: nextStatus });
+    } catch (error) {
+      console.warn('Failed to grab order:', error);
     }
   };
 
@@ -409,16 +607,20 @@ const App: React.FC = () => {
   };
 
   const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+    return orders.filter((order) => {
       const matchesTab =
         (activeTab === 'beginner' && order.notionalAmount < 100000) ||
         (activeTab === 'competitive' && order.notionalAmount >= 100000 && order.notionalAmount < 1000000) ||
         (activeTab === 'master' && order.notionalAmount >= 1000000);
 
       if (!matchesTab) return false;
-      // NST 外部协议的订单不受偏好过滤限制，直接显示
       if (order.sourceProtocol === 'NST') return true;
-      return prefs.countries.includes(order.country) && prefs.exchanges.includes(order.exchange) && prefs.assets.includes(order.market);
+
+      return (
+        prefs.countries.includes(order.country) &&
+        prefs.exchanges.includes(order.exchange) &&
+        prefs.assets.includes(order.market)
+      );
     });
   }, [orders, activeTab, prefs]);
 
@@ -437,17 +639,25 @@ const App: React.FC = () => {
             onMouseMove={handleMouseMove}
           />
         );
-      case 'Dashboard': return <DashboardView profile={profile!} />;
-      case 'Leaderboard': return <LeaderboardView />;
-      case 'Inventory': return <InventoryView />;
-      case 'Training Center': return <TrainingView />;
-      case 'Staking': return <StakingView profile={profile!} />;
-      case 'Arbitration': return <ArbitrationView />;
-      default: return null;
+      case 'Dashboard':
+        return <DashboardView profile={profile!} />;
+      case 'Leaderboard':
+        return <LeaderboardView />;
+      case 'Inventory':
+        return <InventoryView />;
+      case 'Achievements':
+        return <AchievementsView />;
+      case 'Training Center':
+        return <TrainingView />;
+      case 'Staking':
+        return <StakingView profile={profile!} />;
+      case 'Arbitration':
+        return <ArbitrationView />;
+      default:
+        return null;
     }
   };
-
-  // 首次渲染时 profile 尚未初始化（useEffect 还未执行），显示加载画面
+  // 首次渲染时 profile 尚未初始化（useEffect 还未执行），显示加载画面
   if (!profile) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#030406] text-cyan-400">
@@ -477,3 +687,8 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+
+
+
+

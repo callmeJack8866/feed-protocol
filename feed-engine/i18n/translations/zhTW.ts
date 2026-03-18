@@ -319,6 +319,17 @@ const zhTW: TranslationKeys = {
         engageNode: '接入節點',
         connecting: '連線中...',
         terminalLink: '終端連結',
+        chainUnknown: '鏈未知',
+        connectingWallet: '正在連接錢包...',
+        requestingNonce: '取得認證憑證...',
+        signMessage: '請在錢包中簽名...',
+        verifyingSignature: '驗證簽名...',
+        installMetamask: '請先安裝 MetaMask 錢包擴充',
+        noWalletAddress: '未能取得錢包地址',
+        nonceFailed: '取得 nonce 失敗',
+        signatureCancelled: '使用者取消簽名',
+        verificationFailed: '簽名驗證失敗',
+        loginFailed: '登入失敗',
     },
 };
 

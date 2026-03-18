@@ -1,4 +1,4 @@
-
+﻿
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FeedOrder, MarketType } from '../types';
 import { getReferenceData } from '../constants';
@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from
 import { useTranslation } from '../i18n';
 import { useWallet } from '../hooks';
 import { getAuthToken, getWalletAddress } from '../services/api';
+import { useAuthStore } from '../store';
 
 interface FeedModalProps {
   order: FeedOrder;
@@ -164,6 +165,8 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
   const [salt, setSalt] = useState('');
   const [priceHash, setPriceHash] = useState('');
   const wallet = useWallet();
+  const authAddress = useAuthStore((s) => s.address);
+  const authToken = useAuthStore((s) => s.token);
 
   const [displayedXP, setDisplayedXP] = useState(0);
   const [displayedFEED, setDisplayedFEED] = useState(0);
@@ -224,10 +227,9 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 检查钱包连接 — 优先从 api.ts 全局状态取（Layout 登录时 setWalletAddress）
-    const walletAddr = wallet.address || getWalletAddress();
+    const walletAddr = wallet.address || authAddress || getWalletAddress();
     if (!walletAddr) {
-      setError('请先连接钱包 (Connect wallet first)');
+      setError('Connect wallet first');
       setIsShaking(true);
       setTimeout(() => setIsShaking(false), 500);
       return;
@@ -235,12 +237,11 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
 
     const val = parseFloat(price);
     if (isNaN(val) || val < range.min || val > range.max) {
-      setError(`Value must be within ±${range.tolerancePercent}% benchmark (${range.min.toFixed(2)} - ${range.max.toFixed(2)})`);
+      setError(`Value must stay within +/-${range.tolerancePercent}% of the reference (${range.min.toFixed(2)} - ${range.max.toFixed(2)})`);
       setIsShaking(true);
       setTimeout(() => setIsShaking(false), 500);
       return;
     }
-    // === Commit 阶段: 生成盐值 + 哈希，提交 Commit ===
     const newSalt = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
     setSalt(newSalt);
     const hash = wallet.computePriceHash(val, newSalt);
@@ -249,17 +250,14 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
     setStep('commit');
 
     try {
-      // 提交哈希到后端
       const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:3001') + '/api';
 
-      // 构建请求头 — 同时携带 JWT 和 wallet address
-      const walletAddr = wallet.address || getWalletAddress() || '';
+      const walletAddr = wallet.address || authAddress || getWalletAddress() || '';
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'x-wallet-address': walletAddr,
       };
-      // 从内存获取 JWT token（由 Layout 登录时设置）
-      const jwtToken = getAuthToken();
+      const jwtToken = authToken || getAuthToken();
       if (jwtToken) {
         headers['Authorization'] = `Bearer ${jwtToken}`;
       }
@@ -275,7 +273,6 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
         throw new Error(err.error || 'Commit failed');
       }
 
-      // === Reveal 阶段: 等待 2 秒后揭示 ===
       setStep('reveal');
       await new Promise(r => setTimeout(r, 2000));
 
@@ -301,7 +298,7 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
       }, 5000);
 
     } catch (err: any) {
-      setError(err.message || 'Commit-Reveal 失败');
+      setError(err.message || 'Commit-reveal failed');
       setStep('input');
     }
   };
@@ -342,7 +339,7 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
   }, [step, order.rewardAmount, playSound, handleFinalClaim, displayedXP, displayedFEED]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/98 backdrop-blur-3xl p-4">
+    <div data-testid="feed-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/98 backdrop-blur-3xl p-4">
       {/* Background Ambience */}
       <AnimatePresence>
         {step === 'success' && (
@@ -362,61 +359,61 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
       >
         <AnimatePresence mode="wait">
           {step === 'input' && (
-            <motion.div key="input" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className="p-16 space-y-10">
+            <motion.div key="input" data-testid="feed-modal-step-input" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className="p-16 space-y-10">
               <div className="flex justify-between items-start">
                 <div className="space-y-2">
                   <h2 className="text-5xl font-black font-orbitron text-white uppercase italic tracking-tighter">ORACLE HANDSHAKE</h2>
                   <p className="text-xs text-slate-500 font-black uppercase tracking-[0.5em]">{order.symbol} // Reference Value: {range.ref}</p>
                 </div>
-                <button onClick={onClose} className="w-14 h-14 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-500 transition-colors">✕</button>
+                <button onClick={onClose} className="w-14 h-14 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-500 transition-colors">X</button>
               </div>
 
-              {/* 订单详情信息面板 */}
+              {/* 璁㈠崟璇︽儏淇℃伅闈㈡澘 */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {order.underlyingName && (
                   <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">标的名称</p>
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Underlying</p>
                     <p className="text-sm text-white font-bold">{order.underlyingName}</p>
                   </div>
                 )}
                 {order.underlyingCode && (
                   <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">标的代码</p>
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Code</p>
                     <p className="text-sm text-cyan-400 font-mono font-bold">{order.underlyingCode}</p>
                   </div>
                 )}
                 {order.direction && (
                   <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">方向</p>
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Direction</p>
                     <p className={`text-sm font-bold ${order.direction === 'Call' || order.direction === 'CALL' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {order.direction === 'Call' || order.direction === 'CALL' ? '📈 CALL' : '📉 PUT'}
+                      {order.direction === 'Call' || order.direction === 'CALL' ? 'CALL' : 'PUT'}
                     </p>
                   </div>
                 )}
                 <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                  <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">名义本金</p>
-                  <p className="text-sm text-amber-400 font-bold font-orbitron">${order.notionalAmount?.toLocaleString() || '—'} <span className="text-[10px] text-slate-500">USDT</span></p>
+                  <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Notional</p>
+                  <p className="text-sm text-amber-400 font-bold font-orbitron">${order.notionalAmount?.toLocaleString() || 'N/A'} <span className="text-[10px] text-slate-500">USDT</span></p>
                 </div>
                 {order.refPrice && (
                   <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">参考价格</p>
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Reference Price</p>
                     <p className="text-sm text-white font-bold font-orbitron">${order.refPrice}</p>
                   </div>
                 )}
                 {order.strikePrice ? (
                   <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">行权价</p>
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Strike Price</p>
                     <p className="text-sm text-white font-bold font-orbitron">${order.strikePrice}</p>
                   </div>
                 ) : null}
                 {order.expiryTimestamp ? (
                   <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">到期日</p>
+                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Expiry Date</p>
                     <p className="text-sm text-white font-bold">{new Date(order.expiryTimestamp * 1000).toLocaleDateString()}</p>
                   </div>
                 ) : null}
                 <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                  <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">喂价类型</p>
+                  <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Feed Type</p>
                   <p className="text-sm text-cyan-400 font-bold">{order.feedType || 'INITIAL'}</p>
                 </div>
               </div>
@@ -428,26 +425,27 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                       type="number" step="0.0001" autoFocus value={price}
                       onChange={(e) => setPrice(e.target.value)}
                       placeholder="0.0000"
+                      data-testid="feed-price-input"
                       className="w-full bg-black/40 border border-white/5 rounded-[3rem] px-14 py-12 text-6xl font-orbitron focus:border-cyan-500 focus:ring-[25px] focus:ring-cyan-500/5 outline-none transition-all text-white placeholder:text-white/5"
                       required
                     />
                     <div className="absolute right-14 top-1/2 -translate-y-1/2 text-slate-700 font-black text-3xl italic tracking-tighter">USDT</div>
                   </div>
                   {error && (
-                    <motion.p initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="text-rose-500 text-xs font-black uppercase tracking-widest px-8 bg-rose-500/5 py-4 rounded-2xl border border-rose-500/10">
+                    <motion.p data-testid="feed-modal-error" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="text-rose-500 text-xs font-black uppercase tracking-widest px-8 bg-rose-500/5 py-4 rounded-2xl border border-rose-500/10">
                       {error}
                     </motion.p>
                   )}
                 </div>
                 <div className="flex gap-6">
                   <button type="button" onClick={() => setStep('report')} className="flex-1 py-8 rounded-[2.5rem] bg-white/5 border border-white/5 text-slate-500 font-black text-xs uppercase tracking-[0.3em] hover:bg-white/10 transition-colors">REPORT ANOMALY</button>
-                  <button type="submit" className="flex-[2] py-8 rounded-[3rem] bg-cyan-500 text-black font-black font-orbitron text-3xl shadow-[0_25px_50px_rgba(34,211,238,0.3)] active:scale-95 transition-all uppercase italic">COMMIT SIGNAL</button>
+                  <button data-testid="commit-signal-button" type="submit" className="flex-[2] py-8 rounded-[3rem] bg-cyan-500 text-black font-black font-orbitron text-3xl shadow-[0_25px_50px_rgba(34,211,238,0.3)] active:scale-95 transition-all uppercase italic">COMMIT SIGNAL</button>
                 </div>
               </form>
             </motion.div>
           )}
           {step === 'commit' && (
-            <motion.div key="commit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-32 flex flex-col items-center space-y-14 text-center">
+            <motion.div key="commit" data-testid="feed-modal-step-commit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-32 flex flex-col items-center space-y-14 text-center">
               <div className="relative">
                 <div className="w-40 h-40 border-4 border-amber-500/10 rounded-full"></div>
                 <motion.div
@@ -458,14 +456,16 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                   animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
                   transition={{ duration: 1.5, repeat: Infinity }}
                   className="absolute inset-0 flex items-center justify-center text-5xl"
-                >🔒</motion.div>
+                >
+                  HASH
+                </motion.div>
               </div>
               <div className="space-y-4">
                 <h3 className="text-4xl font-black font-orbitron text-white italic tracking-widest uppercase">
                   COMMITTING HASH
                 </h3>
                 <p className="text-xs text-slate-500 font-black uppercase tracking-[0.6em] animate-pulse">
-                  Encrypting price data · Generating commitment proof...
+                  Encrypting price data | Generating commitment proof...
                 </p>
                 <p className="text-xs text-amber-500/60 font-mono mt-4 truncate max-w-md mx-auto">
                   Hash: {priceHash.slice(0, 16)}...{priceHash.slice(-8)}
@@ -475,7 +475,7 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
           )}
 
           {step === 'reveal' && (
-            <motion.div key="reveal" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="p-32 flex flex-col items-center space-y-14 text-center">
+            <motion.div key="reveal" data-testid="feed-modal-step-reveal" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="p-32 flex flex-col items-center space-y-14 text-center">
               <div className="relative">
                 <div className="w-40 h-40 border-4 border-emerald-500/10 rounded-full"></div>
                 <motion.div
@@ -486,24 +486,26 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                   animate={{ scale: [1, 1.3, 1], rotateY: [0, 180, 360] }}
                   transition={{ duration: 2, repeat: Infinity }}
                   className="absolute inset-0 flex items-center justify-center text-5xl"
-                >🔓</motion.div>
+                >
+                  OPEN
+                </motion.div>
               </div>
               <div className="space-y-4">
                 <h3 className="text-4xl font-black font-orbitron text-white italic tracking-widest uppercase">
                   REVEALING PRICE
                 </h3>
                 <p className="text-xs text-slate-500 font-black uppercase tracking-[0.6em] animate-pulse">
-                  Broadcasting plaintext · Verifying against commitment...
+                  Broadcasting plaintext | Verifying against commitment...
                 </p>
                 <p className="text-xs text-emerald-500/60 font-mono mt-4">
-                  Price: {price} USDT · Salt verified ✓
+                  Price: {price} USDT | Salt verified OK
                 </p>
               </div>
             </motion.div>
           )}
 
           {(step === 'signing' || step === 'processing') && (
-            <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-32 flex flex-col items-center space-y-14 text-center">
+            <motion.div key="loading" data-testid="feed-modal-step-processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-32 flex flex-col items-center space-y-14 text-center">
               <div className="relative">
                 <div className="w-40 h-40 border-4 border-cyan-500/10 rounded-full"></div>
                 <motion.div
@@ -514,7 +516,9 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                   animate={{ scale: [1, 1.3, 1], opacity: [0.3, 1, 0.3] }}
                   transition={{ duration: 1.5, repeat: Infinity }}
                   className="absolute inset-0 flex items-center justify-center text-5xl"
-                >📡</motion.div>
+                >
+                  SYNC
+                </motion.div>
               </div>
               <div className="space-y-4">
                 <h3 className="text-4xl font-black font-orbitron text-white italic tracking-widest uppercase">
@@ -525,7 +529,7 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
             </motion.div>
           )}
 
-          {/* ========== "无法喂价" Report 步骤 — 方案 §6.6 ========== */}
+          {/* ========== "鏃犳硶鍠備环" Report 姝ラ 鈥?鏂规 搂6.6 ========== */}
           {step === 'report' && (
             <motion.div key="report" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-16 space-y-10">
               <div className="flex justify-between items-start">
@@ -533,20 +537,20 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                   <h2 className="text-4xl font-black font-orbitron text-white uppercase italic tracking-tighter">REPORT ANOMALY</h2>
                   <p className="text-xs text-slate-500 font-black uppercase tracking-[0.5em]">{order.symbol} // Unable to Feed</p>
                 </div>
-                <button onClick={() => setStep('input')} className="w-14 h-14 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-500 transition-colors">✕</button>
+                <button onClick={() => setStep('input')} className="w-14 h-14 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-500 transition-colors">X</button>
               </div>
 
               <p className="text-sm text-slate-400 leading-relaxed">
-                如果您无法为此订单提供价格数据，请选择原因。系统将审核后决定是否重新分配。
+                If you cannot provide a valid price for this order, select the closest reason below. The report will be reviewed before reassignment.
               </p>
 
               <div className="grid grid-cols-1 gap-4">
                 {[
-                  { key: 'SUSPENSION', icon: '⏸️', label: '标的停牌', desc: '该标的目前处于停牌状态' },
-                  { key: 'NO_DATA', icon: '📭', label: '数据源无数据', desc: '无法从数据源获取价格信息' },
-                  { key: 'INVALID_CODE', icon: '❌', label: '代码错误/不存在', desc: '标的代码有误或已退市' },
-                  { key: 'MARKET_CLOSED', icon: '🏛️', label: '市场休市', desc: '相关交易所当前未开盘' },
-                  { key: 'OTHER', icon: '📝', label: '其他原因', desc: '请在下一步提供详细说明' },
+                  { key: 'SUSPENSION', icon: 'HALT', label: 'Instrument Suspended', desc: 'The underlying is currently suspended.' },
+                  { key: 'NO_DATA', icon: 'DATA', label: 'No Data Source', desc: 'No reliable price feed is available right now.' },
+                  { key: 'INVALID_CODE', icon: 'SYMB', label: 'Invalid Symbol', desc: 'The symbol is invalid, delisted, or unavailable.' },
+                  { key: 'MARKET_CLOSED', icon: 'CLOSE', label: 'Market Closed', desc: 'The relevant market is currently closed.' },
+                  { key: 'OTHER', icon: 'NOTE', label: 'Other', desc: 'Provide more context in the next step.' },
                 ].map(reason => (
                   <motion.button
                     key={reason.key}
@@ -570,7 +574,7 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
             </motion.div>
           )}
 
-          {/* ========== 证据截图步骤 ========== */}
+          {/* ========== 璇佹嵁鎴浘姝ラ ========== */}
           {step === 'evidence' && (
             <motion.div key="evidence" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-16 space-y-10">
               <div className="flex justify-between items-start">
@@ -578,35 +582,35 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                   <h2 className="text-4xl font-black font-orbitron text-white uppercase italic tracking-tighter">EVIDENCE</h2>
                   <p className="text-xs text-slate-500 font-black uppercase tracking-[0.5em]">Submit proof for review</p>
                 </div>
-                <button onClick={() => setStep('report')} className="w-14 h-14 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-500 transition-colors">←</button>
+                <button onClick={() => setStep('report')} className="w-14 h-14 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-500 transition-colors">Back</button>
               </div>
 
               <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/20">
-                <p className="text-xs text-amber-400 font-bold uppercase tracking-widest">选择的原因</p>
+                <p className="text-xs text-amber-400 font-bold uppercase tracking-widest">Selected Reason</p>
                 <p className="text-white font-bold mt-2">
-                  {reportReason === 'SUSPENSION' ? '⏸️ 标的停牌' :
-                   reportReason === 'NO_DATA' ? '📭 数据源无数据' :
-                   reportReason === 'INVALID_CODE' ? '❌ 代码错误/不存在' :
-                   reportReason === 'MARKET_CLOSED' ? '🏛️ 市场休市' : '📝 其他原因'}
+                  {reportReason === 'SUSPENSION' ? 'HALT Instrument Suspended' :
+                   reportReason === 'NO_DATA' ? 'DATA No Data Source' :
+                   reportReason === 'INVALID_CODE' ? 'SYMB Invalid Symbol' :
+                   reportReason === 'MARKET_CLOSED' ? 'CLOSE Market Closed' : 'NOTE Other'}
                 </p>
               </div>
 
               <div className="space-y-4">
-                <label className="text-xs text-slate-400 font-bold uppercase tracking-widest">补充说明（可选）</label>
+                <label className="text-xs text-slate-400 font-bold uppercase tracking-widest">Additional Context (Optional)</label>
                 <textarea
                   rows={3}
-                  placeholder="请描述具体情况..."
+                  placeholder="Describe what blocked the feed..."
                   className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm text-white placeholder:text-slate-600 focus:border-cyan-500 outline-none transition-all resize-none"
                   id="report-description"
                 />
               </div>
 
               <div className="space-y-4">
-                <label className="text-xs text-slate-400 font-bold uppercase tracking-widest">截图证据（可选）</label>
+                <label className="text-xs text-slate-400 font-bold uppercase tracking-widest">Screenshot Evidence (Optional)</label>
                 <div className="p-8 rounded-2xl border-2 border-dashed border-white/10 text-center hover:border-cyan-500/30 transition-colors cursor-pointer">
-                  <p className="text-3xl mb-3">📸</p>
-                  <p className="text-sm text-slate-400">点击上传截图或拖拽文件到此处</p>
-                  <p className="text-xs text-slate-600 mt-2">支持 PNG / JPG / WEBP，最大 5MB</p>
+                  <p className="text-3xl mb-3">UP</p>
+                  <p className="text-sm text-slate-400">Upload a screenshot here in the next iteration of the UI.</p>
+                  <p className="text-xs text-slate-600 mt-2">Supported formats: PNG / JPG / WEBP, up to 5 MB</p>
                 </div>
               </div>
 
@@ -623,12 +627,12 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                     try {
                       setError(null);
                       const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:3001') + '/api';
-                      const walletAddr = wallet.address || getWalletAddress() || '';
+                      const walletAddr = wallet.address || authAddress || getWalletAddress() || '';
                       const headers: Record<string, string> = {
                         'Content-Type': 'application/json',
                         'x-wallet-address': walletAddr,
                       };
-                      const jwtToken = getAuthToken();
+                      const jwtToken = authToken || getAuthToken();
                       if (jwtToken) headers['Authorization'] = `Bearer ${jwtToken}`;
 
                       const descEl = document.getElementById('report-description') as HTMLTextAreaElement | null;
@@ -645,10 +649,9 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                         throw new Error(err.error || 'Report failed');
                       }
 
-                      // 报告成功 → 直接关闭
                       onComplete(0, 0);
                     } catch (err: any) {
-                      setError(err.message || '提交失败');
+                      setError(err.message || 'Report submission failed');
                     }
                   }}
                   className="flex-[2] py-8 rounded-[3rem] bg-amber-500 text-black font-black font-orbitron text-2xl shadow-[0_25px_50px_rgba(245,158,11,0.3)] active:scale-95 transition-all uppercase italic"
@@ -660,7 +663,7 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
           )}
 
           {step === 'consensus' && (
-            <motion.div key="consensus" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-16 space-y-12">
+            <motion.div key="consensus" data-testid="feed-modal-step-consensus" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-16 space-y-12">
               <div className="text-center space-y-4">
                 <h3 className="text-4xl font-black font-orbitron text-white italic uppercase tracking-widest">QUORUM SYNCING</h3>
                 <p className="text-xs text-slate-500 font-black uppercase tracking-[0.5em]">Waiting for {order.consensusThreshold} Validation Sigs</p>
@@ -689,12 +692,13 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
           {step === 'success' && (
             <motion.div
               key="success"
-              className="relative p-16 flex flex-col items-center justify-center text-center space-y-14 overflow-hidden bg-[#050608] min-h-[900px]"
+              data-testid="feed-modal-step-success"
+              className="relative px-6 py-10 md:px-12 md:py-12 flex flex-col items-center justify-start text-center gap-8 md:gap-10 overflow-y-auto overflow-x-hidden bg-[#050608] min-h-[720px] md:min-h-[820px] max-h-[85vh]"
             >
               {/* Orbital Rings */}
               <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
-                <motion.div animate={{ rotate: 360 }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} className="absolute w-[600px] h-[600px] border border-dashed border-cyan-500 rounded-full" />
-                <motion.div animate={{ rotate: -360 }} transition={{ duration: 35, repeat: Infinity, ease: "linear" }} className="absolute w-[900px] h-[900px] border border-dashed border-cyan-500 rounded-full" />
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} className="absolute w-[360px] h-[360px] md:w-[600px] md:h-[600px] border border-dashed border-cyan-500 rounded-full" />
+                <motion.div animate={{ rotate: -360 }} transition={{ duration: 35, repeat: Infinity, ease: "linear" }} className="absolute w-[540px] h-[540px] md:w-[900px] md:h-[900px] border border-dashed border-cyan-500 rounded-full" />
               </div>
 
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -706,12 +710,12 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                 initial={{ opacity: 0, scale: 0, rotateY: 180 }}
                 animate={{ opacity: 1, scale: 1, rotateY: 0 }}
                 transition={{ delay: 0.2, type: 'spring', damping: 15 }}
-                className="relative z-10 w-64 h-64 bg-gradient-to-tr from-cyan-600 to-cyan-400 rounded-full flex items-center justify-center shadow-[0_0_120px_rgba(34,211,238,0.5)] border-[12px] border-white/10"
+                className="relative z-10 w-40 h-40 md:w-56 md:h-56 bg-gradient-to-tr from-cyan-600 to-cyan-400 rounded-full flex items-center justify-center shadow-[0_0_120px_rgba(34,211,238,0.5)] border-[10px] md:border-[12px] border-white/10 shrink-0"
               >
                 <motion.span
                   initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.6 }}
-                  className="text-[12rem] text-black font-black leading-none select-none drop-shadow-2xl"
-                >✓</motion.span>
+                  className="text-[7rem] md:text-[12rem] text-black font-black leading-none select-none drop-shadow-2xl"
+                >OK</motion.span>
 
                 <motion.div
                   animate={{ scale: [1, 3], opacity: [0.6, 0] }}
@@ -721,23 +725,23 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
               </motion.div>
 
               {/* Typographic Victory Reveal */}
-              <div className="relative z-10 space-y-12 w-full">
-                <div className="space-y-4">
+              <div className="relative z-10 space-y-8 md:space-y-10 w-full max-w-5xl">
+                <div className="space-y-3 md:space-y-4">
                   <motion.h3
                     initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 1, ease: "backOut" }}
-                    className="text-[8.5rem] font-black font-orbitron text-white tracking-tighter uppercase italic leading-[0.8] drop-shadow-[0_20px_40px_rgba(0,0,0,0.8)]"
+                    className="text-[3.8rem] sm:text-[5.5rem] md:text-[8.5rem] font-black font-orbitron text-white tracking-tighter uppercase italic leading-[0.82] drop-shadow-[0_20px_40px_rgba(0,0,0,0.8)]"
                   >
                     MISSION<br /><span className="text-cyan-400">SUCCESS</span>
                   </motion.h3>
                   <motion.p
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }}
-                    className="text-lg text-cyan-400 font-black uppercase tracking-[0.8em] italic"
+                    className="text-sm md:text-lg text-cyan-400 font-black uppercase tracking-[0.45em] md:tracking-[0.8em] italic"
                   >
                     Oracle Synchronized // Bounty Unlocked
                   </motion.p>
                 </div>
 
-                {/* 感谢卡片 — §13.4 喂价感谢与行为挖矿 */}
+                {/* 鎰熻阿鍗＄墖 鈥?搂13.4 鍠備环鎰熻阿涓庤涓烘寲鐭?*/}
                 <motion.div
                   initial={{ opacity: 0, y: 30, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -753,23 +757,23 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                     />
 
                     <div className="relative z-10 text-center space-y-4">
-                      <p className="text-2xl">🎉</p>
+                      <p className="text-2xl">SYNC</p>
                       <p className="text-sm text-cyan-300 font-bold leading-relaxed">
                         {t.thanks.title}<br />
                         <span className="text-slate-400">{t.thanks.subtitle}</span>
                       </p>
 
-                      <div className="flex items-center justify-center gap-8 py-3">
+                      <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 py-3">
                         <div className="text-center">
                           <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t.thanks.deviationRate}</p>
                           <p className="text-lg font-black font-orbitron text-emerald-400">0.02%</p>
                         </div>
-                        <div className="w-px h-8 bg-white/10" />
+                        <div className="hidden md:block w-px h-8 bg-white/10" />
                         <div className="text-center">
                           <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t.thanks.accuracyRating}</p>
-                          <p className="text-lg tracking-wider">⭐⭐⭐⭐⭐</p>
+                          <p className="text-lg tracking-wider">AAA</p>
                         </div>
-                        <div className="w-px h-8 bg-white/10" />
+                        <div className="hidden md:block w-px h-8 bg-white/10" />
                         <div className="text-center">
                           <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t.thanks.behaviorMining}</p>
                           <p className="text-lg font-black font-orbitron text-amber-400">+15 <span className="text-[10px] text-slate-500">FEED</span></p>
@@ -780,12 +784,12 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                 </motion.div>
 
                 {/* High Fidelity Reward Cards */}
-                <div className="flex justify-center gap-10 w-full px-8">
+                <div className="flex flex-col md:flex-row justify-center gap-6 md:gap-10 w-full px-0 md:px-8">
                   <RewardCard
                     title={t.feed.nodeRecognition}
                     value={displayedXP}
                     unit={t.feed.experiencePoints}
-                    icon="⭐"
+                    icon="XP"
                     color="text-amber-400"
                     delay={1.6}
                   />
@@ -793,19 +797,20 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                     title={t.feed.protocolBounty}
                     value={displayedFEED}
                     unit={t.feed.feedTokens}
-                    icon="🪙"
+                    icon="FEED"
                     color="text-cyan-400"
                     delay={1.9}
                   />
                 </div>
 
                 {/* Final Actions & Terminal Info */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="pt-12 space-y-10 flex flex-col items-center">
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="sticky bottom-0 z-20 pt-6 md:pt-8 pb-2 md:pb-4 space-y-6 w-full max-w-3xl mx-auto flex flex-col items-center bg-gradient-to-t from-[#050608] via-[#050608]/95 to-transparent">
                   <motion.button
                     whileHover={{ scale: 1.05, backgroundColor: '#22d3ee' }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleFinalClaim}
-                    className="relative px-32 py-10 rounded-full bg-white text-black font-black font-orbitron text-4xl shadow-[0_30px_60px_rgba(0,0,0,0.6)] active:scale-95 transition-all uppercase italic tracking-tighter overflow-hidden group"
+                    data-testid="claim-bounty-button"
+                    className="relative w-full max-w-xl px-8 py-5 md:px-16 md:py-8 rounded-full bg-white text-black font-black font-orbitron text-xl md:text-3xl shadow-[0_30px_60px_rgba(0,0,0,0.6)] active:scale-95 transition-all uppercase italic tracking-tighter overflow-hidden group"
                   >
                     <span className="relative z-10">CLAIM BOUNTY</span>
                     <motion.div
@@ -815,8 +820,8 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
                   </motion.button>
 
                   <div className="space-y-3 opacity-40">
-                    <p className="text-sm text-slate-500 font-black uppercase tracking-[0.4em] italic">Node Address: {order.symbol}_SECURE_SYNC_09</p>
-                    <p className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Network Latency: 12.4ms // Consensus Status: FINALIZED</p>
+                    <p className="text-xs md:text-sm text-slate-500 font-black uppercase tracking-[0.25em] md:tracking-[0.4em] italic">Node Address: {order.symbol}_SECURE_SYNC_09</p>
+                    <p className="text-[10px] text-slate-600 font-bold uppercase tracking-[0.2em] md:tracking-widest">Network Latency: 12.4ms // Consensus Status: FINALIZED</p>
                   </div>
                 </motion.div>
               </div>
@@ -835,3 +840,4 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
 };
 
 export default FeedModal;
+

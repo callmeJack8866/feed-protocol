@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+﻿import { Router, Request, Response } from 'express';
 import { ethers } from 'ethers';
 import prisma from '../config/database';
 import { matchOrdersForFeeder } from '../services/matching.service';
@@ -48,6 +48,14 @@ function calculateExpiresAt(feedType: string): Date {
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + config.feedTimeoutMin);
     return expiresAt;
+}
+
+function computeCommitHash(price: number | string, salt: string): string {
+    const normalizedPrice = ethers.parseUnits(price.toString(), 18);
+    return ethers.solidityPackedKeccak256(
+        ['uint256', 'string'],
+        [normalizedPrice, salt]
+    );
 }
 
 /**
@@ -309,19 +317,51 @@ router.post('/:id/submit', submitRateLimit, async (req: Request, res: Response) 
             return res.status(404).json({ error: 'Feeder not found' });
         }
 
-        // 更新或创建提交记录（upsert: 如果没有先抢单，也允许直接提交）
-        const submission = await prisma.priceSubmission.upsert({
+        const [order, submissionRecord] = await Promise.all([
+            prisma.order.findUnique({
+                where: { id },
+                select: {
+                    id: true,
+                    status: true,
+                    expiresAt: true
+                }
+            }),
+            prisma.priceSubmission.findUnique({
+                where: {
+                    orderId_feederId: { orderId: id, feederId: feeder.id }
+                }
+            })
+        ]);
+
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        if (['SETTLED', 'DISPUTED', 'EXPIRED'].includes(order.status)) {
+            return res.status(400).json({ error: `Order is not available for commit in status ${order.status}` });
+        }
+
+        if (order.expiresAt && new Date() > order.expiresAt) {
+            await prisma.order.update({
+                where: { id },
+                data: { status: 'EXPIRED' }
+            });
+            return res.status(400).json({ error: 'Order already expired' });
+        }
+
+        if (!submissionRecord) {
+            return res.status(400).json({ error: 'Must grab order before committing price hash' });
+        }
+
+        if (submissionRecord.committedAt) {
+            return res.status(400).json({ error: 'Price hash already committed for this order' });
+        }
+
+        const submission = await prisma.priceSubmission.update({
             where: {
                 orderId_feederId: { orderId: id, feederId: feeder.id }
             },
-            update: {
-                priceHash,
-                screenshot,
-                committedAt: new Date()
-            },
-            create: {
-                orderId: id,
-                feederId: feeder.id,
+            data: {
                 priceHash,
                 screenshot,
                 committedAt: new Date()
@@ -348,7 +388,7 @@ router.post('/:id/reveal', async (req: Request, res: Response) => {
         const { price, salt } = req.body;
         const address = req.headers['x-wallet-address'] as string;
 
-        if (!address || !price || !salt) {
+        if (!address || price === undefined || price === null || !salt) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
@@ -383,11 +423,31 @@ router.post('/:id/reveal', async (req: Request, res: Response) => {
             return res.status(400).json({ error: 'Price already revealed' });
         }
 
-        // 2. Commit-Reveal 哈希校验（暂时跳过 — 前后端哈希算法待统一）
-        // TODO: 统一前端 useWallet.computePriceHash 和后端使用相同的 keccak256 算法
-        // 当前前端用简单位移哈希，后端用 ethers.solidityPackedKeccak256 + bytes32 salt
-        // 测试阶段先跳过验证，直接接受 reveal
-        console.log(`📝 Reveal for order ${id}, feeder ${feeder.id}, price=${price} (hash verification skipped)`);
+        const order = await prisma.order.findUnique({
+            where: { id },
+            include: { submissions: true }
+        });
+
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        if (['SETTLED', 'DISPUTED', 'EXPIRED'].includes(order.status)) {
+            return res.status(400).json({ error: `Order is not available for reveal in status ${order.status}` });
+        }
+
+        if (order.expiresAt && new Date() > order.expiresAt) {
+            await prisma.order.update({
+                where: { id },
+                data: { status: 'EXPIRED' }
+            });
+            return res.status(400).json({ error: 'Order already expired' });
+        }
+
+        const computedHash = computeCommitHash(price, salt);
+        if (computedHash !== existingSubmission.priceHash) {
+            return res.status(400).json({ error: 'Commit hash verification failed' });
+        }
 
         // 3. 哈希验证通过，更新提交记录
         const submission = await prisma.priceSubmission.update({
@@ -401,22 +461,22 @@ router.post('/:id/reveal', async (req: Request, res: Response) => {
             }
         });
 
-        // 检查是否所有人都已揭示
-        const order = await prisma.order.findUnique({
+        const refreshedOrder = await prisma.order.findUnique({
             where: { id },
             include: { submissions: true }
         });
 
-        if (order) {
-            const allRevealed = order.submissions.every(s => s.revealedPrice !== null);
+        if (refreshedOrder) {
+            const allRevealed = refreshedOrder.submissions.every(s => s.revealedPrice !== null);
 
-            if (allRevealed && order.submissions.length >= order.requiredFeeders) {
+            if (allRevealed && refreshedOrder.submissions.length >= refreshedOrder.requiredFeeders) {
                 // 使用共识服务处理（包含正确算法和成就检测）
                 const result = await processOrderConsensus(id);
 
                 if (result) {
                     // 广播共识达成
-                    io.emit('order:consensus', { orderId: id, consensusPrice: result.consensusPrice });
+                    io.emit('order:consensus', { orderId: id, consensusPrice: result.consensusPrice, status: 'CONSENSUS' });
+                    io.emit('order:settled', { orderId: id, consensusPrice: result.consensusPrice, status: 'SETTLED' });
                 }
             }
         }
@@ -645,14 +705,17 @@ router.post('/batch/submit', submitRateLimit, async (req: Request, res: Response
                 });
 
                 if (!order) throw new Error(`Order ${sub.orderId} not found`);
-                if (order.status !== 'GRABBED') throw new Error(`Order ${sub.orderId} status is ${order.status}, expected GRABBED`);
+                if (!['GRABBED', 'FEEDING'].includes(order.status)) {
+                    throw new Error(`Order ${sub.orderId} status is ${order.status}, expected GRABBED or FEEDING`);
+                }
 
                 // 检查是否已提交
                 const existingSub = await prisma.priceSubmission.findFirst({
                     where: { orderId: sub.orderId, feederId: feeder.id }
                 });
 
-                if (existingSub?.priceHash) throw new Error(`Order ${sub.orderId} already submitted`);
+                if (!existingSub) throw new Error(`Order ${sub.orderId} must be grabbed before commit`);
+                if (existingSub.priceHash) throw new Error(`Order ${sub.orderId} already submitted`);
 
                 // 创建或更新提交记录
                 const submission = await prisma.priceSubmission.upsert({

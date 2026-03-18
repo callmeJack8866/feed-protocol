@@ -122,6 +122,7 @@ router.get('/progress', async (req: Request, res: Response) => {
                 course: {
                     id: course.id,
                     title: course.title,
+                    description: course.description,
                     category: course.category,
                     duration: course.duration,
                     xpReward: course.xpReward,

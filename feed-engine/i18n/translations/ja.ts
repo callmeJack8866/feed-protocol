@@ -319,6 +319,17 @@ const ja: TranslationKeys = {
         engageNode: 'ノード接続',
         connecting: '接続中...',
         terminalLink: 'ターミナルリンク',
+        chainUnknown: 'チェーン不明',
+        connectingWallet: 'ウォレットに接続中...',
+        requestingNonce: 'SIWE nonce を取得中...',
+        signMessage: 'ウォレットでSIWEメッセージに署名してください...',
+        verifyingSignature: '署名を検証中...',
+        installMetamask: 'MetaMaskウォレット拡張機能をインストールしてください',
+        noWalletAddress: 'ウォレットアドレスを取得できません',
+        nonceFailed: 'nonce の取得に失敗しました',
+        signatureCancelled: '署名がキャンセルされました',
+        verificationFailed: '署名の検証に失敗しました',
+        loginFailed: 'ログインに失敗しました',
     },
 };
 

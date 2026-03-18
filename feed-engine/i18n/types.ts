@@ -383,5 +383,18 @@ export interface TranslationKeys {
         engageNode: string;
         connecting: string;
         terminalLink: string;
+        chainUnknown: string;
+        // 登录流程状态
+        connectingWallet: string;
+        requestingNonce: string;
+        signMessage: string;
+        verifyingSignature: string;
+        // 登录错误
+        installMetamask: string;
+        noWalletAddress: string;
+        nonceFailed: string;
+        signatureCancelled: string;
+        verificationFailed: string;
+        loginFailed: string;
     };
 }

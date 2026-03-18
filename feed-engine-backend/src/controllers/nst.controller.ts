@@ -128,6 +128,7 @@ router.post('/request-feed', requireApiKey, async (req: Request, res: Response) 
             specialConditions,
             callbackUrl,
             externalOrderId,
+            externalRequestId,
             rewardAmount,
             grabTimeout,
             feedTimeout
@@ -201,6 +202,8 @@ router.post('/request-feed', requireApiKey, async (req: Request, res: Response) 
                 feedTimeout: finalFeedTimeout,
                 expiresAt,
                 sourceProtocol: req.protocolName || 'NST',
+                externalOrderId: externalOrderId || null,
+                externalRequestId: externalRequestId || null,
                 callbackUrl: callbackUrl || null,
                 status: 'OPEN'
             }
@@ -249,6 +252,8 @@ router.post('/request-feed', requireApiKey, async (req: Request, res: Response) 
                 requiredFeeders,
                 consensusThreshold,
                 status: order.status,
+                externalOrderId: order.externalOrderId,
+                externalRequestId: order.externalRequestId,
                 expiresAt: order.expiresAt,
                 createdAt: order.createdAt
             }

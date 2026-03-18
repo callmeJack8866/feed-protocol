@@ -319,6 +319,17 @@ const en: TranslationKeys = {
         engageNode: 'Engage Node',
         connecting: 'Connecting...',
         terminalLink: 'Terminal Link',
+        chainUnknown: 'CHAIN_UNKNOWN',
+        connectingWallet: 'Connecting wallet...',
+        requestingNonce: 'Requesting SIWE nonce...',
+        signMessage: 'Sign the SIWE message in your wallet...',
+        verifyingSignature: 'Verifying signature...',
+        installMetamask: 'Please install MetaMask wallet extension',
+        noWalletAddress: 'Unable to read wallet address',
+        nonceFailed: 'Failed to fetch nonce',
+        signatureCancelled: 'Signature was cancelled',
+        verificationFailed: 'Signature verification failed',
+        loginFailed: 'Login failed',
     },
 };
 

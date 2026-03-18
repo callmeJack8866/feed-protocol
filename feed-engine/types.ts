@@ -87,6 +87,7 @@ export interface FeederProfile {
   accuracyRate: number;
   balanceFEED: number;
   balanceUSDT: number;
+  balanceNative?: number;
   history: FeedHistoryItem[];
   stakedAmount: number;
   stakeType: 'FEED' | 'USDT' | 'NFT';
@@ -101,7 +102,15 @@ export interface FeedHistoryItem {
   timestamp: number;
 }
 
-export type ViewType = 'Quest Hall' | 'Dashboard' | 'Leaderboard' | 'Inventory' | 'Training Center' | 'Staking' | 'Arbitration';
+export type ViewType =
+  | 'Quest Hall'
+  | 'Dashboard'
+  | 'Leaderboard'
+  | 'Inventory'
+  | 'Achievements'
+  | 'Training Center'
+  | 'Staking'
+  | 'Arbitration';
 
 export interface TrainingCourse {
   id: string;

@@ -1,16 +1,16 @@
-import { Router, Request, Response } from 'express';
+﻿import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { cacheOrFetch, CACHE_PREFIX, CACHE_TTL } from '../config/cache';
 
 const router = Router();
 
 // ============================================
-// 赛季管理 API
+// 璧涘绠＄悊 API
 // ============================================
 
 /**
  * GET /api/seasons
- * 获取赛季列表
+ * 鑾峰彇璧涘鍒楄〃
  */
 router.get('/', async (req: Request, res: Response) => {
     try {
@@ -34,28 +34,28 @@ router.get('/', async (req: Request, res: Response) => {
 
 /**
  * GET /api/seasons/current
- * 获取当前赛季
+ * 鑾峰彇褰撳墠璧涘
  */
 router.get('/current', async (req: Request, res: Response) => {
     try {
         const now = new Date();
 
-        // 查找当前进行中的赛季
-        let season = await prisma.season.findFirst({
-            where: { status: 'ACTIVE' }
+        await prisma.season.updateMany({
+            where: {
+                status: 'ACTIVE',
+                endDate: { lt: now }
+            },
+            data: { status: 'ENDED' }
         });
 
-        // 如果没有进行中的赛季，查找最近的
-        if (!season) {
-            season = await prisma.season.findFirst({
-                where: {
-                    startDate: { lte: now }
-                },
-                orderBy: { startDate: 'desc' }
-            });
-        }
+        let season = await prisma.season.findFirst({
+            where: {
+                startDate: { lte: now },
+                endDate: { gte: now }
+            },
+            orderBy: { startDate: 'desc' }
+        });
 
-        // 如果还是没有，自动创建当前月份的赛季
         if (!season) {
             const year = now.getFullYear();
             const month = now.getMonth() + 1;
@@ -63,8 +63,14 @@ router.get('/current', async (req: Request, res: Response) => {
             const startDate = new Date(year, now.getMonth(), 1);
             const endDate = new Date(year, now.getMonth() + 1, 0, 23, 59, 59);
 
-            season = await prisma.season.create({
-                data: {
+            season = await prisma.season.upsert({
+                where: { code },
+                update: {
+                    startDate,
+                    endDate,
+                    status: 'ACTIVE'
+                },
+                create: {
                     name: `${year}年${month}月赛季`,
                     code,
                     startDate,
@@ -80,6 +86,11 @@ router.get('/current', async (req: Request, res: Response) => {
                     })
                 }
             });
+        } else if (season.status !== 'ACTIVE') {
+            season = await prisma.season.update({
+                where: { id: season.id },
+                data: { status: 'ACTIVE' }
+            });
         }
 
         res.json({ success: true, season });
@@ -91,7 +102,7 @@ router.get('/current', async (req: Request, res: Response) => {
 
 /**
  * GET /api/seasons/:code/leaderboard
- * 获取赛季排行榜
+ * 鑾峰彇璧涘鎺掕姒?
  */
 router.get('/:code/leaderboard', async (req: Request, res: Response) => {
     try {
@@ -100,12 +111,12 @@ router.get('/:code/leaderboard', async (req: Request, res: Response) => {
         const cacheKey = `${CACHE_PREFIX.LEADERBOARD}season:${code}:${type}:${limit}`;
 
         const result = await cacheOrFetch(cacheKey, async () => {
-            // 检查赛季是否存在
+            // 妫€鏌ヨ禌瀛ｆ槸鍚﹀瓨鍦?
             const season = await prisma.season.findUnique({
                 where: { code }
             });
 
-            // 如果赛季已结束，从快照获取
+            // 濡傛灉璧涘宸茬粨鏉燂紝浠庡揩鐓ц幏鍙?
             if (season?.status === 'SETTLED' || season?.status === 'ENDED') {
                 const snapshots = await prisma.seasonSnapshot.findMany({
                     where: { season: code, rankType: type as string },
@@ -115,7 +126,7 @@ router.get('/:code/leaderboard', async (req: Request, res: Response) => {
                 return { leaderboard: snapshots, source: 'snapshot' };
             }
 
-            // 进行中的赛季，实时计算
+            // 杩涜涓殑璧涘锛屽疄鏃惰绠?
             let orderBy: any = { xp: 'desc' };
             if (type === 'FEEDS') orderBy = { totalFeeds: 'desc' };
             if (type === 'ACCURACY') orderBy = { accuracyRate: 'desc' };
@@ -136,7 +147,7 @@ router.get('/:code/leaderboard', async (req: Request, res: Response) => {
             }));
 
             return { leaderboard, source: 'realtime' };
-        }, CACHE_TTL.LONG); // 30分钟缓存
+        }, CACHE_TTL.LONG); // 30鍒嗛挓缂撳瓨
 
         res.json({ success: true, ...result });
     } catch (error) {
@@ -147,7 +158,7 @@ router.get('/:code/leaderboard', async (req: Request, res: Response) => {
 
 /**
  * GET /api/seasons/:code/my-rank
- * 获取当前用户在赛季中的排名
+ * 鑾峰彇褰撳墠鐢ㄦ埛鍦ㄨ禌瀛ｄ腑鐨勬帓鍚?
  */
 router.get('/:code/my-rank', async (req: Request, res: Response) => {
     try {
@@ -166,7 +177,7 @@ router.get('/:code/my-rank', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Feeder not found' });
         }
 
-        // 计算各维度排名
+        // 璁＄畻鍚勭淮搴︽帓鍚?
         const [xpRank, feedsRank, accuracyRank, stakingRank] = await Promise.all([
             prisma.feeder.count({
                 where: { xp: { gt: feeder.xp }, isBanned: false }
@@ -188,13 +199,13 @@ router.get('/:code/my-rank', async (req: Request, res: Response) => {
                 overall: xpRank + 1,
                 feeds: feedsRank + 1,
                 accuracy: accuracyRank + 1,
-                staking: stakingRank + 1  // 方案 §4.7: 质押量排名
+                staking: stakingRank + 1  // 鏂规 搂4.7: 璐ㄦ娂閲忔帓鍚?
             },
             stats: {
                 xp: feeder.xp,
                 totalFeeds: feeder.totalFeeds,
                 accuracyRate: feeder.accuracyRate,
-                stakedAmount: feeder.stakedAmount  // 方案 §4.7
+                stakedAmount: feeder.stakedAmount  // 鏂规 搂4.7
             }
         });
     } catch (error) {
@@ -205,7 +216,7 @@ router.get('/:code/my-rank', async (req: Request, res: Response) => {
 
 /**
  * GET /api/seasons/:code/rewards
- * 获取赛季奖励信息
+ * 鑾峰彇璧涘濂栧姳淇℃伅
  */
 router.get('/:code/rewards', async (req: Request, res: Response) => {
     try {
@@ -219,7 +230,7 @@ router.get('/:code/rewards', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Season not found' });
         }
 
-        // Prisma Json 类型自动反序列化
+        // Prisma Json 绫诲瀷鑷姩鍙嶅簭鍒楀寲
         const rewardConfig = season.rewardConfig || {};
 
         res.json({

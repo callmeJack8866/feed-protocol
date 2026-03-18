@@ -1,5 +1,4 @@
-
-import { MarketType, FeedType, ConditionType, OrderStatus, FeedOrder, FeederRank, FeedHistoryItem } from './types';
+﻿import { MarketType, FeedType, ConditionType, OrderStatus, FeedOrder, FeederRank, FeedHistoryItem } from './types';
 
 export const MOCK_ORDERS: FeedOrder[] = [
   {
@@ -13,12 +12,12 @@ export const MOCK_ORDERS: FeedOrder[] = [
     requiredFeeders: 5,
     consensusThreshold: '3/5',
     specialConditions: [
-      { type: ConditionType.CONSECUTIVE_LIMIT, description: '三连涨停板，需确认封板状态', highlightLevel: 'critical' },
-      { type: ConditionType.EX_DIVIDEND, description: '今日除权，注意复权计算', highlightLevel: 'warning' }
+      { type: ConditionType.CONSECUTIVE_LIMIT, description: 'Three consecutive limit moves require manual confirmation.', highlightLevel: 'critical' },
+      { type: ConditionType.EX_DIVIDEND, description: 'Ex-dividend adjustment required before settlement.', highlightLevel: 'warning' },
     ],
     rewardAmount: 25,
     status: OrderStatus.OPEN,
-    timeRemaining: 210
+    timeRemaining: 210,
   },
   {
     orderId: 'ORD-12346',
@@ -31,11 +30,11 @@ export const MOCK_ORDERS: FeedOrder[] = [
     requiredFeeders: 3,
     consensusThreshold: '2/3',
     specialConditions: [
-      { type: ConditionType.VOLATILITY_HIGH, description: '当前波动率超过 5%', highlightLevel: 'warning' }
+      { type: ConditionType.VOLATILITY_HIGH, description: 'Volatility has exceeded the normal intraday threshold.', highlightLevel: 'warning' },
     ],
     rewardAmount: 10,
-    status: OrderStatus.GRABBED, // Updated to demonstrate "Secured" state
-    timeRemaining: 145
+    status: OrderStatus.GRABBED,
+    timeRemaining: 145,
   },
   {
     orderId: 'ORD-12347',
@@ -50,7 +49,7 @@ export const MOCK_ORDERS: FeedOrder[] = [
     specialConditions: [],
     rewardAmount: 15,
     status: OrderStatus.OPEN,
-    timeRemaining: 400
+    timeRemaining: 400,
   },
   {
     orderId: 'ORD-12348',
@@ -63,19 +62,19 @@ export const MOCK_ORDERS: FeedOrder[] = [
     requiredFeeders: 7,
     consensusThreshold: '5/7',
     specialConditions: [
-      { type: ConditionType.VOLATILITY_HIGH, description: 'Earnings report expected shortly', highlightLevel: 'critical' }
+      { type: ConditionType.VOLATILITY_HIGH, description: 'Earnings report expected shortly.', highlightLevel: 'critical' },
     ],
     rewardAmount: 150,
     status: OrderStatus.OPEN,
-    timeRemaining: 300
-  }
+    timeRemaining: 300,
+  },
 ];
 
 export const MOCK_HISTORY: FeedHistoryItem[] = [
   { id: '1', symbol: 'TSLA', price: 184.52, deviation: 0.01, reward: 15, timestamp: Date.now() - 3600000 },
-  { id: '2', symbol: 'ETH/USDT', price: 2451.20, deviation: 0.03, reward: 12, timestamp: Date.now() - 7200000 },
-  { id: '3', symbol: '600036.SH', price: 32.15, deviation: 0.00, reward: 25, timestamp: Date.now() - 10800000 },
-  { id: '4', symbol: 'GOLD', price: 2150.30, deviation: 0.05, reward: 30, timestamp: Date.now() - 86400000 },
+  { id: '2', symbol: 'ETH/USDT', price: 2451.2, deviation: 0.03, reward: 12, timestamp: Date.now() - 7200000 },
+  { id: '3', symbol: '600036.SH', price: 32.15, deviation: 0.0, reward: 25, timestamp: Date.now() - 10800000 },
+  { id: '4', symbol: 'GOLD', price: 2150.3, deviation: 0.05, reward: 30, timestamp: Date.now() - 86400000 },
 ];
 
 export const MOCK_LEADERBOARD = [
@@ -93,25 +92,25 @@ export const RANK_COLORS = {
   [FeederRank.C]: 'text-indigo-400',
   [FeederRank.B]: 'text-purple-400',
   [FeederRank.A]: 'text-amber-400',
-  [FeederRank.S]: 'text-rose-400'
+  [FeederRank.S]: 'text-rose-400',
 };
 
 export const MARKET_ICONS = {
-  [MarketType.CRYPTO]: '🌐',
-  [MarketType.US_STOCK]: '🇺🇸',
-  [MarketType.CN_STOCK]: '🇨🇳',
-  [MarketType.HK_STOCK]: '🇭🇰',
-  [MarketType.FOREX]: '💱',
-  [MarketType.COMMODITY]: '📦'
+  [MarketType.CRYPTO]: 'CR',
+  [MarketType.US_STOCK]: 'US',
+  [MarketType.CN_STOCK]: 'CN',
+  [MarketType.HK_STOCK]: 'HK',
+  [MarketType.FOREX]: 'FX',
+  [MarketType.COMMODITY]: 'CM',
 };
 
 export const STATUS_CONFIG = {
-  [OrderStatus.OPEN]: { label: 'Signal Open', color: 'text-slate-500 bg-slate-50 border-slate-200', icon: '📡', animate: false },
-  [OrderStatus.GRABBED]: { label: 'Secured', color: 'text-amber-600 bg-amber-50 border-amber-200', icon: '🔒', animate: false },
-  [OrderStatus.FEEDING]: { label: 'Syncing', color: 'text-cyan-600 bg-cyan-50 border-cyan-200', icon: '🛰️', animate: true },
-  [OrderStatus.CONSENSUS]: { label: 'Quorum', color: 'text-indigo-600 bg-indigo-50 border-indigo-200', icon: '⚖️', animate: true },
-  [OrderStatus.SETTLED]: { label: 'Finalized', color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: '✅', animate: false },
-  [OrderStatus.DISPUTED]: { label: 'Conflict', color: 'text-rose-600 bg-rose-50 border-rose-200', icon: '⚠️', animate: true },
+  [OrderStatus.OPEN]: { label: 'Signal Open', color: 'text-slate-500 bg-slate-50 border-slate-200', icon: 'OPEN', animate: false },
+  [OrderStatus.GRABBED]: { label: 'Secured', color: 'text-amber-600 bg-amber-50 border-amber-200', icon: 'LOCK', animate: false },
+  [OrderStatus.FEEDING]: { label: 'Syncing', color: 'text-cyan-600 bg-cyan-50 border-cyan-200', icon: 'SYNC', animate: true },
+  [OrderStatus.CONSENSUS]: { label: 'Quorum', color: 'text-indigo-600 bg-indigo-50 border-indigo-200', icon: 'QRM', animate: true },
+  [OrderStatus.SETTLED]: { label: 'Finalized', color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: 'OK', animate: false },
+  [OrderStatus.DISPUTED]: { label: 'Conflict', color: 'text-rose-600 bg-rose-50 border-rose-200', icon: 'ERR', animate: true },
 };
 
 export const getReferenceData = (symbol: string) => {
@@ -122,7 +121,8 @@ export const getReferenceData = (symbol: string) => {
     'NVDA': 125,
     'TSLA': 185,
     'ETH/USDT': 2450,
-    'GOLD': 2150
+    GOLD: 2150,
   };
+
   return prices[symbol] || 100;
 };

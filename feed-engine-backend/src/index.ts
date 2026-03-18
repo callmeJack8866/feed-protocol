@@ -32,22 +32,39 @@ import { globalRateLimit } from './config/rate-limiter';
 import { isRedisAvailable, closeRedis, redisHealthCheck } from './config/redis';
 import { optionalAuth } from './middlewares/auth.middleware';
 
+function getAllowedOrigins(): string[] {
+    const configuredOrigins = process.env.FRONTEND_URL
+        ? process.env.FRONTEND_URL.split(',').map(origin => origin.trim()).filter(Boolean)
+        : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'];
+
+    const expandedOrigins = new Set(configuredOrigins);
+
+    configuredOrigins.forEach((origin) => {
+        if (origin.includes('localhost')) {
+            expandedOrigins.add(origin.replace('localhost', '127.0.0.1'));
+        }
+
+        if (origin.includes('127.0.0.1')) {
+            expandedOrigins.add(origin.replace('127.0.0.1', 'localhost'));
+        }
+    });
+
+    return Array.from(expandedOrigins);
+}
+
 const app = express();
 const httpServer = createServer(app);
+const allowedOrigins = getAllowedOrigins();
 const io = new SocketIOServer(httpServer, {
     cors: {
-        origin: process.env.FRONTEND_URL
-            ? process.env.FRONTEND_URL.split(',')
-            : ['http://localhost:5173', 'http://localhost:5174'],
+        origin: allowedOrigins,
         methods: ['GET', 'POST']
     }
 });
 
 // 中间件 - CORS 必须在 helmet 之前，否则 preflight 请求会被阻止
 app.use(cors({
-    origin: process.env.FRONTEND_URL
-        ? process.env.FRONTEND_URL.split(',')
-        : ['http://localhost:5173', 'http://localhost:5174'],
+    origin: allowedOrigins,
     credentials: true
 }));
 app.use(helmet({
