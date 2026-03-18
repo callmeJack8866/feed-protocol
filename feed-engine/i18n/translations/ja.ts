@@ -308,6 +308,18 @@ const ja: TranslationKeys = {
         noMetamask: 'MetaMaskをインストールしてください',
         signing: '署名中...',
     },
+    layout: {
+        systemLogs: 'システムログ',
+        fuelReserves: '燃料リザーブ',
+        hardwareStatus: 'ハードウェアステータス',
+        integrityRating: '整合性評価',
+        syncEfficiency: '同期効率',
+        riskCollateral: 'リスク担保',
+        overrideSecurity: 'セキュリティオーバーライド',
+        engageNode: 'ノード接続',
+        connecting: '接続中...',
+        terminalLink: 'ターミナルリンク',
+    },
 };
 
 export default ja;

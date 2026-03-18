@@ -308,6 +308,18 @@ const en: TranslationKeys = {
         noMetamask: 'Please install MetaMask',
         signing: 'Signing...',
     },
+    layout: {
+        systemLogs: 'System Logs',
+        fuelReserves: 'Fuel Reserves',
+        hardwareStatus: 'Hardware Status',
+        integrityRating: 'Integrity Rating',
+        syncEfficiency: 'Sync Efficiency',
+        riskCollateral: 'Risk Collateral',
+        overrideSecurity: 'Override Security',
+        engageNode: 'Engage Node',
+        connecting: 'Connecting...',
+        terminalLink: 'Terminal Link',
+    },
 };
 
 export default en;

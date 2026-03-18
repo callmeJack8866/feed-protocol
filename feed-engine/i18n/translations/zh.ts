@@ -308,6 +308,18 @@ const zh: TranslationKeys = {
         noMetamask: '请安装 MetaMask 钱包',
         signing: '签名中...',
     },
+    layout: {
+        systemLogs: '系统日志',
+        fuelReserves: '燃料储备',
+        hardwareStatus: '硬件状态',
+        integrityRating: '完整性评级',
+        syncEfficiency: '同步效率',
+        riskCollateral: '风险抵押',
+        overrideSecurity: '覆盖安全',
+        engageNode: '接入节点',
+        connecting: '连接中...',
+        terminalLink: '终端链接',
+    },
 };
 
 export default zh;

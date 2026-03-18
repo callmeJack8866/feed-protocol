@@ -177,7 +177,7 @@ const CosmicHero: React.FC<{ springX: MotionValue<number>; springY: MotionValue<
             className="flex flex-col items-center"
           >
             <h2 className="text-[100px] md:text-[120px] font-black font-orbitron tracking-tighter italic uppercase text-white leading-none drop-shadow-[0_30px_60px_rgba(0,0,0,1)] selection:bg-cyan-500">
-              OWL<span className="text-cyan-400 glow-cyan">VERSE</span>
+              FEED<span className="text-cyan-400 glow-cyan">VERSE</span>
             </h2>
             <div className="flex items-center gap-10 w-full max-w-4xl opacity-40">
               <div className="h-px flex-1 bg-gradient-to-r from-transparent to-cyan-500" />

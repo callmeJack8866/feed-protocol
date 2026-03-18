@@ -204,7 +204,7 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
         <div className="mt-auto p-10 relative z-10">
           <div className="hidden lg:block p-8 rounded-[2.5rem] bg-black/40 border border-white/5 space-y-4 shadow-inner">
             <div className="flex items-center justify-between">
-              <p className="text-[8px] text-cyan-500/60 font-black uppercase tracking-[0.5em]">Terminal Link</p>
+              <p className="text-[8px] text-cyan-500/60 font-black uppercase tracking-[0.5em]">{t.layout.terminalLink}</p>
               <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-[0_0_10px_rgba(34,211,238,1)] animate-pulse" />
             </div>
             <div className="space-y-1 font-mono text-[9px] text-slate-600">
@@ -261,7 +261,7 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
                   : 'bg-white text-black hover:bg-cyan-500 hover:text-black'
                   }`}
               >
-                {auth.isConnecting ? (loginStatus || '连接中...') : 'Engage Node'}
+                {auth.isConnecting ? (loginStatus || t.layout.connecting) : t.layout.engageNode}
               </button>
             )}
             {auth.error && (
@@ -289,7 +289,7 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
           <aside className="w-[400px] border-l border-white/5 bg-black/40 hidden 2xl:flex flex-col overflow-y-auto custom-scrollbar backdrop-blur-3xl relative">
             <div className="p-12 space-y-16 relative z-10">
               <div className="flex justify-between items-center px-4">
-                <h2 className="text-[11px] font-black tracking-[0.8em] uppercase text-slate-500">SYSTEM_LOGS</h2>
+                <h2 className="text-[11px] font-black tracking-[0.8em] uppercase text-slate-500">{t.layout.systemLogs}</h2>
                 <div className="w-10 h-10 rounded-2xl bg-white/5 flex items-center justify-center cursor-pointer hover:bg-cyan-500/10 hover:text-cyan-400 transition-all text-sm border border-white/5">»</div>
               </div>
 
@@ -317,7 +317,7 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
 
                   <div className="space-y-6 relative z-10">
                     <div className="flex justify-between items-end px-2">
-                      <span className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">Fuel Reserves</span>
+                      <span className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">{t.layout.fuelReserves}</span>
                       <span className="text-3xl font-black font-orbitron text-white italic glow-text">{profile.balanceFEED.toLocaleString()} <span className="text-xs text-cyan-500/60">XTTA</span></span>
                     </div>
                     <div className="h-3 w-full bg-black/60 rounded-full overflow-hidden border border-white/10 p-0.5">
@@ -332,12 +332,12 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
 
                 {/* Stats Grid */}
                 <div className="space-y-8">
-                  <h3 className="text-[11px] font-black uppercase tracking-[0.6em] text-slate-600 px-6">Hardware Status</h3>
+                  <h3 className="text-[11px] font-black uppercase tracking-[0.6em] text-slate-600 px-6">{t.layout.hardwareStatus}</h3>
                   <div className="grid grid-cols-1 gap-5">
                     {[
-                      { label: 'Integrity Rating', val: profile.rank + ' CLASS', color: 'text-rose-500', bg: 'bg-rose-500/5' },
-                      { label: 'Sync Efficiency', val: profile.accuracyRate + '%', color: 'text-cyan-400', bg: 'bg-cyan-500/5' },
-                      { label: 'Risk Collateral', val: '$' + (profile.stakedAmount / 1000) + 'K', color: 'text-white', bg: 'bg-white/5' }
+                      { label: t.layout.integrityRating, val: profile.rank + ' CLASS', color: 'text-rose-500', bg: 'bg-rose-500/5' },
+                      { label: t.layout.syncEfficiency, val: profile.accuracyRate + '%', color: 'text-cyan-400', bg: 'bg-cyan-500/5' },
+                      { label: t.layout.riskCollateral, val: '$' + (profile.stakedAmount / 1000) + 'K', color: 'text-white', bg: 'bg-white/5' }
                     ].map(stat => (
                       <div key={stat.label} className={`p-8 rounded-[2.5rem] ${stat.bg} border border-white/5 flex justify-between items-center group hover:scale-[1.02] transition-all cursor-crosshair`}>
                         <span className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em]">{stat.label}</span>
@@ -349,7 +349,7 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
 
                 <div className="pt-12">
                   <button className="w-full py-6 rounded-[2.5rem] bg-white text-black text-[11px] font-black uppercase tracking-[0.5em] shadow-2xl hover:bg-cyan-400 hover:text-black transition-all italic font-orbitron active:scale-95">
-                    Override Security
+                    {t.layout.overrideSecurity}
                   </button>
                 </div>
               </div>

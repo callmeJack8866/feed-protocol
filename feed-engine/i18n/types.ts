@@ -370,4 +370,18 @@ export interface TranslationKeys {
         noMetamask: string;
         signing: string;
     };
+
+    // ======== 布局/侧边栏 ========
+    layout: {
+        systemLogs: string;
+        fuelReserves: string;
+        hardwareStatus: string;
+        integrityRating: string;
+        syncEfficiency: string;
+        riskCollateral: string;
+        overrideSecurity: string;
+        engageNode: string;
+        connecting: string;
+        terminalLink: string;
+    };
 }

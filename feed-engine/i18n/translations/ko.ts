@@ -308,6 +308,18 @@ const ko: TranslationKeys = {
         noMetamask: 'MetaMask를 설치해주세요',
         signing: '서명 중...',
     },
+    layout: {
+        systemLogs: '시스템 로그',
+        fuelReserves: '연료 보유량',
+        hardwareStatus: '하드웨어 상태',
+        integrityRating: '무결성 등급',
+        syncEfficiency: '동기화 효율',
+        riskCollateral: '리스크 담보',
+        overrideSecurity: '보안 재정의',
+        engageNode: '노드 연결',
+        connecting: '연결 중...',
+        terminalLink: '터미널 링크',
+    },
 };
 
 export default ko;

@@ -308,6 +308,18 @@ const zhTW: TranslationKeys = {
         noMetamask: '請安裝 MetaMask 錢包',
         signing: '簽名中...',
     },
+    layout: {
+        systemLogs: '系統日誌',
+        fuelReserves: '燃料儲備',
+        hardwareStatus: '硬體狀態',
+        integrityRating: '完整性評級',
+        syncEfficiency: '同步效率',
+        riskCollateral: '風險抵押',
+        overrideSecurity: '覆蓋安全',
+        engageNode: '接入節點',
+        connecting: '連線中...',
+        terminalLink: '終端連結',
+    },
 };
 
 export default zhTW;

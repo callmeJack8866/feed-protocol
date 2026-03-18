@@ -158,7 +158,7 @@ router.post('/orders', adminAuth, async (req: Request, res: Response) => {
                 consensusThreshold,
                 specialConditions: specialConditions || [],
                 rewardAmount: rewardAmount || calculateReward(notionalAmount, feedType),
-                feeAmount: feeAmount || ({ 'INITIAL': 5, 'DYNAMIC': 5, 'SETTLEMENT': 10, 'FINAL': 10, 'ARBITRATION': 20 }[feedType] || 5),
+                feeAmount: feeAmount || (({ 'INITIAL': 5, 'DYNAMIC': 5, 'SETTLEMENT': 10, 'FINAL': 10, 'ARBITRATION': 20 } as Record<string, number>)[feedType] || 5),
                 grabTimeout: grabTimeout || 300,
                 feedTimeout: feedTimeout || 600,
                 expiresAt,

@@ -308,6 +308,18 @@ const vi: TranslationKeys = {
         noMetamask: 'Vui lòng cài đặt MetaMask',
         signing: 'Đang ký...',
     },
+    layout: {
+        systemLogs: 'Nhật Ký Hệ Thống',
+        fuelReserves: 'Dự Trữ Nhiên Liệu',
+        hardwareStatus: 'Trạng Thái Phần Cứng',
+        integrityRating: 'Đánh Giá Toàn Vẹn',
+        syncEfficiency: 'Hiệu Suất Đồng Bộ',
+        riskCollateral: 'Tài Sản Thế Chấp Rủi Ro',
+        overrideSecurity: 'Ghi Đè Bảo Mật',
+        engageNode: 'Kết Nối Nút',
+        connecting: 'Đang kết nối...',
+        terminalLink: 'Liên Kết Đầu Cuối',
+    },
 };
 
 export default vi;
