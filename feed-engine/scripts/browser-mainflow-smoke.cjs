@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 
 const API_BASE_URL = process.env.SMOKE_API_URL || 'http://127.0.0.1:3001';
-const APP_BASE_URL = process.env.SMOKE_APP_URL || 'http://localhost:5173';
+const APP_BASE_URL = process.env.SMOKE_APP_URL || 'http://localhost:3000';
 const STAKE_AMOUNT = 150;
 const FLOW_SYMBOL = `FLOW_${Date.now()}`;
 const FLOW_PRICE = '100.12';

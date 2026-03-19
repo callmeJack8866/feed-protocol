@@ -22,14 +22,17 @@ interface Season {
 }
 
 interface LeaderboardEntry {
-  id: string;
+  feederId: string;
   address: string;
   nickname?: string;
   rank: string;
-  xp: number;
-  totalFeeds: number;
-  accuracyRate: number;
+  totalXp: number;
+  feeds: number;
+  accuracy: number;
   position: number;
+  reward?: number;
+  stakedAmount?: number;
+  rankType?: string;
 }
 
 interface RewardConfigEntry {
@@ -245,7 +248,7 @@ const LeaderboardView: React.FC = () => {
           <div className="space-y-3">
             {leaderboard.map((user, index) => (
               <motion.div
-                key={user.id}
+                key={user.feederId}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
@@ -284,10 +287,10 @@ const LeaderboardView: React.FC = () => {
                 </div>
                 <div className="col-span-2 font-bold font-orbitron text-white">
                   {activeTab === 'FEEDS'
-                    ? user.totalFeeds.toLocaleString()
+                    ? user.feeds.toLocaleString()
                     : activeTab === 'ACCURACY'
-                      ? `${user.accuracyRate}%`
-                      : user.xp.toLocaleString()}
+                      ? `${user.accuracy}%`
+                      : user.totalXp.toLocaleString()}
                 </div>
                 <div className="col-span-3 text-right">
                   <span className={`${index < 3 ? 'text-amber-400' : 'text-slate-400'} font-bold`}>

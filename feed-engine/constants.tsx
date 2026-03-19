@@ -1,4 +1,4 @@
-﻿import { MarketType, FeedType, ConditionType, OrderStatus, FeedOrder, FeederRank, FeedHistoryItem } from './types';
+import { MarketType, FeedType, ConditionType, OrderStatus, FeedOrder, FeederRank, FeedHistoryItem } from './types';
 
 export const MOCK_ORDERS: FeedOrder[] = [
   {
@@ -111,6 +111,8 @@ export const STATUS_CONFIG = {
   [OrderStatus.CONSENSUS]: { label: 'Quorum', color: 'text-indigo-600 bg-indigo-50 border-indigo-200', icon: 'QRM', animate: true },
   [OrderStatus.SETTLED]: { label: 'Finalized', color: 'text-emerald-600 bg-emerald-50 border-emerald-200', icon: 'OK', animate: false },
   [OrderStatus.DISPUTED]: { label: 'Conflict', color: 'text-rose-600 bg-rose-50 border-rose-200', icon: 'ERR', animate: true },
+  [OrderStatus.CANCELLED]: { label: 'Cancelled', color: 'text-gray-500 bg-gray-50 border-gray-300', icon: 'OFF', animate: false },
+  [OrderStatus.EXPIRED]: { label: 'Expired', color: 'text-orange-500 bg-orange-50 border-orange-200', icon: 'EXP', animate: false },
 };
 
 export const getReferenceData = (symbol: string) => {

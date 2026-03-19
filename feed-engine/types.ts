@@ -38,7 +38,9 @@ export enum OrderStatus {
   FEEDING = 'FEEDING',
   CONSENSUS = 'CONSENSUS',
   SETTLED = 'SETTLED',
-  DISPUTED = 'DISPUTED'
+  DISPUTED = 'DISPUTED',
+  CANCELLED = 'CANCELLED',
+  EXPIRED = 'EXPIRED'
 }
 
 export enum FeederRank {

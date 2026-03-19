@@ -410,7 +410,7 @@ const StakingView: React.FC<{ profile: FeederProfile }> = ({ profile }) => {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="font-bold text-white">{license.name}</p>
-                      <p className="text-xs text-slate-500 mt-1">Tier {license.tier} ¡¤ Max rank {license.maxRank}</p>
+                      <p className="text-xs text-slate-500 mt-1">Tier {license.tier}  |  Max rank {license.maxRank}</p>
                     </div>
                     <span className={`text-xs font-bold px-3 py-1 rounded-full ${license.isStaked ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
                       {license.isStaked ? 'Staked' : 'Available'}

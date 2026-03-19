@@ -24,38 +24,7 @@ interface Exam {
   questions: { id: number; question: string; options: string[] }[];
 }
 
-const fallbackCourses: Course[] = [
-  {
-    id: '1',
-    title: 'Oracle Fundamentals',
-    category: 'ONBOARDING',
-    xpReward: 100,
-    duration: 30,
-    isRequired: true,
-    status: 'NOT_STARTED',
-    description: 'Understand the feeder workflow, oracle roles, and the Commit-Reveal submission model.',
-  },
-  {
-    id: '2',
-    title: 'Equity Market Pricing Advanced',
-    category: 'MARKET_SPECIFIC',
-    xpReward: 200,
-    duration: 45,
-    isRequired: false,
-    status: 'NOT_STARTED',
-    description: 'Handle suspensions, corporate actions, and other special market conditions with confidence.',
-  },
-  {
-    id: '3',
-    title: 'Crypto Volatility Response',
-    category: 'ADVANCED',
-    xpReward: 300,
-    duration: 60,
-    isRequired: false,
-    status: 'NOT_STARTED',
-    description: 'Prepare for flash crashes, liquidity gaps, and other extreme crypto trading scenarios.',
-  },
-];
+
 
 const getOutlineItems = (course: Course): string[] => {
   const shared = [
@@ -99,6 +68,7 @@ const TrainingView: React.FC = () => {
   const [examStartTime, setExamStartTime] = useState<Date | null>(null);
   const [examResult, setExamResult] = useState<any>(null);
   const [stats, setStats] = useState({ total: 0, completed: 0, inProgress: 0, examsPassed: 0 });
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     loadProgress();
@@ -115,18 +85,15 @@ const TrainingView: React.FC = () => {
           progress: p.progress,
           examPassed: p.examPassed,
         }));
+        setLoadError(null);
         setCourses(mappedCourses);
         if (res.stats) setStats(res.stats);
       }
     } catch (error) {
       console.error('Load progress error:', error);
-      setCourses(fallbackCourses);
-      setStats({
-        total: fallbackCourses.length,
-        completed: 0,
-        inProgress: 0,
-        examsPassed: 0,
-      });
+      setLoadError(error instanceof Error ? error.message : 'Failed to load training courses');
+      setCourses([]);
+      setStats({ total: 0, completed: 0, inProgress: 0, examsPassed: 0 });
     } finally {
       setLoading(false);
     }
@@ -211,6 +178,17 @@ const TrainingView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {loadError && (
+          <div className="col-span-full mb-4 p-4 rounded-xl border border-rose-500/30 bg-rose-500/10 text-center">
+            <p className="text-rose-400 font-semibold mb-2">⚠️ {loadError}</p>
+            <button
+              onClick={() => { setLoadError(null); loadProgress(); }}
+              className="px-4 py-2 bg-cyan-500/20 border border-cyan-500/50 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-all text-sm font-semibold"
+            >
+              ↻ Retry
+            </button>
+          </div>
+        )}
         {courses.map((course, idx) => {
           const statusInfo = getStatusDisplay(course.status, course.examPassed);
           return (

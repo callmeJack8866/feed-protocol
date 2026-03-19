@@ -53,11 +53,11 @@ export function initWebSocket(): void {
     'arbitration:resolved',
     'arbitration:appeal',
     'appeal:resolved',
-    'chain:priceSubmitted',
+    'chain:priceCommitted',
     'chain:priceRevealed',
-    'chain:consensusReached',
+    'chain:consensusSubmitted',
     'chain:staked',
-    'chain:slashed',
+    'chain:penaltyApplied',
     'nst:feedRequest',
   ].forEach(forward);
 }

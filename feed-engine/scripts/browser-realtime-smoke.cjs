@@ -4,7 +4,7 @@ const path = require('path');
 const fs = require('fs');
 
 const API_BASE_URL = process.env.SMOKE_API_URL || 'http://127.0.0.1:3001';
-const APP_BASE_URL = process.env.SMOKE_APP_URL || 'http://localhost:5173';
+const APP_BASE_URL = process.env.SMOKE_APP_URL || 'http://localhost:3000';
 const PRIMARY_BROWSER_PATHS = [
   'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
   'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',

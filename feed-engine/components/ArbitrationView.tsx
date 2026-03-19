@@ -318,7 +318,7 @@ const ArbitrationView: React.FC = () => {
                 <option value="">Select order</option>
                 {orders.map((order) => (
                   <option key={order.id} value={order.id}>
-                    {order.symbol} ， {order.market} ， {order.status}
+                    {order.symbol}  |  {order.market}  |  {order.status}
                   </option>
                 ))}
               </select>
@@ -404,7 +404,7 @@ const ArbitrationView: React.FC = () => {
               <div className="flex items-start justify-between gap-6 flex-wrap">
                 <div className="space-y-2">
                   <h3 className="text-2xl font-black font-orbitron text-white">{selectedCase.disputeReason}</h3>
-                  <p className="text-sm text-slate-500">Order {selectedCase.orderId} ， Created {new Date(selectedCase.createdAt).toLocaleString()}</p>
+                  <p className="text-sm text-slate-500">Order {selectedCase.orderId}  |  Created {new Date(selectedCase.createdAt).toLocaleString()}</p>
                 </div>
                 <div className="text-right space-y-2">
                   <div className="text-xs font-black uppercase tracking-widest text-slate-500">Deposit</div>
@@ -554,7 +554,7 @@ const ArbitrationView: React.FC = () => {
                             <p className="text-sm text-slate-400 mt-2">{appeal.reason}</p>
                           </div>
                           <div className="text-xs text-slate-500">
-                            Support {appeal.supportVotes} ， Reject {appeal.rejectVotes} ， Total voters {appeal.totalVoters}
+                            Support {appeal.supportVotes}  |  Reject {appeal.rejectVotes}  |  Total voters {appeal.totalVoters}
                           </div>
                           {appeal.status === 'VOTING' && (
                             <div className="grid grid-cols-2 gap-3">

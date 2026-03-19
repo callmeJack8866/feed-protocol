@@ -1,16 +1,63 @@
-﻿import { Router, Request, Response } from 'express';
+import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import { cacheOrFetch, CACHE_PREFIX, CACHE_TTL } from '../config/cache';
 
 const router = Router();
 
 // ============================================
-// 璧涘绠＄悊 API
+// 赛季管理 API
 // ============================================
 
 /**
+ * 按赛季时间范围从 FeedHistory 聚合排行榜数据。
+ * 返回每个 feeder 在赛季内的 feeds 总数、累计 XP、累计 reward、平均偏差。
+ */
+async function aggregateSeasonStats(startDate: Date, endDate: Date) {
+    // FeedHistory 每条记录对应一次喂价完成
+    const rows = await prisma.feedHistory.groupBy({
+        by: ['feederId'],
+        where: {
+            createdAt: { gte: startDate, lte: endDate }
+        },
+        _count: { id: true },
+        _sum: { xpEarned: true, reward: true },
+        _avg: { deviation: true }
+    });
+
+    return rows.map(row => ({
+        feederId: row.feederId,
+        feeds: row._count.id,
+        xp: row._sum.xpEarned ?? 0,
+        reward: row._sum.reward ?? 0,
+        avgDeviation: row._avg.deviation ?? 0
+    }));
+}
+
+/**
+ * 获取 feeder 展示信息（nickname、rank、address 等），批量查询。
+ */
+async function getFeederDisplayMap(feederIds: string[]) {
+    if (feederIds.length === 0) return new Map<string, any>();
+
+    const feeders = await prisma.feeder.findMany({
+        where: { id: { in: feederIds }, isBanned: false },
+        select: {
+            id: true,
+            address: true,
+            nickname: true,
+            rank: true,
+            stakedAmount: true
+        }
+    });
+
+    const map = new Map<string, any>();
+    feeders.forEach(f => map.set(f.id, f));
+    return map;
+}
+
+/**
  * GET /api/seasons
- * 鑾峰彇璧涘鍒楄〃
+ * 获取赛季列表
  */
 router.get('/', async (req: Request, res: Response) => {
     try {
@@ -34,12 +81,13 @@ router.get('/', async (req: Request, res: Response) => {
 
 /**
  * GET /api/seasons/current
- * 鑾峰彇褰撳墠璧涘
+ * 获取当前赛季（如果不存在则自动创建当月赛季）
  */
 router.get('/current', async (req: Request, res: Response) => {
     try {
         const now = new Date();
 
+        // 将已过期的 ACTIVE 赛季标记为 ENDED
         await prisma.season.updateMany({
             where: {
                 status: 'ACTIVE',
@@ -102,52 +150,103 @@ router.get('/current', async (req: Request, res: Response) => {
 
 /**
  * GET /api/seasons/:code/leaderboard
- * 鑾峰彇璧涘鎺掕姒?
+ * 获取赛季排行榜 — 严格按赛季时间范围聚合
+ *
+ * type=OVERALL  → 赛季内 SUM(xpEarned) 降序
+ * type=FEEDS    → 赛季内 COUNT(feeds) 降序
+ * type=ACCURACY → 赛季内 AVG(deviation) 升序（偏差越小越好）
+ * type=STAKING  → feeder.stakedAmount 降序（实时质押快照）
  */
 router.get('/:code/leaderboard', async (req: Request, res: Response) => {
     try {
         const { code } = req.params;
         const { type = 'OVERALL', limit = 100 } = req.query;
-        const cacheKey = `${CACHE_PREFIX.LEADERBOARD}season:${code}:${type}:${limit}`;
+        const take = Math.min(Number(limit) || 100, 500);
+        const cacheKey = `${CACHE_PREFIX.LEADERBOARD}season:${code}:${type}:${take}`;
 
         const result = await cacheOrFetch(cacheKey, async () => {
-            // 妫€鏌ヨ禌瀛ｆ槸鍚﹀瓨鍦?
-            const season = await prisma.season.findUnique({
-                where: { code }
-            });
+            const season = await prisma.season.findUnique({ where: { code } });
+            if (!season) {
+                return { leaderboard: [], source: 'empty', error: 'Season not found' };
+            }
 
-            // 濡傛灉璧涘宸茬粨鏉燂紝浠庡揩鐓ц幏鍙?
-            if (season?.status === 'SETTLED' || season?.status === 'ENDED') {
+            // 已结算赛季 → 直接从快照读取
+            if (season.status === 'SETTLED' || season.status === 'ENDED') {
                 const snapshots = await prisma.seasonSnapshot.findMany({
                     where: { season: code, rankType: type as string },
                     orderBy: { rank: 'asc' },
-                    take: Number(limit)
+                    take
                 });
                 return { leaderboard: snapshots, source: 'snapshot' };
             }
 
-            // 杩涜涓殑璧涘锛屽疄鏃惰绠?
-            let orderBy: any = { xp: 'desc' };
-            if (type === 'FEEDS') orderBy = { totalFeeds: 'desc' };
-            if (type === 'ACCURACY') orderBy = { accuracyRate: 'desc' };
-            if (type === 'STAKING') orderBy = { stakedAmount: 'desc' };
+            // ===== 进行中的赛季 → 实时聚合 =====
 
-            const feeders = await prisma.feeder.findMany({
-                where: { isBanned: false },
-                orderBy,
-                take: Number(limit),
-                select: {
-                    id: true, address: true, nickname: true, rank: true,
-                    xp: true, totalFeeds: true, accuracyRate: true, stakedAmount: true
-                }
-            });
+            // STAKING 维度：质押是实时快照，不按赛季时间过滤
+            if (type === 'STAKING') {
+                const feeders = await prisma.feeder.findMany({
+                    where: { isBanned: false, stakedAmount: { gt: 0 } },
+                    orderBy: { stakedAmount: 'desc' },
+                    take,
+                    select: {
+                        id: true, address: true, nickname: true, rank: true,
+                        stakedAmount: true
+                    }
+                });
+                return {
+                    leaderboard: feeders.map((f, i) => ({
+                        ...f, position: i + 1, rankType: 'STAKING',
+                        feeds: 0, totalXp: 0, accuracy: 0, reward: 0
+                    })),
+                    source: 'realtime'
+                };
+            }
 
-            const leaderboard = feeders.map((feeder, index) => ({
-                ...feeder, position: index + 1, rankType: type
-            }));
+            // OVERALL / FEEDS / ACCURACY → 从 FeedHistory 聚合
+            const stats = await aggregateSeasonStats(season.startDate, season.endDate);
+
+            if (stats.length === 0) {
+                return { leaderboard: [], source: 'realtime' };
+            }
+
+            // 按请求维度排序
+            let sorted: typeof stats;
+            if (type === 'FEEDS') {
+                sorted = stats.sort((a, b) => b.feeds - a.feeds);
+            } else if (type === 'ACCURACY') {
+                // 偏差越小越好；过滤出至少有 1 次 feed 的
+                sorted = stats
+                    .filter(s => s.feeds > 0)
+                    .sort((a, b) => Math.abs(a.avgDeviation) - Math.abs(b.avgDeviation));
+            } else {
+                // OVERALL → XP
+                sorted = stats.sort((a, b) => b.xp - a.xp);
+            }
+
+            const topSlice = sorted.slice(0, take);
+            const feederMap = await getFeederDisplayMap(topSlice.map(s => s.feederId));
+
+            const leaderboard = topSlice
+                .filter(s => feederMap.has(s.feederId)) // 排除已封禁
+                .map((s, i) => {
+                    const feeder = feederMap.get(s.feederId)!;
+                    return {
+                        position: i + 1,
+                        rankType: type,
+                        feederId: s.feederId,
+                        address: feeder.address,
+                        nickname: feeder.nickname,
+                        rank: feeder.rank,
+                        totalXp: s.xp,
+                        feeds: s.feeds,
+                        accuracy: s.feeds > 0 ? +(100 - Math.abs(s.avgDeviation)).toFixed(2) : 0,
+                        reward: +s.reward.toFixed(2),
+                        stakedAmount: feeder.stakedAmount
+                    };
+                });
 
             return { leaderboard, source: 'realtime' };
-        }, CACHE_TTL.LONG); // 30鍒嗛挓缂撳瓨
+        }, CACHE_TTL.LONG); // 30 分钟缓存
 
         res.json({ success: true, ...result });
     } catch (error) {
@@ -158,7 +257,7 @@ router.get('/:code/leaderboard', async (req: Request, res: Response) => {
 
 /**
  * GET /api/seasons/:code/my-rank
- * 鑾峰彇褰撳墠鐢ㄦ埛鍦ㄨ禌瀛ｄ腑鐨勬帓鍚?
+ * 获取当前用户在赛季中的排名 — 严格按赛季时间范围聚合
  */
 router.get('/:code/my-rank', async (req: Request, res: Response) => {
     try {
@@ -177,35 +276,68 @@ router.get('/:code/my-rank', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Feeder not found' });
         }
 
-        // 璁＄畻鍚勭淮搴︽帓鍚?
-        const [xpRank, feedsRank, accuracyRank, stakingRank] = await Promise.all([
-            prisma.feeder.count({
-                where: { xp: { gt: feeder.xp }, isBanned: false }
-            }),
-            prisma.feeder.count({
-                where: { totalFeeds: { gt: feeder.totalFeeds }, isBanned: false }
-            }),
-            prisma.feeder.count({
-                where: { accuracyRate: { gt: feeder.accuracyRate }, isBanned: false }
-            }),
-            prisma.feeder.count({
-                where: { stakedAmount: { gt: feeder.stakedAmount }, isBanned: false }
-            })
-        ]);
+        const season = await prisma.season.findUnique({ where: { code } });
+        if (!season) {
+            return res.status(404).json({ error: 'Season not found' });
+        }
+
+        // 聚合全部 feeder 的赛季内数据
+        const allStats = await aggregateSeasonStats(season.startDate, season.endDate);
+
+        // 查找当前用户的赛季数据
+        const myStats = allStats.find(s => s.feederId === feeder.id) || {
+            feederId: feeder.id, feeds: 0, xp: 0, reward: 0, avgDeviation: 0
+        };
+
+        // 获取未被封禁的 feeder ID 集合
+        const activeFeeders = await prisma.feeder.findMany({
+            where: { isBanned: false },
+            select: { id: true }
+        });
+        const activeIds = new Set(activeFeeders.map(f => f.id));
+
+        // 只保留未封禁用户的统计数据
+        const activeStats = allStats.filter(s => activeIds.has(s.feederId));
+
+        // 计算各维度排名
+        const xpRank = activeStats.filter(s => s.xp > myStats.xp).length + 1;
+        const feedsRank = activeStats.filter(s => s.feeds > myStats.feeds).length + 1;
+
+        // ACCURACY：偏差绝对值更小的排在前面
+        const myAbsDev = Math.abs(myStats.avgDeviation);
+        const accuracyRank = myStats.feeds > 0
+            ? activeStats.filter(s => s.feeds > 0 && Math.abs(s.avgDeviation) < myAbsDev).length + 1
+            : activeStats.filter(s => s.feeds > 0).length + 1; // 无 feed 则排最后
+
+        // STAKING：仍然用实时质押金额
+        const stakingRank = await prisma.feeder.count({
+            where: { stakedAmount: { gt: feeder.stakedAmount }, isBanned: false }
+        }) + 1;
+
+        const myAccuracy = myStats.feeds > 0
+            ? +(100 - Math.abs(myStats.avgDeviation)).toFixed(2)
+            : 0;
 
         res.json({
             success: true,
             ranks: {
-                overall: xpRank + 1,
-                feeds: feedsRank + 1,
-                accuracy: accuracyRank + 1,
-                staking: stakingRank + 1  // 鏂规 搂4.7: 璐ㄦ娂閲忔帓鍚?
+                overall: xpRank,
+                feeds: feedsRank,
+                accuracy: accuracyRank,
+                staking: stakingRank
             },
             stats: {
-                xp: feeder.xp,
-                totalFeeds: feeder.totalFeeds,
-                accuracyRate: feeder.accuracyRate,
-                stakedAmount: feeder.stakedAmount  // 鏂规 搂4.7
+                xp: myStats.xp,
+                totalFeeds: myStats.feeds,
+                accuracyRate: myAccuracy,
+                totalReward: +myStats.reward.toFixed(2),
+                stakedAmount: feeder.stakedAmount
+            },
+            season: {
+                code: season.code,
+                name: season.name,
+                startDate: season.startDate,
+                endDate: season.endDate
             }
         });
     } catch (error) {
@@ -216,7 +348,7 @@ router.get('/:code/my-rank', async (req: Request, res: Response) => {
 
 /**
  * GET /api/seasons/:code/rewards
- * 鑾峰彇璧涘濂栧姳淇℃伅
+ * 获取赛季奖励信息
  */
 router.get('/:code/rewards', async (req: Request, res: Response) => {
     try {
@@ -230,7 +362,6 @@ router.get('/:code/rewards', async (req: Request, res: Response) => {
             return res.status(404).json({ error: 'Season not found' });
         }
 
-        // Prisma Json 绫诲瀷鑷姩鍙嶅簭鍒楀寲
         const rewardConfig = season.rewardConfig || {};
 
         res.json({
@@ -247,6 +378,132 @@ router.get('/:code/rewards', async (req: Request, res: Response) => {
     } catch (error) {
         console.error('Get rewards error:', error);
         res.status(500).json({ error: 'Failed to get rewards' });
+    }
+});
+/**
+ * POST /api/seasons/:code/claim
+ * 用户领取赛季奖励
+ *
+ * 流程:
+ * 1. 赛季必须已结算 (SETTLED)
+ * 2. 查找该用户的 OVERALL 排名快照
+ * 3. 排名 ≤100 才有奖励
+ * 4. snapshot.reward > 0 表示未领取，领取后标记为负数（-reward）防止重复领取
+ * 5. 增加用户 XP + totalEarnings
+ */
+router.post('/:code/claim', async (req: Request, res: Response) => {
+    try {
+        const address = req.headers['x-wallet-address'] as string;
+        const { code } = req.params;
+
+        if (!address) {
+            return res.status(401).json({ error: 'Not authenticated' });
+        }
+
+        // 1. 查找赛季
+        const season = await prisma.season.findUnique({ where: { code } });
+        if (!season) {
+            return res.status(404).json({ error: 'Season not found' });
+        }
+
+        if (season.status !== 'SETTLED') {
+            return res.status(400).json({
+                error: 'Season not settled yet',
+                message: '赛季尚未结算，无法领取奖励'
+            });
+        }
+
+        // 2. 查找用户
+        const feeder = await prisma.feeder.findUnique({
+            where: { address: address.toLowerCase() }
+        });
+
+        if (!feeder) {
+            return res.status(404).json({ error: 'Feeder not found' });
+        }
+
+        // 3. 查找用户在该赛季的 OVERALL 排名快照
+        const snapshot = await prisma.seasonSnapshot.findFirst({
+            where: {
+                season: code,
+                feederId: feeder.id,
+                rankType: 'OVERALL'
+            }
+        });
+
+        if (!snapshot) {
+            return res.status(404).json({
+                error: 'No ranking found',
+                message: '您在该赛季没有排名记录'
+            });
+        }
+
+        // 4. 检查是否有奖励（reward > 0 表示可领取，reward < 0 表示已领取）
+        if (!snapshot.reward || snapshot.reward <= 0) {
+            if (snapshot.reward !== null && snapshot.reward < 0) {
+                return res.status(400).json({
+                    error: 'Already claimed',
+                    message: '您已领取过该赛季奖励',
+                    claimed: true,
+                    reward: Math.abs(snapshot.reward)
+                });
+            }
+            return res.status(400).json({
+                error: 'No reward',
+                message: '您的排名未进入奖励范围（Top 100）'
+            });
+        }
+
+        const feedReward = snapshot.reward;
+
+        // 使用配置获取对应排名的 XP 奖励
+        const RANK_XP: Record<string, number> = {
+            '1': 2000, '2': 1500, '3': 1500,
+            '4-10': 1000, '11-50': 500, '51-100': 300
+        };
+        let xpReward = 0;
+        const rank = snapshot.rank;
+        if (rank === 1) xpReward = RANK_XP['1'];
+        else if (rank <= 3) xpReward = RANK_XP['2'];
+        else if (rank <= 10) xpReward = RANK_XP['4-10'];
+        else if (rank <= 50) xpReward = RANK_XP['11-50'];
+        else if (rank <= 100) xpReward = RANK_XP['51-100'];
+
+        // 5. 执行领取: 更新 feeder + 标记快照已领取（reward 设为负数）
+        await prisma.$transaction([
+            // 增加用户 XP 和收益
+            prisma.feeder.update({
+                where: { id: feeder.id },
+                data: {
+                    xp: { increment: xpReward },
+                    totalEarnings: { increment: feedReward }
+                }
+            }),
+            // 标记快照已领取（负数 = 已领取的金额）
+            prisma.seasonSnapshot.update({
+                where: { id: snapshot.id },
+                data: { reward: -feedReward }
+            })
+        ]);
+
+        console.log(`🎁 Season reward claimed: ${feeder.address} rank #${rank} → +${feedReward} FEED, +${xpReward} XP`);
+
+        res.json({
+            success: true,
+            claimed: true,
+            rank: snapshot.rank,
+            reward: {
+                feed: feedReward,
+                xp: xpReward,
+            },
+            season: {
+                code: season.code,
+                name: season.name
+            }
+        });
+    } catch (error) {
+        console.error('Claim season reward error:', error);
+        res.status(500).json({ error: 'Failed to claim season reward' });
     }
 });
 

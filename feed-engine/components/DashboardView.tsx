@@ -112,7 +112,7 @@ const DashboardView: React.FC<{ profile: FeederProfile }> = ({ profile }) => {
               {t.dashboard.nodeTelemetry}
             </h2>
           </div>
-          <p className="text-slate-500 text-xs font-black uppercase tracking-[0.5em] italic ml-7">{profile.nickname} ¡¤ {profile.address.slice(0, 6)}...{profile.address.slice(-4)}</p>
+          <p className="text-slate-500 text-xs font-black uppercase tracking-[0.5em] italic ml-7">{profile.nickname}  |  {profile.address.slice(0, 6)}...{profile.address.slice(-4)}</p>
         </div>
         <div className="px-10 py-5 bg-black/60 border border-white/10 rounded-[2.5rem] backdrop-blur-3xl shadow-2xl flex items-center gap-8 relative group">
           <div className="text-right">

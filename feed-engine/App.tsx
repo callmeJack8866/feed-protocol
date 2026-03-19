@@ -245,7 +245,8 @@ const QuestHallView: React.FC<{
         </div>
       </section>
 
-      {/* 分区描述横幅 */}
+      {/* 分区描述横幅 */}
+
       <motion.div
         key={activeTab}
         initial={{ opacity: 0, y: -10 }}
@@ -335,34 +336,16 @@ const App: React.FC = () => {
   const grabAndFeed = useUIStore((s) => s.grabAndFeed);
 
   const [dataLoading, setDataLoading] = React.useState(true);
+  const [profileError, setProfileError] = React.useState<string | null>(null);
 
-  const buildFallbackProfile = React.useCallback((address?: string) => {
-    const currentProfile = useFeederStore.getState().profile;
 
-    return {
-      address: address || currentProfile?.address || '0x0000000000000000000000000000000000000000',
-      nickname: currentProfile?.nickname || 'Feed Operator',
-      rank: currentProfile?.rank || FeederRank.F,
-      xp: currentProfile?.xp ?? 0,
-      totalFeeds: currentProfile?.totalFeeds ?? 0,
-      accuracyRate: currentProfile?.accuracyRate ?? 0,
-      balanceFEED: currentProfile?.balanceFEED ?? 0,
-      balanceUSDT: currentProfile?.balanceUSDT ?? 0,
-      balanceNative: currentProfile?.balanceNative ?? 0,
-      history: currentProfile?.history ?? [],
-      stakedAmount: currentProfile?.stakedAmount ?? 0,
-      stakeType: currentProfile?.stakeType ?? 'USDT',
-    };
-  }, []);
 
   const loadProfile = React.useCallback(async () => {
     api.setAuthToken(authToken ?? null);
     api.setWalletAddress(authAddress ?? null);
 
     if (!authAddress) {
-      if (!useFeederStore.getState().profile) {
-        useFeederStore.getState().setProfile(buildFallbackProfile());
-      }
+      useFeederStore.getState().setProfile(null);
       return;
     }
 
@@ -393,12 +376,14 @@ const App: React.FC = () => {
         backendHistory,
       );
 
+      setProfileError(null);
       useFeederStore.getState().setProfile(nextProfile);
     } catch (error) {
       console.warn('Failed to load profile:', error);
-      useFeederStore.getState().setProfile(buildFallbackProfile(authAddress));
+      setProfileError(error instanceof Error ? error.message : 'Failed to load profile');
+      useFeederStore.getState().setProfile(null);
     }
-  }, [authAddress, authToken, buildFallbackProfile]);
+  }, [authAddress, authToken]);
 
   const loadOrders = React.useCallback(async () => {
     try {
@@ -657,8 +642,9 @@ const App: React.FC = () => {
         return null;
     }
   };
-  // 首次渲染时 profile 尚未初始化（useEffect 还未执行），显示加载画面
-  if (!profile) {
+  // 首次渲染时 profile 尚未初始化（useEffect 还未执行），显示加载画面
+
+  if (dataLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-[#030406] text-cyan-400">
         <motion.div
@@ -666,6 +652,32 @@ const App: React.FC = () => {
           transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
           className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-400 rounded-full"
         />
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#030406]">
+        <div className="text-center space-y-6 max-w-md px-8">
+          <div className="text-6xl mb-4">{!authAddress ? '🔗' : '⚠️'}</div>
+          <h2 className="text-2xl font-bold font-orbitron text-cyan-400">
+            {!authAddress ? 'Connect Your Wallet' : 'Profile Load Failed'}
+          </h2>
+          <p className="text-slate-400 text-sm leading-relaxed">
+            {!authAddress
+              ? 'Connect your wallet to access the Feed Engine dashboard, manage orders, and earn rewards.'
+              : profileError || 'Unable to load your feeder profile. The server may be temporarily unavailable.'}
+          </p>
+          {authAddress && (
+            <button
+              onClick={() => { setProfileError(null); void loadProfile(); }}
+              className="px-6 py-3 bg-cyan-500/20 border border-cyan-500/50 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-all font-semibold"
+            >
+              ↻ Retry
+            </button>
+          )}
+        </div>
       </div>
     );
   }
