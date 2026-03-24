@@ -1,4 +1,4 @@
-﻿
+
 import React, { useState, useEffect, useMemo } from 'react';
 import Layout from './components/Layout';
 import OrderCard from './components/OrderCard';
@@ -379,8 +379,17 @@ const App: React.FC = () => {
       setProfileError(null);
       useFeederStore.getState().setProfile(nextProfile);
     } catch (error) {
-      console.warn('Failed to load profile:', error);
-      setProfileError(error instanceof Error ? error.message : 'Failed to load profile');
+      const msg = error instanceof Error ? error.message : 'Failed to load profile';
+      console.warn('Failed to load profile:', msg);
+
+      // If JWT expired or unauthorized, clear auth state → show "Connect Wallet"
+      if (msg.includes('expired') || msg.includes('Unauthorized') || msg.includes('401') || msg.includes('Invalid')) {
+        console.warn('Auth expired, clearing session...');
+        useAuthStore.getState().disconnect();
+        setProfileError(null);
+      } else {
+        setProfileError(msg);
+      }
       useFeederStore.getState().setProfile(null);
     }
   }, [authAddress, authToken]);
@@ -389,7 +398,12 @@ const App: React.FC = () => {
     try {
       const res = await api.getOrders();
       if (res.success) {
-        useFeederStore.getState().setOrders((res.orders ?? []).map(transformOrder));
+        const transformed = (res.orders ?? []).map(transformOrder);
+        // DEBUG: 打印 NST 订单的 sourceProtocol 值
+        const nstOrders = transformed.filter((o: any) => o.sourceProtocol === 'NST' || o.externalOrderId);
+        console.log('[DEBUG] Total orders:', transformed.length, 'NST orders:', nstOrders.length);
+        nstOrders.forEach((o: any) => console.log('[DEBUG NST]', o.symbol, 'sourceProtocol=', JSON.stringify(o.sourceProtocol), 'externalOrderId=', o.externalOrderId));
+        useFeederStore.getState().setOrders(transformed);
       }
     } catch (error) {
       console.warn('Failed to load orders:', error);
@@ -417,13 +431,25 @@ const App: React.FC = () => {
     }
 
     const intervalId = window.setInterval(() => {
-      void loadProfile();
+      // Don't auto-retry when there's a persistent error (user must click Retry)
+      if (!profileError) {
+        void loadProfile();
+      }
     }, 8000);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [authAddress, loadProfile]);
+  }, [authAddress, loadProfile, profileError]);
+
+  // 订单列表定时轮询（30s），作为 WebSocket 推送的兜底
+  React.useEffect(() => {
+    if (!authAddress) return undefined;
+    const ordersIntervalId = window.setInterval(() => {
+      void loadOrders();
+    }, 30000);
+    return () => window.clearInterval(ordersIntervalId);
+  }, [authAddress, loadOrders]);
 
   React.useEffect(() => {
     const mapStatus = (status?: string): OrderStatus | undefined => {
@@ -586,20 +612,31 @@ const App: React.FC = () => {
   const handleComplete = (xp: number, feed: number) => {
     feederOnComplete(xp, feed);
     if (activeOrder) {
-      removeOrder(activeOrder.orderId);
+      // NST 订单喂价完后更新状态而非删除（让用户能看到已完成的订单）
+      const isNST = activeOrder.sourceProtocol === 'NST' || !!(activeOrder as any).externalOrderId;
+      if (isNST) {
+        useFeederStore.getState().updateOrder(activeOrder.orderId, { status: 'SETTLED' as any });
+      } else {
+        removeOrder(activeOrder.orderId);
+      }
     }
     setActiveOrder(null);
+    // 刷新订单列表获取最新状态
+    loadOrders();
   };
 
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
+      // NST 协议订单 — 不受 tab 分区限制，始终显示
+      const isNST = order.sourceProtocol === 'NST' || !!(order as any).externalOrderId;
+      if (isNST) return true;
+
       const matchesTab =
         (activeTab === 'beginner' && order.notionalAmount < 100000) ||
         (activeTab === 'competitive' && order.notionalAmount >= 100000 && order.notionalAmount < 1000000) ||
         (activeTab === 'master' && order.notionalAmount >= 1000000);
 
       if (!matchesTab) return false;
-      if (order.sourceProtocol === 'NST') return true;
 
       return (
         prefs.countries.includes(order.country) &&
@@ -610,6 +647,33 @@ const App: React.FC = () => {
   }, [orders, activeTab, prefs]);
 
   const renderContent = () => {
+    // No profile: show connect wallet / error prompt inside Layout
+    if (!profile) {
+      return (
+        <div className="flex items-center justify-center py-32 min-h-[50vh]">
+          <div className="text-center space-y-6 max-w-md px-8">
+            <div className="text-6xl mb-4">{!authAddress ? '🔗' : '⚠️'}</div>
+            <h2 className="text-2xl font-bold font-orbitron text-cyan-400">
+              {!authAddress ? 'Connect Your Wallet' : 'Profile Load Failed'}
+            </h2>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              {!authAddress
+                ? 'Connect your wallet to access the Feed Engine dashboard, manage orders, and earn rewards.'
+                : profileError || 'Unable to load your feeder profile. The server may be temporarily unavailable.'}
+            </p>
+            {authAddress && (
+              <button
+                onClick={() => { setProfileError(null); void loadProfile(); }}
+                className="px-6 py-3 bg-cyan-500/20 border border-cyan-500/50 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-all font-semibold"
+              >
+                ↻ Retry
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     switch (activeView) {
       case 'Quest Hall':
         return (
@@ -625,7 +689,7 @@ const App: React.FC = () => {
           />
         );
       case 'Dashboard':
-        return <DashboardView profile={profile!} />;
+        return <DashboardView profile={profile} />;
       case 'Leaderboard':
         return <LeaderboardView />;
       case 'Inventory':
@@ -635,7 +699,7 @@ const App: React.FC = () => {
       case 'Training Center':
         return <TrainingView />;
       case 'Staking':
-        return <StakingView profile={profile!} />;
+        return <StakingView profile={profile} />;
       case 'Arbitration':
         return <ArbitrationView />;
       default:
@@ -656,31 +720,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (!profile) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#030406]">
-        <div className="text-center space-y-6 max-w-md px-8">
-          <div className="text-6xl mb-4">{!authAddress ? '🔗' : '⚠️'}</div>
-          <h2 className="text-2xl font-bold font-orbitron text-cyan-400">
-            {!authAddress ? 'Connect Your Wallet' : 'Profile Load Failed'}
-          </h2>
-          <p className="text-slate-400 text-sm leading-relaxed">
-            {!authAddress
-              ? 'Connect your wallet to access the Feed Engine dashboard, manage orders, and earn rewards.'
-              : profileError || 'Unable to load your feeder profile. The server may be temporarily unavailable.'}
-          </p>
-          {authAddress && (
-            <button
-              onClick={() => { setProfileError(null); void loadProfile(); }}
-              className="px-6 py-3 bg-cyan-500/20 border border-cyan-500/50 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-all font-semibold"
-            >
-              ↻ Retry
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <Layout profile={profile} activeView={activeView} onNavigate={setActiveView}>

@@ -16,20 +16,24 @@ let isRedisReady = false;
 
 /** Redis 客户端单例 */
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-    maxRetriesPerRequest: 3,
+    maxRetriesPerRequest: 1,
     retryStrategy(times: number) {
-        if (times > 10) {
-            console.error('❌ Redis 连接重试超过 10 次，停止重试');
-            return null;
+        if (times > 3) {
+            console.warn('⚠️ Redis 不可用，已降级到内存缓存模式');
+            return null; // 停止重试
         }
-        const delay = Math.min(times * 500, 5000);
-        console.log(`🔄 Redis 重连中... 第 ${times} 次 (${delay}ms 后)`);
+        const delay = Math.min(times * 1000, 3000);
         return delay;
     },
-    connectTimeout: 10000,
-    commandTimeout: 5000,
-    enableOfflineQueue: true,
-    lazyConnect: false,
+    connectTimeout: 3000,
+    commandTimeout: 3000,
+    enableOfflineQueue: false,
+    lazyConnect: true,
+});
+
+// 尝试连接（非阻塞，失败则静默降级）
+redis.connect().catch(() => {
+    console.warn('⚠️ Redis 未启动，使用内存缓存模式 (开发环境可忽略)');
 });
 
 // ============ 事件监听 ============
@@ -43,18 +47,13 @@ redis.on('ready', () => {
     console.log('✅ Redis 就绪');
 });
 
-redis.on('error', (err) => {
+redis.on('error', () => {
     isRedisReady = false;
-    console.error('❌ Redis 错误:', err.message);
+    // 静默处理，不再刷屏
 });
 
 redis.on('close', () => {
     isRedisReady = false;
-    console.log('🔌 Redis 连接关闭');
-});
-
-redis.on('reconnecting', () => {
-    console.log('🔄 Redis 重连中...');
 });
 
 // ============ 工具函数 ============

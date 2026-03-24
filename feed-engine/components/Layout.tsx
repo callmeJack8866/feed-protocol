@@ -10,7 +10,7 @@ import { getNonce, verifySIWE, buildSIWEMessage, setAuthToken, setWalletAddress 
 
 interface LayoutProps {
   children: React.ReactNode;
-  profile: FeederProfile;
+  profile: FeederProfile | null;
   activeView: ViewType;
   onNavigate: (view: ViewType) => void;
 }
@@ -35,22 +35,31 @@ const SystemMarquee = () => {
 const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNavigate }) => {
   const { t } = useTranslation();
 
-  const level = useMemo(() => Math.max(1, Math.floor(profile.xp / 1000) + 1), [profile.xp]);
-  const xpProgress = useMemo(() => ((profile.xp % 1000) / 1000) * 100, [profile.xp]);
-  const riskCollateralLabel = useMemo(() => `${profile.stakedAmount.toLocaleString()} ${profile.stakeType}`, [profile.stakedAmount, profile.stakeType]);
+  const level = useMemo(() => Math.max(1, Math.floor((profile?.xp ?? 0) / 1000) + 1), [profile?.xp]);
+  const xpProgress = useMemo(() => (((profile?.xp ?? 0) % 1000) / 1000) * 100, [profile?.xp]);
+  const riskCollateralLabel = useMemo(() => profile ? `${profile?.stakedAmount.toLocaleString()} ${profile?.stakeType}` : '-- --', [profile?.stakedAmount, profile?.stakeType]);
   const auth = useAuthStore();
   const wallet = useWallet();
   const [loginStatus, setLoginStatus] = useState<string>('');
 
-  /**
-   * ENGAGE NODE 完整登录流程:
-   * 1. 连接 MetaMask（EIP-1193）
-   * 2. 获取 SIWE nonce
-   * 3. 构造 EIP-4361 消息
-   * 4. 钱包签名
-   * 5. 后端验证签名  返回 JWT
-   * 6. 存入 Zustand AuthStore
-   */
+  /**
+
+   * ENGAGE NODE 完整登录流程:
+
+   * 1. 连接 MetaMask（EIP-1193）
+
+   * 2. 获取 SIWE nonce
+
+   * 3. 构造 EIP-4361 消息
+
+   * 4. 钱包签名
+
+   * 5. 后端验证签名  返回 JWT
+
+   * 6. 存入 Zustand AuthStore
+
+   */
+
   const handleEngageNode = useCallback(async () => {
     if (auth.isConnected) return; // 已连接则跳过
     auth.setConnecting(true);
@@ -93,7 +102,8 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
         throw new Error(t.layout.signatureCancelled);
       }
 
-      // Step 5: 后端验证签名  JWT
+      // Step 5: 后端验证签名  JWT
+
 
       setLoginStatus(t.layout.verifyingSignature);
       const authRes = await verifySIWE(message, signature);
@@ -309,10 +319,10 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
                       </div>
                     </div>
                     <div>
-                      <p className="font-black font-orbitron text-2xl text-white italic tracking-tighter uppercase leading-none mb-2">{profile.nickname}</p>
+                      <p className="font-black font-orbitron text-2xl text-white italic tracking-tighter uppercase leading-none mb-2">{profile?.nickname}</p>
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                        <p className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">{profile.address.slice(0, 15)}...</p>
+                        <p className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">{profile?.address.slice(0, 15)}...</p>
                       </div>
                     </div>
                   </div>
@@ -320,7 +330,7 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
                   <div className="space-y-6 relative z-10">
                     <div className="flex justify-between items-end px-2">
                       <span className="text-[10px] text-slate-500 font-black uppercase tracking-[0.3em]">{t.layout.fuelReserves}</span>
-                      <span className="text-3xl font-black font-orbitron text-white italic glow-text">{profile.balanceFEED.toLocaleString()} <span className="text-xs text-cyan-500/60">XTTA</span></span>
+                      <span className="text-3xl font-black font-orbitron text-white italic glow-text">{profile?.balanceFEED.toLocaleString()} <span className="text-xs text-cyan-500/60">XTTA</span></span>
                     </div>
                     <div className="h-3 w-full bg-black/60 rounded-full overflow-hidden border border-white/10 p-0.5">
                       <motion.div
@@ -337,10 +347,10 @@ const Layout: React.FC<LayoutProps> = ({ children, profile, activeView, onNaviga
                   <h3 className="text-[11px] font-black uppercase tracking-[0.6em] text-slate-600 px-6">{t.layout.hardwareStatus}</h3>
                   <div className="grid grid-cols-1 gap-5">
                     {[
-                      { label: t.layout.integrityRating, val: profile.rank + ' CLASS', color: 'text-rose-500', bg: 'bg-rose-500/5' },
-                      { label: t.layout.syncEfficiency, val: profile.accuracyRate.toFixed(1) + '%', color: 'text-cyan-400', bg: 'bg-cyan-500/5' },
+                      { label: t.layout.integrityRating, val: profile?.rank + ' CLASS', color: 'text-rose-500', bg: 'bg-rose-500/5' },
+                      { label: t.layout.syncEfficiency, val: profile?.accuracyRate.toFixed(1) + '%', color: 'text-cyan-400', bg: 'bg-cyan-500/5' },
                       { label: t.layout.riskCollateral, val: riskCollateralLabel, color: 'text-white', bg: 'bg-white/5' },
-                      { label: 'USDT', val: profile.balanceUSDT.toLocaleString(undefined, { maximumFractionDigits: 4 }), color: 'text-amber-400', bg: 'bg-amber-500/5' }
+                      { label: 'USDT', val: profile?.balanceUSDT.toLocaleString(undefined, { maximumFractionDigits: 4 }), color: 'text-amber-400', bg: 'bg-amber-500/5' }
                     ].map(stat => (
                       <div key={stat.label} className={`p-8 rounded-[2.5rem] ${stat.bg} border border-white/5 flex justify-between items-center group hover:scale-[1.02] transition-all cursor-crosshair`}>
                         <span className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em]">{stat.label}</span>

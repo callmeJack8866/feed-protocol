@@ -25,6 +25,7 @@ import nstRoutes from './controllers/nst.controller';
 import { setupWebSocket } from './websocket';
 import { initBlockchain } from './services/blockchain.service';
 import { initEventListener } from './services/event-listener.service';
+import { startNstSync } from './services/nst-sync.service';
 import { startScheduler } from './services/cron.service';
 import { initNFTService } from './services/nft-badge.service';
 import { seedTrainingData } from './seeds/training.seed';
@@ -111,6 +112,7 @@ setupWebSocket(io);
 // 初始化区块链服务
 initBlockchain();
 initEventListener();
+startNstSync();  // NST 订单定时同步（event listener 备份）
 
 // 错误处理中间件
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

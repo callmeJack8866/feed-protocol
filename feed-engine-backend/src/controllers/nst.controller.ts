@@ -66,11 +66,11 @@ const FEED_TYPE_REWARD_MULTIPLIER: Record<string, number> = {
  * grabTimeout: 抢单超时(秒), feedTimeout: 喂价超时(秒), orderTTL: 订单有效期(秒)
  */
 const FEED_TYPE_TIMEOUT: Record<string, { grabTimeout: number; feedTimeout: number; orderTTL: number }> = {
-    'INITIAL':     { grabTimeout: 300,  feedTimeout: 600,  orderTTL: 3600 },  // 5分/10分/1小时
-    'DYNAMIC':     { grabTimeout: 120,  feedTimeout: 300,  orderTTL: 1800 },  // 2分/5分/30分钟
-    'SETTLEMENT':  { grabTimeout: 180,  feedTimeout: 480,  orderTTL: 3600 },  // 3分/8分/1小时
-    'FINAL':       { grabTimeout: 180,  feedTimeout: 480,  orderTTL: 3600 },  // 同 SETTLEMENT
-    'ARBITRATION': { grabTimeout: 600,  feedTimeout: 1800, orderTTL: 7200 },  // 10分/30分/2小时
+    'INITIAL':     { grabTimeout: 300,  feedTimeout: 600,  orderTTL: 604800 },  // 5分/10分/7天
+    'DYNAMIC':     { grabTimeout: 120,  feedTimeout: 300,  orderTTL: 604800 },  // 2分/5分/7天
+    'SETTLEMENT':  { grabTimeout: 180,  feedTimeout: 480,  orderTTL: 604800 },  // 3分/8分/7天
+    'FINAL':       { grabTimeout: 180,  feedTimeout: 480,  orderTTL: 604800 },  // 同 SETTLEMENT/7天
+    'ARBITRATION': { grabTimeout: 600,  feedTimeout: 1800, orderTTL: 604800 },  // 10分/30分/7天
 };
 
 /**
@@ -195,7 +195,7 @@ router.post('/request-feed', requireApiKey, async (req: Request, res: Response) 
                 notionalAmount: amount,
                 requiredFeeders,
                 consensusThreshold,
-                specialConditions: specialConditions || [],
+                specialConditions: JSON.stringify(specialConditions || []),
                 rewardAmount: rewardAmount || calculateReward(amount, feedType),
                 feeAmount: FEED_TYPE_FEE[feedType || 'SETTLEMENT'] || 5,
                 grabTimeout: finalGrabTimeout,

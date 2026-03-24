@@ -438,7 +438,7 @@ async function handleParsedEvent(
                 if (CONTRACT_ADDRESSES.NST_OPTIONS_CORE && provider) {
                     try {
                         const optionsCoreAbi = [
-                            'function getOrder(uint256 orderId) view returns (tuple(uint256 orderId, address buyer, address seller, string underlyingName, string underlyingCode, string market, string country, string refPrice, uint8 direction, uint256 notionalUSDT, uint256 strikePrice, uint256 expiryTimestamp, uint256 premiumRate, uint256 premiumAmount, uint256 initialMargin, uint256 currentMargin, uint256 minMarginRate, uint8 liquidationRule, uint8 consecutiveDays, uint8 dailyLimitPercent, uint8 exerciseDelay, uint8 sellerType, address designatedSeller, uint256 arbitrationWindow, uint256 marginCallDeadline, bool dividendAdjustment, uint8 feedRule, uint8 status, uint256 createdAt, uint256 matchedAt, uint256 settledAt, uint256 lastFeedPrice, uint256 dividendAmount))'
+                            'function getOrder(uint256 orderId) view returns (tuple(uint256 orderId, address buyer, address seller, string underlyingName, string underlyingCode, string market, string country, string refPrice, uint8 direction, uint256 notionalUSDT, uint256 strikePrice, uint256 expiryTimestamp, uint256 premiumRate, uint256 premiumAmount, uint256 initialMargin, uint256 currentMargin, uint256 minMarginRate, uint256 maxPremiumRate, uint8 liquidationRule, uint8 consecutiveDays, uint8 dailyLimitPercent, uint8 exerciseDelay, uint8 sellerType, address designatedSeller, uint256 arbitrationWindow, uint256 marginCallDeadline, bool dividendAdjustment, uint8 feedRule, uint8 status, uint256 createdAt, uint256 matchedAt, uint256 settledAt, uint256 lastFeedPrice, uint256 dividendAmount, uint256 finalFeedRequestedAt))'
                         ];
                         const optionsCore = new ethers.Contract(CONTRACT_ADDRESSES.NST_OPTIONS_CORE, optionsCoreAbi, provider);
                         const order = await optionsCore.getOrder(orderId);
@@ -463,7 +463,7 @@ async function handleParsedEvent(
                         consensusThreshold: '1/1',
                         rewardAmount: 2.7,
                         status: 'OPEN',
-                        expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+                        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7天有效期
                         sourceProtocol: 'NST',
                         externalOrderId: orderId.toString(),
                         externalRequestId: requestId.toString(),
@@ -557,6 +557,12 @@ async function pollLoop(contractConfigs: ContractConfig[]): Promise<void> {
         const latestBlock = await provider.getBlockNumber();
         const savedCursor = await loadCursor();
         const fromBlock = savedCursor !== null ? savedCursor + 1 : Math.max(0, latestBlock - STARTUP_LOOKBACK);
+
+        // DEBUG: 打印每次轮询状态
+        const gap = latestBlock - fromBlock;
+        if (gap > 0) {
+            console.log(`📡 [Poll] from=${fromBlock} → latest=${latestBlock} gap=${gap} blocks`);
+        }
 
         if (fromBlock > latestBlock) {
             // 没有新区块，等下一轮

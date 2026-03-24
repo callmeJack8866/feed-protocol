@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { FeedOrder, OrderStatus, MarketType } from '../types';
 import { MARKET_ICONS, STATUS_CONFIG, getReferenceData } from '../constants';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -358,18 +358,24 @@ const OrderDetailModal: React.FC<OrderDetailModalProps> = ({ order, onClose, onG
 
             <div className="space-y-4">
               <motion.button
-                disabled={order.status !== OrderStatus.OPEN}
+                disabled={order.status === OrderStatus.EXPIRED}
                 whileHover={{ scale: 1.02, y: -4 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => onGrab(order.orderId)}
                 data-testid="order-detail-engage"
                 className={`w-full py-8 rounded-[2.5rem] font-black font-orbitron text-2xl transition-all uppercase italic shadow-2xl ${
-                  order.status === OrderStatus.OPEN
-                    ? 'bg-cyan-500 text-black shadow-cyan-500/30'
-                    : 'bg-slate-900 text-slate-700 cursor-not-allowed border border-white/5'
+                  order.status === OrderStatus.EXPIRED
+                    ? 'bg-slate-900 text-slate-700 cursor-not-allowed border border-white/5'
+                    : order.status === OrderStatus.OPEN
+                      ? 'bg-cyan-500 text-black shadow-cyan-500/30'
+                      : 'bg-emerald-500 text-black shadow-emerald-500/30'
                 }`}
               >
-                {order.status === OrderStatus.OPEN ? t.orderDetail.engageDirective : t.orderDetail.protocolBusy}
+                {order.status === OrderStatus.OPEN
+                  ? t.orderDetail.engageDirective
+                  : order.status === OrderStatus.EXPIRED
+                    ? t.orderDetail.protocolBusy
+                    : (t.orderDetail as any).continueFeed || 'CONTINUE FEED'}
               </motion.button>
               <button onClick={onClose} className="w-full text-slate-700 font-black hover:text-slate-400 transition-colors text-[10px] uppercase tracking-[0.6em] italic">
                 {t.orderDetail.abortBriefing}
