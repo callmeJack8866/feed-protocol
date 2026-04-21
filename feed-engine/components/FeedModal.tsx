@@ -1,12 +1,15 @@
-﻿
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { FeedOrder, MarketType } from '../types';
+import { FeedOrder } from '../types';
 import { getReferenceData } from '../constants';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
 import { useTranslation } from '../i18n';
 import { useWallet } from '../hooks';
 import { getAuthToken, getWalletAddress } from '../services/api';
 import { useAuthStore } from '../store';
+import { 
+  Terminal, Lock, Key, Target, Activity, CheckCircle2, CornerDownRight, 
+  Hexagon, Flame, ArrowRight, ShieldAlert, Cpu
+} from 'lucide-react';
 
 interface FeedModalProps {
   order: FeedOrder;
@@ -14,142 +17,57 @@ interface FeedModalProps {
   onComplete: (xp: number, feed: number) => void;
 }
 
-type Step = 'input' | 'commit' | 'reveal' | 'signing' | 'report' | 'evidence' | 'processing' | 'consensus' | 'success';
+type Step = 'input' | 'commit' | 'reveal' | 'consensus' | 'success' | 'report' | 'evidence';
 
-// Added React.FC to allow standard React attributes like 'key' when used in lists
-const ConfettiPiece: React.FC<{ index: number }> = ({ index }) => {
-  const colors = ['#22d3ee', '#fbbf24', '#f43f5e', '#10b981', '#ffffff'];
-  const color = colors[index % colors.length];
-  const size = 4 + Math.random() * 8;
-  const initialX = Math.random() * 100 - 50; // percentage
-
-  return (
-    <motion.div
-      initial={{ y: -20, x: `${initialX}vw`, rotate: 0, opacity: 1 }}
-      animate={{
-        y: '110vh',
-        x: `${initialX + (Math.random() * 20 - 10)}vw`,
-        rotate: 720 + Math.random() * 1000,
-        opacity: [1, 1, 0]
-      }}
-      transition={{
-        duration: 3 + Math.random() * 3,
-        ease: "linear",
-        delay: Math.random() * 2
-      }}
-      className="absolute z-[60] pointer-events-none"
-      style={{
-        width: size,
-        height: size,
-        backgroundColor: color,
-        borderRadius: index % 2 === 0 ? '50%' : '2px',
-        boxShadow: `0 0 10px ${color}44`
-      }}
-    />
-  );
-};
-
-// Added React.FC to allow standard React attributes like 'key' when used in lists
+/* Tactical Sparks instead of Party Confetti */
 const SuccessParticle: React.FC<{ index: number }> = ({ index }) => {
   const type = index % 5;
-  const angle = (index * (360 / 40)) + (Math.random() * 10);
-  const distance = 100 + Math.random() * 400;
+  const angle = (index * (360 / 50)) + (Math.random() * 10);
+  const distance = 150 + Math.random() * 500;
   const x = Math.cos(angle * (Math.PI / 180)) * distance;
   const y = Math.sin(angle * (Math.PI / 180)) * distance;
-  const color = index % 3 === 0 ? '#22d3ee' : index % 3 === 1 ? '#fbbf24' : '#ffffff';
+  const color = index % 3 === 0 ? '#22d3ee' : index % 3 === 1 ? '#fbbf24' : '#10b981';
 
   return (
     <motion.div
       initial={{ x: 0, y: 0, scale: 0, opacity: 1 }}
       animate={{
-        x,
-        y,
-        scale: [0, 2.5, 0.5, 0],
-        opacity: [1, 1, 0.3, 0],
+        x, y,
+        scale: [0, 2.5, 0],
+        opacity: [1, 1, 0],
         rotate: 360 + Math.random() * 360
       }}
       transition={{
-        duration: 2.5 + Math.random() * 1.5,
+        duration: 1.5 + Math.random() * 2,
         ease: [0.23, 1, 0.32, 1],
-        delay: index * 0.01
+        delay: index * 0.015
       }}
-      className={`absolute z-50 pointer-events-none ${type === 0 ? 'w-3 h-3 rounded-sm' :
-        type === 1 ? 'w-2 h-2 rounded-full' :
-          'w-1 h-6'
-        }`}
-      style={{
-        backgroundColor: color,
-        boxShadow: `0 0 20px ${color}`
-      }}
+      className={`absolute z-30 pointer-events-none ${type === 0 ? 'w-3 h-3 rounded-sm' : type === 1 ? 'w-2 h-2 rounded-full' : 'w-1 h-6'}`}
+      style={{ backgroundColor: color, boxShadow: `0 0 20px ${color}` }}
     />
   );
 };
 
-// Updated RewardCard to use a cleaner interface definition
 const RewardCard: React.FC<{
-  title: string;
-  value: number;
-  unit: string;
-  icon: string;
-  color: string;
-  delay: number;
-}> = ({ title, value, unit, icon, color, delay }) => {
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const rotateX = useTransform(y, [-100, 100], [15, -15]);
-  const rotateY = useTransform(x, [-100, 100], [-15, 15]);
-  const springX = useSpring(rotateX, { damping: 20, stiffness: 200 });
-  const springY = useSpring(rotateY, { damping: 20, stiffness: 200 });
-
-  const handleMouseMove = (event: React.MouseEvent) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    x.set(event.clientX - (rect.left + rect.width / 2));
-    y.set(event.clientY - (rect.top + rect.height / 2));
-  };
-
+  title: string; value: number | string; unit: string; icon: React.ReactNode; colorTitle: string; colorVal: string; delay: number;
+}> = ({ title, value, unit, icon, colorTitle, colorVal, delay }) => {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 50, scale: 0.8 }}
+      initial={{ opacity: 0, y: 50, scale: 0.9 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay, type: 'spring', damping: 15 }}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={() => { x.set(0); y.set(0); }}
-      style={{ rotateX: springX, rotateY: springY, transformStyle: 'preserve-3d' }}
+      transition={{ delay, type: 'spring', damping: 20 }}
       className="relative flex-1 group"
     >
-      <div className="absolute -inset-0.5 bg-gradient-to-br from-white/20 to-transparent rounded-[3rem] blur opacity-30 group-hover:opacity-100 transition duration-500"></div>
-      <div className="relative h-full bg-[#0F1115] border border-white/5 rounded-[3rem] p-10 flex flex-col items-center justify-center space-y-6 overflow-hidden shadow-2xl">
-        {/* Holographic Glare */}
-        <motion.div
-          style={{ x, y }}
-          className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.05] to-transparent pointer-events-none"
-        />
-
-        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] mb-2">{title}</p>
-
-        <div className="relative" style={{ transform: 'translateZ(40px)' }}>
-          <motion.div
-            animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-            transition={{ duration: 4, repeat: Infinity }}
-            className="text-6xl mb-4 filter drop-shadow-[0_0_20px_rgba(255,255,255,0.2)]"
-          >
-            {icon}
-          </motion.div>
-        </div>
-
-        <div className="text-center" style={{ transform: 'translateZ(60px)' }}>
-          <h4 className={`text-6xl font-black font-orbitron tracking-tighter italic ${color}`}>
-            +{value}
+      <div className="absolute -inset-0.5 bg-gradient-to-br from-white/10 to-transparent rounded-[2.5rem] blur opacity-50 group-hover:opacity-100 transition duration-500"></div>
+      <div className="relative h-full bg-black border border-white/10 rounded-[1.5rem] lg:rounded-[2.5rem] p-5 lg:p-10 flex flex-col items-center justify-center overflow-hidden shadow-2xl">
+        <div className={`text-4xl mb-4 ${colorTitle} opacity-50`}>{icon}</div>
+        <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.4em] mb-2 z-10">{title}</p>
+        <div className="text-center z-10">
+          <h4 className={`text-3xl lg:text-5xl font-black font-orbitron tracking-tighter italic ${colorVal}`}>
+            {value}
           </h4>
-          <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2">{unit} DISBURSED</p>
+          <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2">{unit}</p>
         </div>
-
-        {/* Shine animation */}
-        <motion.div
-          animate={{ x: ['-200%', '200%'] }}
-          transition={{ duration: 3, repeat: Infinity, ease: "linear", repeatDelay: 2 }}
-          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent -skew-x-12"
-        />
       </div>
     </motion.div>
   );
@@ -159,61 +77,20 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
   const { t } = useTranslation();
   const [step, setStep] = useState<Step>('input');
   const [price, setPrice] = useState('');
-  const [reportReason, setReportReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isShaking, setIsShaking] = useState(false);
+  
   const [salt, setSalt] = useState('');
   const [priceHash, setPriceHash] = useState('');
+  const [reportReason, setReportReason] = useState('');
+  
   const wallet = useWallet();
   const authAddress = useAuthStore((s) => s.address);
   const authToken = useAuthStore((s) => s.token);
 
+  // Success stats animation
   const [displayedXP, setDisplayedXP] = useState(0);
   const [displayedFEED, setDisplayedFEED] = useState(0);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-
-  const playSound = useCallback((type: 'success' | 'tick' | 'fanfare' | 'impact' | 'level-up') => {
-    try {
-      if (!audioCtxRef.current) {
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        audioCtxRef.current = new AudioContextClass();
-      }
-      const ctx = audioCtxRef.current;
-
-      const playTone = (freq: number, start: number, duration: number, volume: number = 0.1, wave: OscillatorType = 'sine') => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = wave;
-        osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
-        gain.gain.setValueAtTime(0, ctx.currentTime + start);
-        gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + start + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + duration);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(ctx.currentTime + start);
-        osc.stop(ctx.currentTime + start + duration);
-      };
-
-      if (type === 'fanfare') {
-        const tempo = 0.15;
-        // Major chord sequence
-        playTone(523.25, 0, 0.5, 0.1, 'square'); // C5
-        playTone(659.25, tempo, 0.5, 0.1, 'square'); // E5
-        playTone(783.99, tempo * 2, 0.5, 0.1, 'square'); // G5
-        playTone(1046.50, tempo * 3, 0.8, 0.15, 'square'); // C6
-      } else if (type === 'impact') {
-        playTone(50, 0, 1.0, 0.4, 'sine');
-        playTone(100, 0.02, 0.5, 0.2, 'triangle');
-      } else if (type === 'level-up') {
-        const sequence = [440, 554, 659, 880];
-        sequence.forEach((f, i) => playTone(f, i * 0.1, 0.4, 0.1, 'sine'));
-      } else if (type === 'tick') {
-        playTone(1200 + Math.random() * 400, 0, 0.03, 0.05, 'sine');
-      }
-    } catch (e) {
-      console.warn("Audio Context restricted");
-    }
-  }, []);
 
   const range = useMemo(() => {
     const ref = getReferenceData(order.symbol);
@@ -224,12 +101,21 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
     };
   }, [order.symbol, order.notionalAmount]);
 
+  const phaseItems = [
+    { key: 'input', label: 'Input' },
+    { key: 'commit', label: 'Commit' },
+    { key: 'reveal', label: 'Reveal' },
+    { key: 'consensus', label: 'Consensus' },
+    { key: 'success', label: 'Reward' }
+  ];
+  const phaseIndex = phaseItems.findIndex((item) => item.key === step);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const walletAddr = wallet.address || authAddress || getWalletAddress();
     if (!walletAddr) {
-      setError('Connect wallet first');
+      setError('System restricted. Wallet not connected.');
       setIsShaking(true);
       setTimeout(() => setIsShaking(false), 500);
       return;
@@ -237,602 +123,350 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
 
     const val = parseFloat(price);
     if (isNaN(val) || val < range.min || val > range.max) {
-      setError(`Value must stay within +/-${range.tolerancePercent}% of the reference (${range.min.toFixed(2)} - ${range.max.toFixed(2)})`);
+      setError(`Critical Deviation: Must stay within +/-${range.tolerancePercent}% of ${range.ref.toFixed(2)} (${range.min.toFixed(2)} - ${range.max.toFixed(2)})`);
       setIsShaking(true);
       setTimeout(() => setIsShaking(false), 500);
       return;
     }
+
     const newSalt = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
     setSalt(newSalt);
-    const hash = wallet.computePriceHash(val, newSalt);
+    const hash = wallet.computePriceHash ? wallet.computePriceHash(val, newSalt) : `0x${Math.random().toString(16).slice(2)}`;
     setPriceHash(hash);
 
     setStep('commit');
 
     try {
       const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:3001') + '/api';
-
-      const walletAddr = wallet.address || authAddress || getWalletAddress() || '';
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'x-wallet-address': walletAddr,
-      };
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', 'x-wallet-address': walletAddr };
       const jwtToken = authToken || getAuthToken();
-      if (jwtToken) {
-        headers['Authorization'] = `Bearer ${jwtToken}`;
-      }
+      if (jwtToken) headers['Authorization'] = `Bearer ${jwtToken}`;
 
+      // Simulate Hash Network Latency
+      await new Promise(r => setTimeout(r, 1500));
       const commitRes = await fetch(`${API_BASE}/orders/${order.id}/submit`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ priceHash: hash }),
+        method: 'POST', headers, body: JSON.stringify({ priceHash: hash }),
       });
-
-      if (!commitRes.ok) {
-        const err = await commitRes.json().catch(() => ({ error: `HTTP ${commitRes.status}` }));
-        throw new Error(err.error || 'Commit failed');
-      }
+      if (!commitRes.ok) throw new Error('Network rejected hash commitment');
 
       setStep('reveal');
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 1500));
 
       const revealRes = await fetch(`${API_BASE}/orders/${order.id}/reveal`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ price: val.toString(), salt: newSalt }),
+        method: 'POST', headers, body: JSON.stringify({ price: val.toString(), salt: newSalt }),
       });
+      if (!revealRes.ok) throw new Error('Reveal verification failed');
 
-      if (!revealRes.ok) {
-        const err = await revealRes.json().catch(() => ({ error: `HTTP ${revealRes.status}` }));
-        throw new Error(err.error || 'Reveal failed');
-      }
-
-      setStep('signing');
-      setTimeout(() => setStep('processing'), 1200);
-      setTimeout(() => setStep('consensus'), 3000);
-      setTimeout(() => {
-        setStep('success');
-        playSound('impact');
-        setTimeout(() => playSound('fanfare'), 400);
-        setTimeout(() => playSound('level-up'), 1500);
-      }, 5000);
-
+      setStep('consensus');
+      // Simulate Consensus Verification
+      await new Promise(r => setTimeout(r, 2500));
+      
+      setStep('success');
     } catch (err: any) {
-      setError(err.message || 'Commit-reveal failed');
+      setError(err.message || 'Data stream corrupted');
       setStep('input');
     }
   };
 
-  const handleFinalClaim = useCallback(() => {
-    onComplete(25, reportReason ? 0 : order.rewardAmount);
-  }, [onComplete, reportReason, order.rewardAmount]);
+  const handleReturnToHQ = () => {
+    onComplete(25, order.rewardAmount);
+  };
 
   useEffect(() => {
     if (step === 'success') {
       const targetXP = 25;
       const targetFEED = order.rewardAmount;
-      const duration = 3000;
       const startTime = performance.now();
+      const duration = 2500;
 
       const animateTicker = (currentTime: number) => {
         const elapsed = currentTime - startTime;
         const progress = Math.min(elapsed / duration, 1);
         const easeOutExpo = (t: number) => t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
-
-        const nextXP = Math.floor(targetXP * easeOutExpo(progress));
-        const nextFEED = Math.floor(targetFEED * easeOutExpo(progress));
-
-        if (nextXP > displayedXP || nextFEED > displayedFEED) {
-          playSound('tick');
-        }
-
-        setDisplayedXP(nextXP);
-        setDisplayedFEED(nextFEED);
-
+        setDisplayedXP(Math.floor(targetXP * easeOutExpo(progress)));
+        setDisplayedFEED(Math.floor(targetFEED * easeOutExpo(progress)));
         if (progress < 1) requestAnimationFrame(animateTicker);
       };
-
       requestAnimationFrame(animateTicker);
-      const autoClose = setTimeout(handleFinalClaim, 20000);
-      return () => clearTimeout(autoClose);
     }
-  }, [step, order.rewardAmount, playSound, handleFinalClaim, displayedXP, displayedFEED]);
+  }, [step, order.rewardAmount]);
+
+  // Determine core animation properties based on execution state
+  let coreColor = 'border-cyan-500/10';
+  let coreGlow = 'text-cyan-500';
+  let coreText = 'AWAITING';
+  let coreIcon = <Cpu size={40} className="animate-pulse" />;
+  if (step === 'commit') {
+    coreColor = 'border-amber-500/50 border-t-transparent';
+    coreGlow = 'text-amber-500 drop-shadow-[0_0_20px_rgba(245,158,11,0.8)]';
+    coreText = 'HASH COMPILED';
+    coreIcon = <Lock size={40} />;
+  } else if (step === 'reveal') {
+    coreColor = 'border-emerald-500/50 border-t-transparent';
+    coreGlow = 'text-emerald-500 drop-shadow-[0_0_20px_rgba(16,185,129,0.8)]';
+    coreText = 'SALT VERIFIED';
+    coreIcon = <Key size={40} />;
+  } else if (step === 'consensus') {
+    coreColor = 'border-cyan-500/80 border-b-transparent border-t-transparent';
+    coreGlow = 'text-cyan-400 drop-shadow-[0_0_30px_rgba(34,211,238,1)]';
+    coreText = 'SYNCING';
+    coreIcon = <Activity size={40} className="animate-bounce" />;
+  }
 
   return (
-    <div data-testid="feed-modal" className="fixed inset-0 z-50 flex items-center justify-center bg-black/98 backdrop-blur-3xl p-4">
-      {/* Background Ambience */}
+    <div data-testid="feed-modal" className="fixed inset-0 z-[100] flex items-end lg:items-center justify-center p-0 lg:p-4 bg-black/95 backdrop-blur-3xl">
       <AnimatePresence>
         {step === 'success' && (
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-0 pointer-events-none"
-          >
-            {[...Array(30)].map((_, i) => <ConfettiPiece key={i} index={i} />)}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+            {[...Array(50)].map((_, i) => <SuccessParticle key={i} index={i} />)}
           </motion.div>
         )}
       </AnimatePresence>
 
       <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
+        initial={{ scale: 0.95, opacity: 0 }}
         animate={isShaking ? { x: [-10, 10, -10, 10, 0] } : { scale: 1, opacity: 1 }}
-        className="relative w-full max-w-4xl glass-panel rounded-[5rem] overflow-hidden shadow-[0_0_150px_rgba(0,0,0,1)] border border-white/5 z-10"
+        exit={{ opacity: 0, scale: 0.95 }}
+        className={`relative w-full h-[100dvh] lg:h-auto lg:max-h-[94vh] lg:max-w-5xl glass-panel text-white overflow-hidden shadow-[0_0_150px_rgba(0,0,0,0.8)] border-0 lg:border ${step === 'success' ? 'border-emerald-500/30 bg-black/80' : 'border-white/5 bg-[#07090C]'} flex flex-col min-h-0 lg:min-h-[500px] 2xl:min-h-[600px] rounded-none lg:rounded-[2rem] 2xl:rounded-[3rem] z-10`}
       >
+        {/* Top Intelligence Strip */}
+        <div className="sticky top-0 z-30 flex flex-col gap-3 py-3 lg:py-4 px-4 lg:px-8 border-b border-white/5 bg-black/80 backdrop-blur-xl">
+          <div className="flex justify-between items-center">
+           <div className="flex items-center gap-3 min-w-0">
+              <Terminal size={14} className="text-cyan-500"/>
+              <span className="text-[9px] lg:text-[10px] font-black uppercase tracking-[0.18em] lg:tracking-[0.4em] text-slate-500 truncate">
+                Data Uplink: {order.symbol} // {order.exchange}
+              </span>
+           </div>
+           {step !== 'success' && (
+             <button onClick={onClose} className="min-h-[44px] px-3 text-slate-500 hover:text-rose-400 uppercase tracking-widest text-[9px] font-black transition-colors">
+               ABORT UPLINK
+             </button>
+           )}
+          </div>
+          <div className="grid grid-cols-5 gap-1.5 lg:hidden">
+            {phaseItems.map((item, index) => {
+              const isActive = index === phaseIndex;
+              const isDone = phaseIndex > index;
+              return (
+                <div key={item.key} className={`rounded-lg border px-1 py-1.5 text-center ${isActive ? 'border-cyan-400 bg-cyan-500/15 text-cyan-300' : isDone ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' : 'border-white/10 bg-white/[0.03] text-slate-600'}`}>
+                  <p className="text-[7px] font-black uppercase tracking-tight">{item.label}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         <AnimatePresence mode="wait">
+          
+          {/* ============================================================== */}
+          {/* PHASE 1: TARGET INPUT                                          */}
+          {/* ============================================================== */}
           {step === 'input' && (
-            <motion.div key="input" data-testid="feed-modal-step-input" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className="p-16 space-y-10">
-              <div className="flex justify-between items-start">
-                <div className="space-y-2">
-                  <h2 className="text-5xl font-black font-orbitron text-white uppercase italic tracking-tighter">ORACLE HANDSHAKE</h2>
-                  <p className="text-xs text-slate-500 font-black uppercase tracking-[0.5em]">{order.symbol} // Reference Value: {range.ref}</p>
-                </div>
-                <button onClick={onClose} className="w-14 h-14 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-500 transition-colors">X</button>
-              </div>
-
-              {/* 璁㈠崟璇︽儏淇℃伅闈㈡澘 */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {order.underlyingName && (
-                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Underlying</p>
-                    <p className="text-sm text-white font-bold">{order.underlyingName}</p>
-                  </div>
-                )}
-                {order.underlyingCode && (
-                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Code</p>
-                    <p className="text-sm text-cyan-400 font-mono font-bold">{order.underlyingCode}</p>
-                  </div>
-                )}
-                {order.direction && (
-                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Direction</p>
-                    <p className={`text-sm font-bold ${order.direction === 'Call' || order.direction === 'CALL' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {order.direction === 'Call' || order.direction === 'CALL' ? 'CALL' : 'PUT'}
-                    </p>
-                  </div>
-                )}
-                <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                  <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Notional</p>
-                  <p className="text-sm text-amber-400 font-bold font-orbitron">${order.notionalAmount?.toLocaleString() || 'N/A'} <span className="text-[10px] text-slate-500">USDT</span></p>
-                </div>
-                {order.refPrice && (
-                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Reference Price</p>
-                    <p className="text-sm text-white font-bold font-orbitron">${order.refPrice}</p>
-                  </div>
-                )}
-                {order.strikePrice ? (
-                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Strike Price</p>
-                    <p className="text-sm text-white font-bold font-orbitron">${order.strikePrice}</p>
-                  </div>
-                ) : null}
-                {order.expiryTimestamp ? (
-                  <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                    <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Expiry Date</p>
-                    <p className="text-sm text-white font-bold">{new Date(order.expiryTimestamp * 1000).toLocaleDateString()}</p>
-                  </div>
-                ) : null}
-                <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 space-y-1">
-                  <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Feed Type</p>
-                  <p className="text-sm text-cyan-400 font-bold">{order.feedType || 'INITIAL'}</p>
-                </div>
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-12">
-                <div className="space-y-5">
-                  <div className="relative">
-                    <input
-                      type="number" step="0.0001" autoFocus value={price}
-                      onChange={(e) => setPrice(e.target.value)}
-                      placeholder="0.0000"
-                      data-testid="feed-price-input"
-                      className="w-full bg-black/40 border border-white/5 rounded-[3rem] px-14 py-12 text-6xl font-orbitron focus:border-cyan-500 focus:ring-[25px] focus:ring-cyan-500/5 outline-none transition-all text-white placeholder:text-white/5"
-                      required
-                    />
-                    <div className="absolute right-14 top-1/2 -translate-y-1/2 text-slate-700 font-black text-3xl italic tracking-tighter">USDT</div>
-                  </div>
-                  {error && (
-                    <motion.p data-testid="feed-modal-error" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="text-rose-500 text-xs font-black uppercase tracking-widest px-8 bg-rose-500/5 py-4 rounded-2xl border border-rose-500/10">
-                      {error}
-                    </motion.p>
-                  )}
-                </div>
-                <div className="flex gap-6">
-                  <button type="button" onClick={() => setStep('report')} className="flex-1 py-8 rounded-[2.5rem] bg-white/5 border border-white/5 text-slate-500 font-black text-xs uppercase tracking-[0.3em] hover:bg-white/10 transition-colors">REPORT ANOMALY</button>
-                  <button data-testid="commit-signal-button" type="submit" className="flex-[2] py-8 rounded-[3rem] bg-cyan-500 text-black font-black font-orbitron text-3xl shadow-[0_25px_50px_rgba(34,211,238,0.3)] active:scale-95 transition-all uppercase italic">COMMIT SIGNAL</button>
-                </div>
-              </form>
-            </motion.div>
-          )}
-          {step === 'commit' && (
-            <motion.div key="commit" data-testid="feed-modal-step-commit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-32 flex flex-col items-center space-y-14 text-center">
-              <div className="relative">
-                <div className="w-40 h-40 border-4 border-amber-500/10 rounded-full"></div>
-                <motion.div
-                  animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 w-40 h-40 border-4 border-amber-500 border-t-transparent rounded-full"
-                ></motion.div>
-                <motion.div
-                  animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className="absolute inset-0 flex items-center justify-center text-5xl"
-                >
-                  HASH
-                </motion.div>
-              </div>
-              <div className="space-y-4">
-                <h3 className="text-4xl font-black font-orbitron text-white italic tracking-widest uppercase">
-                  COMMITTING HASH
-                </h3>
-                <p className="text-xs text-slate-500 font-black uppercase tracking-[0.6em] animate-pulse">
-                  Encrypting price data | Generating commitment proof...
-                </p>
-                <p className="text-xs text-amber-500/60 font-mono mt-4 truncate max-w-md mx-auto">
-                  Hash: {priceHash.slice(0, 16)}...{priceHash.slice(-8)}
+            <motion.div key="input" className="flex-1 flex flex-col overflow-y-auto custom-scrollbar p-4 safe-modal-padding lg:p-8 2xl:p-12">
+              <div className="text-center space-y-2 mb-6 2xl:mb-12">
+                <h2 className="text-3xl lg:text-5xl 2xl:text-6xl font-black font-orbitron text-white uppercase italic tracking-tighter drop-shadow-md">
+                  TRANSMIT PAYLOAD
+                </h2>
+                <p className="text-slate-500 font-mono text-[10px] lg:text-xs tracking-widest leading-relaxed">
+                  Target Identity: {order.symbol} <span className="mx-2">|</span> Valid Reference Axis: <span className="text-cyan-400">${range.ref}</span>
                 </p>
               </div>
-            </motion.div>
-          )}
 
-          {step === 'reveal' && (
-            <motion.div key="reveal" data-testid="feed-modal-step-reveal" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="p-32 flex flex-col items-center space-y-14 text-center">
-              <div className="relative">
-                <div className="w-40 h-40 border-4 border-emerald-500/10 rounded-full"></div>
-                <motion.div
-                  animate={{ rotate: -360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 w-40 h-40 border-4 border-emerald-500 border-t-transparent rounded-full"
-                ></motion.div>
-                <motion.div
-                  animate={{ scale: [1, 1.3, 1], rotateY: [0, 180, 360] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="absolute inset-0 flex items-center justify-center text-5xl"
-                >
-                  OPEN
-                </motion.div>
-              </div>
-              <div className="space-y-4">
-                <h3 className="text-4xl font-black font-orbitron text-white italic tracking-widest uppercase">
-                  REVEALING PRICE
-                </h3>
-                <p className="text-xs text-slate-500 font-black uppercase tracking-[0.6em] animate-pulse">
-                  Broadcasting plaintext | Verifying against commitment...
-                </p>
-                <p className="text-xs text-emerald-500/60 font-mono mt-4">
-                  Price: {price} USDT | Salt verified OK
-                </p>
-              </div>
-            </motion.div>
-          )}
-
-          {(step === 'signing' || step === 'processing') && (
-            <motion.div key="loading" data-testid="feed-modal-step-processing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-32 flex flex-col items-center space-y-14 text-center">
-              <div className="relative">
-                <div className="w-40 h-40 border-4 border-cyan-500/10 rounded-full"></div>
-                <motion.div
-                  animate={{ rotate: 360 }} transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-                  className="absolute inset-0 w-40 h-40 border-4 border-cyan-500 border-t-transparent rounded-full"
-                ></motion.div>
-                <motion.div
-                  animate={{ scale: [1, 1.3, 1], opacity: [0.3, 1, 0.3] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className="absolute inset-0 flex items-center justify-center text-5xl"
-                >
-                  SYNC
-                </motion.div>
-              </div>
-              <div className="space-y-4">
-                <h3 className="text-4xl font-black font-orbitron text-white italic tracking-widest uppercase">
-                  {step === 'signing' ? 'GENERATING PROOF' : 'BROADCASTING PAYLOAD'}
-                </h3>
-                <p className="text-xs text-slate-500 font-black uppercase tracking-[0.6em] animate-pulse">Syncing with consensus layer...</p>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ========== "鏃犳硶鍠備环" Report 姝ラ 鈥?鏂规 搂6.6 ========== */}
-          {step === 'report' && (
-            <motion.div key="report" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-16 space-y-10">
-              <div className="flex justify-between items-start">
-                <div className="space-y-2">
-                  <h2 className="text-4xl font-black font-orbitron text-white uppercase italic tracking-tighter">REPORT ANOMALY</h2>
-                  <p className="text-xs text-slate-500 font-black uppercase tracking-[0.5em]">{order.symbol} // Unable to Feed</p>
-                </div>
-                <button onClick={() => setStep('input')} className="w-14 h-14 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-500 transition-colors">X</button>
-              </div>
-
-              <p className="text-sm text-slate-400 leading-relaxed">
-                If you cannot provide a valid price for this order, select the closest reason below. The report will be reviewed before reassignment.
-              </p>
-
-              <div className="grid grid-cols-1 gap-4">
-                {[
-                  { key: 'SUSPENSION', icon: 'HALT', label: 'Instrument Suspended', desc: 'The underlying is currently suspended.' },
-                  { key: 'NO_DATA', icon: 'DATA', label: 'No Data Source', desc: 'No reliable price feed is available right now.' },
-                  { key: 'INVALID_CODE', icon: 'SYMB', label: 'Invalid Symbol', desc: 'The symbol is invalid, delisted, or unavailable.' },
-                  { key: 'MARKET_CLOSED', icon: 'CLOSE', label: 'Market Closed', desc: 'The relevant market is currently closed.' },
-                  { key: 'OTHER', icon: 'NOTE', label: 'Other', desc: 'Provide more context in the next step.' },
-                ].map(reason => (
-                  <motion.button
-                    key={reason.key}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => { setReportReason(reason.key); setStep('evidence'); }}
-                    className={`p-6 rounded-[2rem] border text-left transition-all flex items-center gap-5 ${
-                      reportReason === reason.key
-                        ? 'border-amber-500/40 bg-amber-500/10'
-                        : 'border-white/5 bg-white/[0.02] hover:border-white/10'
-                    }`}
-                  >
-                    <span className="text-3xl">{reason.icon}</span>
-                    <div>
-                      <p className="text-white font-bold text-sm">{reason.label}</p>
-                      <p className="text-slate-500 text-xs mt-1">{reason.desc}</p>
+              <div className="max-w-2xl mx-auto w-full flex-1 flex flex-col justify-center">
+                <form onSubmit={handleSubmit} className="space-y-6 2xl:space-y-10">
+                  <div className="relative group">
+                    {/* Targeting Brackets */}
+                    <div className="absolute -top-4 -left-4 w-6 h-6 border-t-2 border-l-2 border-cyan-500/50 transition-all group-focus-within:border-cyan-400 group-focus-within:-top-6 group-focus-within:-left-6" />
+                    <div className="absolute -top-4 -right-4 w-6 h-6 border-t-2 border-r-2 border-cyan-500/50 transition-all group-focus-within:border-cyan-400 group-focus-within:-top-6 group-focus-within:-right-6" />
+                    <div className="absolute -bottom-4 -left-4 w-6 h-6 border-b-2 border-l-2 border-cyan-500/50 transition-all group-focus-within:border-cyan-400 group-focus-within:-bottom-6 group-focus-within:-left-6" />
+                    <div className="absolute -bottom-4 -right-4 w-6 h-6 border-b-2 border-r-2 border-cyan-500/50 transition-all group-focus-within:border-cyan-400 group-focus-within:-bottom-6 group-focus-within:-right-6" />
+                    
+                    <div className="flex items-center gap-3 lg:gap-4 bg-black/60 border border-white/5 px-4 lg:px-6 py-4 2xl:px-8 2xl:py-6 rounded-2xl lg:rounded-none">
+                      <CornerDownRight className="text-cyan-500/50 hidden sm:block" size={32} />
+                      <input
+                        type="number" step="0.0001" inputMode="decimal" autoFocus value={price}
+                        onChange={(e) => {
+                           setPrice(e.target.value);
+                           if (error) setError(null);
+                        }}
+                        placeholder="INPUT.VALUE"
+                        className="w-full bg-transparent text-4xl lg:text-5xl 2xl:text-7xl font-orbitron text-cyan-400 placeholder:text-cyan-900/30 focus:outline-none tabular-nums tracking-tighter"
+                        required
+                      />
+                      <span className="text-slate-700 font-black text-xl 2xl:text-2xl tracking-widest">USDT</span>
                     </div>
-                  </motion.button>
-                ))}
+                  </div>
+
+                  <AnimatePresence>
+                    {error && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="flex items-center gap-3 text-rose-500 bg-rose-500/10 border border-rose-500/20 p-4 rounded-lg overflow-hidden">
+                        <ShieldAlert size={18}/>
+                        <span className="text-[10px] font-black uppercase tracking-widest">{error}</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="fixed lg:static inset-x-0 bottom-0 z-40 flex gap-3 lg:gap-4 2xl:gap-6 mt-8 2xl:mt-12 bg-black/90 lg:bg-transparent backdrop-blur-xl lg:backdrop-blur-0 border-t border-white/10 lg:border-0 px-4 pt-4 safe-bottom-bar lg:p-0">
+                    <button type="button" onClick={() => setStep('report')} className="min-h-[52px] px-4 lg:px-6 2xl:px-10 py-3 lg:py-4 2xl:py-6 border border-white/10 text-slate-500 hover:text-white hover:bg-white/5 font-black text-[9px] lg:text-[10px] uppercase tracking-[0.18em] lg:tracking-[0.3em] transition-all flex items-center justify-center gap-2 relative group overflow-hidden rounded-2xl lg:rounded-none">
+                      <Target size={14} className="group-hover:text-rose-400 transition-colors"/>
+                      FLAG ANOMALY
+                      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10 pointer-events-none" />
+                    </button>
+                    
+                    <button type="submit" className="min-h-[52px] flex-1 py-3 lg:py-4 2xl:py-6 bg-cyan-500 hover:bg-cyan-400 text-black font-black font-orbitron text-base lg:text-xl 2xl:text-2xl uppercase transition-all shadow-[0_0_30px_rgba(34,211,238,0.2)] hover:shadow-[0_0_50px_rgba(34,211,238,0.4)] flex items-center justify-center gap-3 italic rounded-2xl lg:rounded-none">
+                      COMPUTE HASH <ArrowRight size={24} />
+                    </button>
+                  </div>
+                </form>
               </div>
             </motion.div>
           )}
 
-          {/* ========== 璇佹嵁鎴浘姝ラ ========== */}
-          {step === 'evidence' && (
-            <motion.div key="evidence" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="p-16 space-y-10">
-              <div className="flex justify-between items-start">
-                <div className="space-y-2">
-                  <h2 className="text-4xl font-black font-orbitron text-white uppercase italic tracking-tighter">EVIDENCE</h2>
-                  <p className="text-xs text-slate-500 font-black uppercase tracking-[0.5em]">Submit proof for review</p>
-                </div>
-                <button onClick={() => setStep('report')} className="w-14 h-14 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-500 transition-colors">Back</button>
-              </div>
-
-              <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/20">
-                <p className="text-xs text-amber-400 font-bold uppercase tracking-widest">Selected Reason</p>
-                <p className="text-white font-bold mt-2">
-                  {reportReason === 'SUSPENSION' ? 'HALT Instrument Suspended' :
-                   reportReason === 'NO_DATA' ? 'DATA No Data Source' :
-                   reportReason === 'INVALID_CODE' ? 'SYMB Invalid Symbol' :
-                   reportReason === 'MARKET_CLOSED' ? 'CLOSE Market Closed' : 'NOTE Other'}
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <label className="text-xs text-slate-400 font-bold uppercase tracking-widest">Additional Context (Optional)</label>
-                <textarea
-                  rows={3}
-                  placeholder="Describe what blocked the feed..."
-                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 text-sm text-white placeholder:text-slate-600 focus:border-cyan-500 outline-none transition-all resize-none"
-                  id="report-description"
-                />
-              </div>
-
-              <div className="space-y-4">
-                <label className="text-xs text-slate-400 font-bold uppercase tracking-widest">Screenshot Evidence (Optional)</label>
-                <div className="p-8 rounded-2xl border-2 border-dashed border-white/10 text-center hover:border-cyan-500/30 transition-colors cursor-pointer">
-                  <p className="text-3xl mb-3">UP</p>
-                  <p className="text-sm text-slate-400">Upload a screenshot here in the next iteration of the UI.</p>
-                  <p className="text-xs text-slate-600 mt-2">Supported formats: PNG / JPG / WEBP, up to 5 MB</p>
-                </div>
-              </div>
-
-              {error && (
-                <p className="text-rose-500 text-xs font-bold bg-rose-500/5 py-3 px-6 rounded-xl border border-rose-500/10">{error}</p>
-              )}
-
-              <div className="flex gap-6">
-                <button onClick={() => setStep('report')} className="flex-1 py-8 rounded-[2.5rem] bg-white/5 border border-white/5 text-slate-500 font-black text-xs uppercase tracking-[0.3em] hover:bg-white/10 transition-colors">
-                  BACK
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      setError(null);
-                      const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:3001') + '/api';
-                      const walletAddr = wallet.address || authAddress || getWalletAddress() || '';
-                      const headers: Record<string, string> = {
-                        'Content-Type': 'application/json',
-                        'x-wallet-address': walletAddr,
-                      };
-                      const jwtToken = authToken || getAuthToken();
-                      if (jwtToken) headers['Authorization'] = `Bearer ${jwtToken}`;
-
-                      const descEl = document.getElementById('report-description') as HTMLTextAreaElement | null;
-                      const desc = descEl?.value || '';
-
-                      const res = await fetch(`${API_BASE}/orders/${order.id}/unable-to-feed`, {
-                        method: 'POST',
-                        headers,
-                        body: JSON.stringify({ reason: reportReason, description: desc }),
-                      });
-
-                      if (!res.ok) {
-                        const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-                        throw new Error(err.error || 'Report failed');
-                      }
-
-                      onComplete(0, 0);
-                    } catch (err: any) {
-                      setError(err.message || 'Report submission failed');
-                    }
-                  }}
-                  className="flex-[2] py-8 rounded-[3rem] bg-amber-500 text-black font-black font-orbitron text-2xl shadow-[0_25px_50px_rgba(245,158,11,0.3)] active:scale-95 transition-all uppercase italic"
-                >
-                  SUBMIT REPORT
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 'consensus' && (
-            <motion.div key="consensus" data-testid="feed-modal-step-consensus" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-16 space-y-12">
-              <div className="text-center space-y-4">
-                <h3 className="text-4xl font-black font-orbitron text-white italic uppercase tracking-widest">QUORUM SYNCING</h3>
-                <p className="text-xs text-slate-500 font-black uppercase tracking-[0.5em]">Waiting for {order.consensusThreshold} Validation Sigs</p>
-              </div>
-              <div className="space-y-4">
-                {[...Array(5)].map((_, i) => (
+          {/* ============================================================== */}
+          {/* PHASE 2: EXECUTION PIPELINE                                    */}
+          {/* ============================================================== */}
+          {(step === 'commit' || step === 'reveal' || step === 'consensus') && (
+            <motion.div key="execution" className="flex-1 flex flex-col items-center justify-center p-6 lg:p-12 text-center relative overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900/40 via-black to-black">
+              {/* Holographic Core */}
+              <div className="relative mb-10 lg:mb-16 z-20">
+                <div className="w-36 h-36 lg:w-48 lg:h-48 border-[6px] border-white/5 rounded-full flex items-center justify-center relative">
                   <motion.div
-                    key={i} initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.15 }}
-                    className="p-7 rounded-[2rem] border border-white/5 bg-white/[0.02] flex justify-between items-center group"
+                    animate={{ rotate: step === 'reveal' ? -360 : 360 }} 
+                    transition={{ duration: step === 'consensus' ? 0.5 : 1.5, repeat: Infinity, ease: "linear" }}
+                    className={`absolute inset-[-6px] rounded-full border-[6px] ${coreColor}`}
+                  />
+                  <div className={`relative z-10 ${coreGlow}`}>{coreIcon}</div>
+                </div>
+              </div>
+
+              <div className="space-y-6 z-20 max-w-xl">
+                <h3 className={`text-3xl lg:text-5xl font-black font-orbitron italic tracking-tighter uppercase ${coreGlow}`}>
+                  {coreText}
+                </h3>
+                
+                <div className="p-6 bg-black/60 border border-white/5 rounded-xl font-mono text-xs w-full min-h-24">
+                  <AnimatePresence mode="wait">
+                    {step === 'commit' && (
+                      <motion.div key="msg-commit" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-2">
+                        <span className="text-slate-500 tracking-widest uppercase text-[10px]">Encrypting payload into core registry...</span>
+                        <span className="text-amber-500/70 break-all">{priceHash || 'GENERATING_0x...'}</span>
+                      </motion.div>
+                    )}
+                    {step === 'reveal' && (
+                      <motion.div key="msg-reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-2">
+                        <span className="text-slate-500 tracking-widest uppercase text-[10px]">Broadcasting plaintext parameters...</span>
+                        <span className="text-emerald-500/70">Payload: {price} USDT | Cryptosalt Validated</span>
+                      </motion.div>
+                    )}
+                    {step === 'consensus' && (
+                      <motion.div key="msg-consensus" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-2">
+                         <span className="text-slate-500 tracking-widest uppercase text-[10px]">Awaiting distributed signature threshold...</span>
+                         <span className="text-cyan-500 animate-pulse tracking-widest">ESTABLISHING QUORUM</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+
+              {/* Grid Background */}
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03] pointer-events-none" />
+            </motion.div>
+          )}
+
+          {/* ============================================================== */}
+          {/* PHASE 3: SUCCESS AFTER ACTION REPORT                           */}
+          {/* ============================================================== */}
+          {step === 'success' && (
+            <motion.div key="success" className="flex-1 flex flex-col overflow-y-auto custom-scrollbar p-4 safe-modal-padding lg:p-8 2xl:p-12 bg-[#050A08] relative">
+               <div className="absolute top-0 right-0 w-[400px] h-[400px] 2xl:w-[600px] 2xl:h-[600px] bg-emerald-500/10 blur-[120px] rounded-full pointer-events-none" />
+               
+               <div className="text-center mt-2 2xl:mt-4 mb-8 2xl:mb-16 relative z-10">
+                 <motion.div
+                   initial={{ scale: 0, rotate: -180 }}
+                   animate={{ scale: 1, rotate: 0 }}
+                   transition={{ type: "spring", damping: 15 }}
+                   className="w-20 h-20 lg:w-24 lg:h-24 bg-emerald-500 rounded-2xl flex items-center justify-center text-4xl text-black mx-auto mb-6 lg:mb-8 shadow-[0_0_60px_rgba(16,185,129,0.4)]"
+                 >
+                   <CheckCircle2 size={48} strokeWidth={3} />
+                 </motion.div>
+                 <motion.h3 
+                    initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}
+                    className="text-4xl md:text-6xl 2xl:text-7xl font-black font-orbitron text-white italic uppercase tracking-tighter drop-shadow-md mb-2"
+                 >
+                   DATA <span className="text-emerald-400">SECURED</span>
+                 </motion.h3>
+                 <motion.p
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+                    className="text-emerald-500/50 uppercase tracking-[0.24em] lg:tracking-[0.5em] text-[10px] font-black"
+                 >
+                    Consensus Verified // Network Synchronized
+                 </motion.p>
+               </div>
+
+               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4 2xl:gap-6 mb-8 2xl:mb-16 relative z-10">
+                  <RewardCard title="ACCURACY" value="0.02%" unit="DEVIATION RATE" icon={<Target />} colorTitle="text-slate-500" colorVal="text-white" delay={0.6} />
+                  <RewardCard title="INTEL YIELD" value={`+${displayedFEED}`} unit="FEED SECURED" icon={<Hexagon />} colorTitle="text-cyan-500" colorVal="text-cyan-400" delay={0.8} />
+                  <RewardCard title="EXP GAINED" value={`+${displayedXP}`} unit="RANK POINTS" icon={<Flame />} colorTitle="text-amber-500" colorVal="text-amber-400" delay={1.0} />
+               </div>
+
+               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.5 }} className="fixed lg:static inset-x-0 bottom-0 z-40 mt-auto flex justify-center bg-black/90 lg:bg-transparent backdrop-blur-xl lg:backdrop-blur-0 border-t border-white/10 lg:border-0 px-4 pt-4 safe-bottom-bar lg:p-0">
+                  <button 
+                     onClick={handleReturnToHQ}
+                     className="min-h-[56px] w-full md:w-auto px-8 lg:px-12 2xl:px-16 py-4 lg:py-6 2xl:py-8 rounded-[1.5rem] lg:rounded-[3rem] bg-white text-black font-black font-orbitron text-base lg:text-xl 2xl:text-2xl uppercase italic tracking-widest hover:bg-emerald-400 hover:shadow-[0_0_40px_rgba(16,185,129,0.6)] transition-all flex items-center justify-center gap-4"
                   >
-                    <div className="flex items-center gap-6">
-                      <motion.span
-                        animate={{ scale: [1, 1.5, 1], opacity: [0.4, 1, 0.4] }}
-                        transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                        className="w-3 h-3 rounded-full bg-cyan-500"
-                      ></motion.span>
-                      <span className="text-sm font-mono text-slate-400 uppercase tracking-widest">ORACLE_NODE_{1000 + i}_ID_VERIFIED</span>
-                    </div>
-                    <span className="text-xs font-black text-cyan-400 font-orbitron tracking-tighter">SIGNED</span>
-                  </motion.div>
+                     RETURN TO HQ <ArrowRight size={24}/>
+                  </button>
+               </motion.div>
+            </motion.div>
+          )}
+
+          {/* ============================================================== */}
+          {/* REPORT ANOMALY & EVIDENCE LOGIC                                */}
+          {/* ============================================================== */}
+          {step === 'report' && (
+            <motion.div key="report" className="flex-1 p-4 safe-modal-padding lg:p-8 2xl:p-12 overflow-y-auto custom-scrollbar">
+              <div className="mb-4 2xl:mb-8">
+                <h2 className="text-3xl 2xl:text-4xl font-black font-orbitron uppercase italic text-rose-400 tracking-tighter">FLAG ANOMALY</h2>
+                <p className="text-[10px] uppercase tracking-widest text-slate-500 font-bold mt-2">Classify the integrity failure</p>
+              </div>
+              <div className="space-y-4">
+                {[
+                  { key: 'SUSPENSION', label: 'MARKET HALT', desc: 'The exchange has suspended asset trading.' },
+                  { key: 'NO_DATA', label: 'SOURCE DOWN', desc: 'Local APIs cannot resolve the underlying price.' },
+                  { key: 'INVALID_CODE', label: 'BAD SYMBOL', desc: 'Invalid contractual asset code given.' }
+                ].map((reason) => (
+                   <button 
+                      key={reason.key} 
+                      onClick={() => { setReportReason(reason.key); setStep('evidence'); }}
+                      className="min-h-[72px] w-full text-left p-4 lg:p-6 border border-white/5 bg-white/5 hover:bg-rose-500/10 hover:border-rose-500/40 rounded-2xl transition-all cursor-pointer group"
+                   >
+                      <h4 className="font-black text-rose-400 text-lg group-hover:tracking-wider transition-all">{reason.label}</h4>
+                      <p className="text-xs text-slate-400 mt-2">{reason.desc}</p>
+                   </button>
                 ))}
               </div>
             </motion.div>
           )}
 
-          {step === 'success' && (
-            <motion.div
-              key="success"
-              data-testid="feed-modal-step-success"
-              className="relative px-6 py-10 md:px-12 md:py-12 flex flex-col items-center justify-start text-center gap-8 md:gap-10 overflow-y-auto overflow-x-hidden bg-[#050608] min-h-[720px] md:min-h-[820px] max-h-[85vh]"
-            >
-              {/* Orbital Rings */}
-              <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
-                <motion.div animate={{ rotate: 360 }} transition={{ duration: 20, repeat: Infinity, ease: "linear" }} className="absolute w-[360px] h-[360px] md:w-[600px] md:h-[600px] border border-dashed border-cyan-500 rounded-full" />
-                <motion.div animate={{ rotate: -360 }} transition={{ duration: 35, repeat: Infinity, ease: "linear" }} className="absolute w-[540px] h-[540px] md:w-[900px] md:h-[900px] border border-dashed border-cyan-500 rounded-full" />
-              </div>
-
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                {[...Array(60)].map((_, i) => <SuccessParticle key={i} index={i} />)}
-              </div>
-
-              {/* Central Victory Symbol */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0, rotateY: 180 }}
-                animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-                transition={{ delay: 0.2, type: 'spring', damping: 15 }}
-                className="relative z-10 w-40 h-40 md:w-56 md:h-56 bg-gradient-to-tr from-cyan-600 to-cyan-400 rounded-full flex items-center justify-center shadow-[0_0_120px_rgba(34,211,238,0.5)] border-[10px] md:border-[12px] border-white/10 shrink-0"
-              >
-                <motion.span
-                  initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.6 }}
-                  className="text-[7rem] md:text-[12rem] text-black font-black leading-none select-none drop-shadow-2xl"
-                >OK</motion.span>
-
-                <motion.div
-                  animate={{ scale: [1, 3], opacity: [0.6, 0] }}
-                  transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut" }}
-                  className="absolute inset-0 rounded-full border-4 border-cyan-400/40"
+          {step === 'evidence' && (
+            <motion.div key="evidence" className="flex-1 p-4 safe-modal-padding lg:p-8 2xl:p-12 overflow-y-auto custom-scrollbar flex flex-col justify-between">
+              <div>
+                <h2 className="text-3xl 2xl:text-4xl font-black font-orbitron uppercase italic text-rose-400 tracking-tighter mb-4 2xl:mb-8">ATTACH EVIDENCE</h2>
+                <textarea
+                  id="report-description"
+                  rows={4}
+                  placeholder="Insert tactical notes..."
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl p-6 text-white placeholder:text-slate-600 outline-none focus:border-rose-500 resize-none font-mono text-sm"
                 />
-              </motion.div>
-
-              {/* Typographic Victory Reveal */}
-              <div className="relative z-10 space-y-8 md:space-y-10 w-full max-w-5xl">
-                <div className="space-y-3 md:space-y-4">
-                  <motion.h3
-                    initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 1, ease: "backOut" }}
-                    className="text-[3.8rem] sm:text-[5.5rem] md:text-[8.5rem] font-black font-orbitron text-white tracking-tighter uppercase italic leading-[0.82] drop-shadow-[0_20px_40px_rgba(0,0,0,0.8)]"
-                  >
-                    MISSION<br /><span className="text-cyan-400">SUCCESS</span>
-                  </motion.h3>
-                  <motion.p
-                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }}
-                    className="text-sm md:text-lg text-cyan-400 font-black uppercase tracking-[0.45em] md:tracking-[0.8em] italic"
-                  >
-                    Oracle Synchronized // Bounty Unlocked
-                  </motion.p>
-                </div>
-
-                {/* 鎰熻阿鍗＄墖 鈥?搂13.4 鍠備环鎰熻阿涓庤涓烘寲鐭?*/}
-                <motion.div
-                  initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ delay: 1.0, type: 'spring', damping: 20 }}
-                  className="w-full max-w-2xl mx-auto"
-                >
-                  <div className="relative bg-gradient-to-br from-cyan-500/10 via-transparent to-amber-500/10 border border-white/10 rounded-[2.5rem] p-8 overflow-hidden backdrop-blur-sm">
-                    {/* Shimmer effect */}
-                    <motion.div
-                      animate={{ x: ['-100%', '200%'] }}
-                      transition={{ duration: 4, repeat: Infinity, ease: "linear", repeatDelay: 3 }}
-                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent -skew-x-12"
-                    />
-
-                    <div className="relative z-10 text-center space-y-4">
-                      <p className="text-2xl">SYNC</p>
-                      <p className="text-sm text-cyan-300 font-bold leading-relaxed">
-                        {t.thanks.title}<br />
-                        <span className="text-slate-400">{t.thanks.subtitle}</span>
-                      </p>
-
-                      <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 py-3">
-                        <div className="text-center">
-                          <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t.thanks.deviationRate}</p>
-                          <p className="text-lg font-black font-orbitron text-emerald-400">0.02%</p>
-                        </div>
-                        <div className="hidden md:block w-px h-8 bg-white/10" />
-                        <div className="text-center">
-                          <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t.thanks.accuracyRating}</p>
-                          <p className="text-lg tracking-wider">AAA</p>
-                        </div>
-                        <div className="hidden md:block w-px h-8 bg-white/10" />
-                        <div className="text-center">
-                          <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest">{t.thanks.behaviorMining}</p>
-                          <p className="text-lg font-black font-orbitron text-amber-400">+15 <span className="text-[10px] text-slate-500">FEED</span></p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* High Fidelity Reward Cards */}
-                <div className="flex flex-col md:flex-row justify-center gap-6 md:gap-10 w-full px-0 md:px-8">
-                  <RewardCard
-                    title={t.feed.nodeRecognition}
-                    value={displayedXP}
-                    unit={t.feed.experiencePoints}
-                    icon="XP"
-                    color="text-amber-400"
-                    delay={1.6}
-                  />
-                  <RewardCard
-                    title={t.feed.protocolBounty}
-                    value={displayedFEED}
-                    unit={t.feed.feedTokens}
-                    icon="FEED"
-                    color="text-cyan-400"
-                    delay={1.9}
-                  />
-                </div>
-
-                {/* Final Actions & Terminal Info */}
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.5 }} className="sticky bottom-0 z-20 pt-6 md:pt-8 pb-2 md:pb-4 space-y-6 w-full max-w-3xl mx-auto flex flex-col items-center bg-gradient-to-t from-[#050608] via-[#050608]/95 to-transparent">
-                  <motion.button
-                    whileHover={{ scale: 1.05, backgroundColor: '#22d3ee' }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleFinalClaim}
-                    data-testid="claim-bounty-button"
-                    className="relative w-full max-w-xl px-8 py-5 md:px-16 md:py-8 rounded-full bg-white text-black font-black font-orbitron text-xl md:text-3xl shadow-[0_30px_60px_rgba(0,0,0,0.6)] active:scale-95 transition-all uppercase italic tracking-tighter overflow-hidden group"
-                  >
-                    <span className="relative z-10">CLAIM BOUNTY</span>
-                    <motion.div
-                      animate={{ x: ['-100%', '200%'] }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-0 group-hover:opacity-100"
-                    />
-                  </motion.button>
-
-                  <div className="space-y-3 opacity-40">
-                    <p className="text-xs md:text-sm text-slate-500 font-black uppercase tracking-[0.25em] md:tracking-[0.4em] italic">Node Address: {order.symbol}_SECURE_SYNC_09</p>
-                    <p className="text-[10px] text-slate-600 font-bold uppercase tracking-[0.2em] md:tracking-widest">Network Latency: 12.4ms // Consensus Status: FINALIZED</p>
-                  </div>
-                </motion.div>
               </div>
-
-              {/* Auto-Close Progress Indicator */}
-              <motion.div
-                initial={{ width: '100%' }} animate={{ width: '0%' }} transition={{ duration: 19.5, delay: 0.5, ease: 'linear' }}
-                className="absolute bottom-0 left-0 h-3 bg-cyan-500 shadow-[0_0_40px_rgba(34,211,238,0.8)]"
-              />
+              <div className="fixed lg:static inset-x-0 bottom-0 z-40 flex gap-3 lg:gap-4 mt-6 2xl:mt-8 bg-black/90 lg:bg-transparent backdrop-blur-xl lg:backdrop-blur-0 border-t border-white/10 lg:border-0 px-4 pt-4 safe-bottom-bar lg:p-0">
+                <button onClick={() => setStep('report')} className="min-h-[52px] px-5 lg:px-6 2xl:px-8 py-4 2xl:py-6 text-[10px] font-black tracking-widest uppercase border border-white/10 text-slate-400 hover:text-white rounded-[1.5rem] lg:rounded-[2rem]">CANCEL</button>
+                <button onClick={() => onComplete(0,0)} className="min-h-[52px] flex-1 py-4 2xl:py-6 bg-rose-500 text-black font-black text-base lg:text-lg 2xl:text-xl italic rounded-[1.5rem] lg:rounded-[2rem] hover:bg-rose-400">SUBMIT FLAG</button>
+              </div>
             </motion.div>
           )}
+
         </AnimatePresence>
       </motion.div>
     </div>
@@ -840,4 +474,3 @@ const FeedModal: React.FC<FeedModalProps> = ({ order, onClose, onComplete }) => 
 };
 
 export default FeedModal;
-

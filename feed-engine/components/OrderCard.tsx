@@ -1,163 +1,210 @@
-﻿import React from 'react';
+import React from 'react';
 import { FeedOrder, ConditionType, SpecialCondition } from '../types';
 import { MARKET_ICONS } from '../constants';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../i18n';
 import type { TranslationKeys } from '../i18n';
+import { 
+  ShieldAlert, ShieldCheck, Sword, Crown, Clock, Flame, Zap, AlertTriangle, 
+  Target, BarChart3, Coins, Database, Fingerprint, Activity, Crosshair
+} from 'lucide-react';
 
 interface OrderCardProps {
   order: FeedOrder;
   onGrab: (orderId: string) => void;
 }
 
-const CONDITION_STYLE_BASE: Record<ConditionType, { icon: string; labelKey: keyof TranslationKeys['condition']; bgColor: string; textColor: string; borderColor: string }> = {
-  [ConditionType.LIMIT_UP]: { icon: 'UP', labelKey: 'limitUp', bgColor: 'bg-red-500/20', textColor: 'text-red-400', borderColor: 'border-red-500/30' },
-  [ConditionType.LIMIT_DOWN]: { icon: 'DN', labelKey: 'limitDown', bgColor: 'bg-emerald-500/20', textColor: 'text-emerald-400', borderColor: 'border-emerald-500/30' },
-  [ConditionType.CONSECUTIVE_LIMIT]: { icon: 'CL', labelKey: 'consecutiveLimit', bgColor: 'bg-red-600/25', textColor: 'text-red-300', borderColor: 'border-red-400/40' },
-  [ConditionType.SUSPENSION]: { icon: 'HALT', labelKey: 'suspension', bgColor: 'bg-slate-500/20', textColor: 'text-slate-400', borderColor: 'border-slate-500/30' },
-  [ConditionType.PRICE_ADJUSTMENT]: { icon: 'ADJ', labelKey: 'priceAdjustment', bgColor: 'bg-amber-500/20', textColor: 'text-amber-400', borderColor: 'border-amber-500/30' },
-  [ConditionType.EX_DIVIDEND]: { icon: 'DIV', labelKey: 'exDividend', bgColor: 'bg-amber-500/20', textColor: 'text-amber-400', borderColor: 'border-amber-500/30' },
-  [ConditionType.VOLATILITY_HIGH]: { icon: 'VOL', labelKey: 'volatilityHigh', bgColor: 'bg-purple-500/20', textColor: 'text-purple-400', borderColor: 'border-purple-500/30' },
-  [ConditionType.SPECIAL_TREATMENT]: { icon: 'ST', labelKey: 'specialTreatment', bgColor: 'bg-red-500/20', textColor: 'text-red-400', borderColor: 'border-red-500/30' },
+const CONDITION_STYLE_BASE: Record<ConditionType, { icon: React.ReactNode; labelKey: keyof TranslationKeys['condition']; bgColor: string; textColor: string; borderColor: string }> = {
+  [ConditionType.LIMIT_UP]: { icon: <Activity size={12}/>, labelKey: 'limitUp', bgColor: 'bg-red-500/10', textColor: 'text-red-400', borderColor: 'border-red-500/30' },
+  [ConditionType.LIMIT_DOWN]: { icon: <Activity size={12}/>, labelKey: 'limitDown', bgColor: 'bg-emerald-500/10', textColor: 'text-emerald-400', borderColor: 'border-emerald-500/30' },
+  [ConditionType.CONSECUTIVE_LIMIT]: { icon: <Flame size={12}/>, labelKey: 'consecutiveLimit', bgColor: 'bg-red-600/20', textColor: 'text-red-300', borderColor: 'border-red-400/40' },
+  [ConditionType.SUSPENSION]: { icon: <ShieldAlert size={12}/>, labelKey: 'suspension', bgColor: 'bg-slate-500/10', textColor: 'text-slate-400', borderColor: 'border-slate-500/30' },
+  [ConditionType.PRICE_ADJUSTMENT]: { icon: <BarChart3 size={12}/>, labelKey: 'priceAdjustment', bgColor: 'bg-amber-500/10', textColor: 'text-amber-400', borderColor: 'border-amber-500/30' },
+  [ConditionType.EX_DIVIDEND]: { icon: <Coins size={12}/>, labelKey: 'exDividend', bgColor: 'bg-amber-500/10', textColor: 'text-amber-400', borderColor: 'border-amber-500/30' },
+  [ConditionType.VOLATILITY_HIGH]: { icon: <Zap size={12}/>, labelKey: 'volatilityHigh', bgColor: 'bg-purple-500/10', textColor: 'text-purple-400', borderColor: 'border-purple-500/30' },
+  [ConditionType.SPECIAL_TREATMENT]: { icon: <AlertTriangle size={12}/>, labelKey: 'specialTreatment', bgColor: 'bg-red-500/10', textColor: 'text-red-400', borderColor: 'border-red-500/30' },
 };
 
-function getZoneBadge(notionalAmount: number): { label: string; icon: string; color: string } {
-  if (notionalAmount >= 1000000) return { label: 'MASTER', icon: 'M3', color: 'bg-gradient-to-r from-amber-500 to-yellow-400 text-black' };
-  if (notionalAmount >= 100000) return { label: 'COMPETITIVE', icon: 'C2', color: 'bg-gradient-to-r from-orange-500 to-red-500 text-white' };
-  return { label: 'BEGINNER', icon: 'B1', color: 'bg-gradient-to-r from-cyan-500 to-blue-500 text-black' };
+function getZoneTheme(notionalAmount: number) {
+  if (notionalAmount >= 1000000) return { 
+    tier: 'S-CLASS',
+    label: 'ZENITH ORACLE', 
+    icon: <Crown size={18}/>, 
+    color: 'rose',
+    bgClasses: 'bg-gradient-to-br from-rose-950/80 via-[#0A050A]/90 to-black',
+    border: 'border-rose-500/40',
+    hoverBorder: 'group-hover:border-rose-500/80',
+    glow: 'group-hover:shadow-[0_0_40px_rgba(225,29,72,0.3),inset_0_0_30px_rgba(225,29,72,0.1)]',
+    textHighlight: 'text-rose-400',
+    tagBg: 'bg-rose-500/20',
+    radarPulse: 'bg-rose-400'
+  };
+  if (notionalAmount >= 100000) return { 
+    tier: 'A-CLASS',
+    label: 'COMBAT FEED', 
+    icon: <Sword size={18}/>, 
+    color: 'orange',
+    bgClasses: 'bg-gradient-to-br from-orange-950/80 via-[#0A0705]/90 to-black',
+    border: 'border-orange-500/40',
+    hoverBorder: 'group-hover:border-orange-500/80',
+    glow: 'group-hover:shadow-[0_0_40px_rgba(249,115,22,0.3),inset_0_0_30px_rgba(249,115,22,0.1)]',
+    textHighlight: 'text-orange-400',
+    tagBg: 'bg-orange-500/20',
+    radarPulse: 'bg-orange-400'
+  };
+  return { 
+    tier: 'B-CLASS',
+    label: 'PRIMARY SYNC', 
+    icon: <ShieldCheck size={18}/>, 
+    color: 'cyan',
+    bgClasses: 'bg-gradient-to-br from-cyan-950/80 via-[#050A10]/90 to-black',
+    border: 'border-cyan-500/40',
+    hoverBorder: 'group-hover:border-cyan-500/80',
+    glow: 'group-hover:shadow-[0_0_40px_rgba(34,211,238,0.3),inset_0_0_30px_rgba(34,211,238,0.1)]',
+    textHighlight: 'text-cyan-400',
+    tagBg: 'bg-cyan-500/20',
+    radarPulse: 'bg-cyan-400'
+  };
 }
 
-const ConditionBadge: React.FC<{ condition: SpecialCondition; conditionLabels: TranslationKeys['condition'] }> = ({ condition, conditionLabels }) => {
-  const style = CONDITION_STYLE_BASE[condition.type];
-  if (!style) return null;
-  const isCritical = condition.highlightLevel === 'critical';
-  const label = conditionLabels[style.labelKey];
-
-  return (
-    <motion.div
-      animate={isCritical ? { scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] } : {}}
-      transition={isCritical ? { duration: 1.5, repeat: Infinity } : {}}
-      className={`px-3 py-1 rounded-lg ${style.bgColor} border ${style.borderColor} backdrop-blur-sm flex items-center gap-1.5 ${isCritical ? 'shadow-[0_0_12px_rgba(239,68,68,0.3)]' : ''}`}
-    >
-      <span className="text-[9px] font-black font-orbitron">{style.icon}</span>
-      <span className={`text-[8px] font-black uppercase tracking-wider ${style.textColor}`}>{label}</span>
-    </motion.div>
-  );
+const formatTime = (seconds: number) => {
+  if (!seconds || seconds <= 0) return '00:00';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 };
 
 const OrderCard: React.FC<OrderCardProps> = ({ order, onGrab }) => {
   const { t } = useTranslation();
-  const isLargeOrder = order.notionalAmount >= 1000000;
-  const cardImages = ['/assets/images/card-btc-v2.png', '/assets/images/card-eth-v2.png', '/assets/images/card-oracle-v2.png'];
-  const headerImage = cardImages[order.symbol.length % cardImages.length];
-  const zone = getZoneBadge(order.notionalAmount);
+  const theme = getZoneTheme(order.notionalAmount);
+  const isHighRisk = order.notionalAmount >= 1000000;
+  const isLargeSettlement = order.notionalAmount >= 500000;
   const conditions = order.specialConditions || [];
-  const descriptor = conditions.length > 0
-    ? `${conditions.map((condition) => {
-        const style = CONDITION_STYLE_BASE[condition.type];
-        return style ? t.condition[style.labelKey] : condition.description;
-      }).join(' | ')} - ${order.symbol}`
-    : `Initiate deep computational handshake for ${order.symbol}. Verify cryptographic proof of state across multi-exchange cross-links.`;
 
   return (
     <motion.div
       onClick={() => onGrab(order.orderId)}
       data-testid={`order-card-${order.id ?? order.orderId}`}
-      className="cosmic-card relative h-[480px] flex flex-col overflow-hidden cursor-pointer group shadow-2xl"
+      className={`relative min-h-[286px] lg:h-[380px] 2xl:h-[480px] rounded-[1.5rem] lg:rounded-[2rem] border ${theme.border} ${theme.bgClasses} backdrop-blur-xl flex flex-col overflow-hidden cursor-crosshair group transition-all duration-500 ${theme.hoverBorder} ${theme.glow}`}
     >
-      <div className="h-3/5 relative overflow-hidden">
-        <img
-          src={headerImage}
-          className="w-full h-full object-cover group-hover:scale-125 transition-transform duration-[2s] brightness-75 group-hover:brightness-110"
-          alt="quest header"
-          onError={(event) => {
-            (event.target as HTMLImageElement).style.display = 'none';
-            (event.target as HTMLImageElement).parentElement?.classList.add('bg-gradient-to-br', 'from-cyan-900/40', 'to-slate-900');
-          }}
-        />
+      {/* Background Ambience */}
+      <div className="absolute inset-0 opacity-10 mix-blend-overlay group-hover:opacity-30 transition-opacity bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] pointer-events-none" />
+      <div className="absolute -top-32 -right-32 w-64 h-64 bg-white/5 rounded-full blur-[80px] pointer-events-none" />
+      <div className={`absolute top-0 w-full h-[1px] bg-gradient-to-r from-transparent via-${theme.color}-500 to-transparent opacity-50`} />
 
-        <div className="absolute inset-0 bg-white/10 w-full h-[2px] animate-scan opacity-0 group-hover:opacity-100 z-10" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0F1E] via-transparent to-black/20" />
+      {/* Header: ID & Market */}
+      <div className="flex justify-between items-start p-4 lg:p-6 pb-2 z-10">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+             <div className={`w-2 h-2 rounded-full ${theme.radarPulse} shadow-[0_0_10px_currentColor] animate-pulse`} />
+             <p className={`text-[10px] font-black uppercase tracking-[0.4em] ${theme.textHighlight}`}>
+               {theme.tier} CONTRACT
+             </p>
+          </div>
+          <p className="text-[11px] font-mono text-slate-500 uppercase">#{order.orderId.substring(0,8)}</p>
+        </div>
+        <div className={`flex items-center gap-1.5 lg:gap-2 px-2.5 lg:px-3 py-1.5 rounded-lg border border-white/10 bg-black/40`}>
+          <span className="text-[10px] font-black tracking-widest text-slate-400">{order.exchange}</span>
+          <span className="text-slate-600">/</span>
+          <span className={`text-[10px] font-black tracking-widest ${theme.textHighlight}`}>{order.market}</span>
+        </div>
+      </div>
 
-        <div className="absolute bottom-[-50px] left-12 w-28 h-28 rounded-[2.5rem] bg-[#0A0F1E] border-4 border-cyan-500/20 shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex items-center justify-center overflow-hidden z-20 group-hover:border-cyan-400 group-hover:scale-110 transition-all duration-500">
-          <img src="/assets/images/owl-mascot-v3.png" className="w-full h-full object-cover opacity-80 group-hover:opacity-100" alt="mascot" />
-          <div className="absolute inset-0 bg-cyan-500/5 mix-blend-overlay" />
+      {/* Central Identity: The Asset */}
+      <div className="px-4 lg:px-6 py-3 lg:py-6 flex-1 z-10 flex flex-col justify-center">
+        <div className="flex justify-between items-center mb-2">
+            <h3 className="text-3xl sm:text-4xl 2xl:text-[3.5rem] font-black font-orbitron text-white italic tracking-tighter uppercase drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] group-hover:scale-105 transition-transform origin-left">
+            {order.symbol.split('.')[0]}
+            </h3>
+            <div className={`w-11 h-11 lg:w-14 lg:h-14 rounded-2xl flex items-center justify-center text-2xl lg:text-3xl font-orbitron border ${theme.border} bg-black/50`}>
+               {MARKET_ICONS[order.market] || <Database size={24} className="text-slate-400"/>}
+            </div>
+        </div>
+        <p className="text-[9px] lg:text-[10px] text-slate-500 uppercase tracking-widest font-mono line-clamp-1 mb-4 lg:mb-8">
+            {order.symbol} INTELLIGENCE REQUIRED
+        </p>
+
+        {/* Mission Tags / Rarity Identifiers */}
+        <div className="flex flex-wrap gap-2 mb-4">
+           <div className={`px-2.5 py-1.5 rounded-md border ${theme.border} ${theme.tagBg} flex items-center gap-1.5`}>
+              <Target size={10} className={theme.textHighlight}/>
+              <span className={`text-[8px] font-black tracking-widest uppercase ${theme.textHighlight}`}>{theme.label}</span>
+           </div>
+
+           {(order.timeRemaining && order.timeRemaining > 0) && (
+             <div className="px-2.5 py-1.5 rounded-md border border-cyan-500/30 bg-cyan-500/10 flex items-center gap-1.5">
+                <Clock size={10} className="text-cyan-400"/>
+                <span className="text-[8px] font-mono font-black tracking-widest text-cyan-400">{formatTime(order.timeRemaining)} LEFT</span>
+             </div>
+           )}
+
+           {isHighRisk && (
+             <div className="px-2.5 py-1.5 rounded-md border border-red-500/40 bg-red-500/20 flex items-center gap-1.5 animate-pulse">
+                <AlertTriangle size={10} className="text-red-400"/>
+                <span className="text-[8px] font-black tracking-widest text-red-400">{t.order.highRisk}</span>
+             </div>
+           )}
+
+           {isLargeSettlement && !isHighRisk && (
+             <div className="px-2.5 py-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 flex items-center gap-1.5">
+                <Coins size={10} className="text-amber-400"/>
+                <span className="text-[8px] font-black tracking-widest text-amber-400">HEAVY PAYOUT</span>
+             </div>
+           )}
         </div>
 
+        {/* Dynamic Condition Array */}
         {conditions.length > 0 && (
-          <div className="absolute top-10 left-10 flex flex-col gap-2 z-20">
-            {conditions.map((condition, index) => (
-              <ConditionBadge key={`${condition.type}-${index}`} condition={condition} conditionLabels={t.condition} />
-            ))}
+          <div className="flex flex-wrap gap-2">
+            {conditions.map((condition, idx) => {
+              const style = CONDITION_STYLE_BASE[condition.type];
+              if (!style) return null;
+              const isCrit = condition.highlightLevel === 'critical';
+              return (
+                <div key={idx} className={`px-2 py-1 rounded border ${style.borderColor} ${style.bgColor} flex items-center gap-1`}>
+                   <span className={style.textColor}>{style.icon}</span>
+                   <span className={`text-[8px] font-black uppercase tracking-wider ${style.textColor}`}>
+                      {t.condition[style.labelKey]}
+                   </span>
+                </div>
+              );
+            })}
           </div>
         )}
-
-        <div className="absolute top-10 right-10 flex flex-col items-end gap-3 z-20">
-          <div className={`px-4 py-1.5 rounded-lg ${zone.color} text-[8px] font-black uppercase tracking-widest`}>
-            {zone.icon} {zone.label}
-          </div>
-          <div className="px-6 py-2 rounded-xl bg-black/80 border border-cyan-500/30 backdrop-blur-xl text-[9px] font-black font-orbitron text-cyan-400 uppercase tracking-[0.3em] shadow-lg">
-            {order.exchange} // {order.market}
-          </div>
-          {isLargeOrder && (
-            <motion.div
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="px-4 py-1.5 rounded-lg bg-amber-500 text-black text-[8px] font-black uppercase tracking-widest italic"
-            >
-              {t.order.highRisk}
-            </motion.div>
-          )}
-        </div>
       </div>
 
-      <div className="flex-1 p-12 pt-20 flex flex-col justify-between relative bg-gradient-to-b from-transparent to-cyan-900/5">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <h3 className="text-4xl font-black font-orbitron text-white italic tracking-tighter uppercase glow-text group-hover:text-cyan-400 transition-colors">
-              {order.symbol.split('.')[0]} HUB
-            </h3>
-            <div className="text-slate-700 font-black text-xs opacity-40 group-hover:opacity-100 transition-opacity shrink-0">
-              #{order.orderId.split('-')[1]}
-            </div>
+      {/* Bottom Bounty Action Area */}
+      <div className={`mt-auto border-t border-white/5 bg-black/60 p-4 lg:p-6 z-10 flex items-end justify-between transition-colors ${theme.hoverBorder}`}>
+        <div>
+          <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.4em] mb-1.5 flex items-center gap-1.5">
+             <Crosshair size={10}/> {t.order.bounty}
+          </p>
+          <div className="flex items-baseline gap-2">
+             <span className={`text-xl lg:text-2xl 2xl:text-3xl font-black font-orbitron italic drop-shadow-[0_0_10px_currentColor] ${theme.textHighlight}`}>
+               {order.rewardAmount}
+             </span>
+             <span className="text-[10px] font-black text-slate-500 tracking-widest">FEED</span>
           </div>
-          <p className="text-xs text-slate-400 font-medium leading-relaxed italic opacity-70 group-hover:opacity-100 transition-opacity line-clamp-2">
-            {descriptor}
+        </div>
+
+        <div className="text-right">
+          <p className="text-[8px] text-slate-500 font-black uppercase tracking-[0.4em] mb-1.5">QUORUM</p>
+          <p className="text-base lg:text-lg font-black font-orbitron text-white italic tracking-tighter">
+             {order.consensusThreshold} <span className="text-[10px] text-slate-600 uppercase tracking-widest not-italic ml-1">NODES</span>
           </p>
         </div>
-
-        <div className="flex items-center justify-between border-t border-white/5 pt-10 gap-6">
-          <div className="flex items-center gap-10">
-            <div className="space-y-1.5">
-              <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.3em]">{t.order.bounty}</p>
-              <p className="text-2xl font-black font-orbitron text-cyan-400 tracking-tighter italic glow-cyan">
-                {order.rewardAmount} <span className="text-xs opacity-40">FEED</span>
-              </p>
-            </div>
-            <div className="w-px h-12 bg-white/10" />
-            <div className="space-y-1.5">
-              <p className="text-[9px] text-slate-500 font-black uppercase tracking-[0.3em]">{t.order.quorum}</p>
-              <p className="text-2xl font-black font-orbitron text-white tracking-tighter italic">{order.consensusThreshold}</p>
-            </div>
-          </div>
-
-          <motion.div
-            whileHover={{ rotate: 15, scale: 1.2 }}
-            className="min-w-16 h-16 px-3 rounded-[2rem] bg-white/5 border border-white/10 flex items-center justify-center text-lg font-black font-orbitron group-hover:border-cyan-500/50 group-hover:bg-cyan-500/20 group-hover:shadow-[0_0_30px_rgba(34,211,238,0.2)] transition-all duration-500"
-          >
-            {MARKET_ICONS[order.market]}
-          </motion.div>
-        </div>
       </div>
 
-      <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-white/10 group-hover:border-cyan-500/40 rounded-tl-[3.5rem] transition-colors" />
-      <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-white/10 group-hover:border-cyan-500/40 rounded-br-[3.5rem] transition-colors" />
-
-      <motion.div
-        animate={{ x: ['-100%', '200%'] }}
-        transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.03] to-transparent -skew-x-12 pointer-events-none"
-      />
+      {/* Hover Selection Overlay - Cyberpunk Brackets */}
+      <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+         <div className={`absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 ${theme.textHighlight.replace('text-', 'border-')}`} />
+         <div className={`absolute top-4 right-4 w-4 h-4 border-t-2 border-r-2 ${theme.textHighlight.replace('text-', 'border-')}`} />
+         <div className={`absolute bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 ${theme.textHighlight.replace('text-', 'border-')}`} />
+         <div className={`absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 ${theme.textHighlight.replace('text-', 'border-')}`} />
+      </div>
+      
+      {/* Scanline sweep effect on hover */}
+      <div className="absolute w-[200%] h-12 bg-white/5 -rotate-45 -translate-y-[400px] group-hover:translate-y-[800px] transition-transform duration-[1.5s] ease-in-out pointer-events-none z-0" />
     </motion.div>
   );
 };

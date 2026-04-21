@@ -20,12 +20,50 @@ import { motion, AnimatePresence, useTransform, useMotionValue, useSpring, Motio
 import { useTranslation } from './i18n';
 import { useAuthStore, useFeederStore, useUIStore } from './store';
 
-// Separate component for Orbital Rings to fix Hook violations
-const OrbitalRing: React.FC<{
-  index: number;
-  springX: MotionValue<number>;
-  springY: MotionValue<number>
-}> = ({ index, springX, springY }) => {
+
+import { Zap, ShieldCheck, Sword, Crown, Activity, Globe, Rocket, Terminal, Target } from 'lucide-react';
+import SystemLoader from './components/feedback/SystemLoader';
+import SystemEmpty from './components/feedback/SystemEmpty';
+import SystemError from './components/feedback/SystemError';
+import RewardModal from './components/feedback/RewardModal';
+
+const THEMES = {
+  beginner: {
+    color: 'cyan',
+    bgColor: 'bg-cyan-500',
+    textColor: 'text-cyan-400',
+    borderColor: 'border-cyan-500/20',
+    ring1: 'rgba(34,211,238,0.6)',
+    ring2: 'rgba(34,211,238,0.3)',
+    glow: 'shadow-[0_0_80px_rgba(34,211,238,0.4),inset_0_0_40px_rgba(34,211,238,0.3)]',
+    gradient: 'from-cyan-400/40 via-cyan-500/60 to-cyan-600/40',
+    textGradient: 'from-transparent to-cyan-500'
+  },
+  competitive: {
+    color: 'orange',
+    bgColor: 'bg-orange-500',
+    textColor: 'text-orange-400',
+    borderColor: 'border-orange-500/20',
+    ring1: 'rgba(249,115,22,0.6)',
+    ring2: 'rgba(249,115,22,0.3)',
+    glow: 'shadow-[0_0_80px_rgba(249,115,22,0.4),inset_0_0_40px_rgba(249,115,22,0.3)]',
+    gradient: 'from-orange-400/40 via-orange-500/60 to-orange-600/40',
+    textGradient: 'from-transparent to-orange-500'
+  },
+  master: {
+    color: 'rose',
+    bgColor: 'bg-rose-500',
+    textColor: 'text-rose-400',
+    borderColor: 'border-rose-500/20',
+    ring1: 'rgba(225,29,72,0.6)',
+    ring2: 'rgba(225,29,72,0.3)',
+    glow: 'shadow-[0_0_80px_rgba(225,29,72,0.4),inset_0_0_40px_rgba(225,29,72,0.3)]',
+    gradient: 'from-rose-400/40 via-rose-500/60 to-rose-600/40',
+    textGradient: 'from-transparent to-rose-500'
+  }
+};
+
+const OrbitalRing: React.FC<{ index: number; springX: MotionValue<number>; springY: MotionValue<number>; themeColor: string }> = ({ index, springX, springY, themeColor }) => {
   const x = useTransform(springX, [-500, 500], [index * -15, index * 15]);
   const y = useTransform(springY, [-500, 500], [index * -15, index * 15]);
   const rotate = index % 2 === 0 ? 360 : -360;
@@ -34,164 +72,140 @@ const OrbitalRing: React.FC<{
     <motion.div
       animate={{ rotate }}
       transition={{ duration: 40 + index * 15, repeat: Infinity, ease: "linear" }}
-      className="absolute rounded-full border border-dashed border-cyan-500/10 shadow-[inset_0_0_50px_rgba(34,211,238,0.05)]"
+      className={`absolute rounded-full border border-dashed shadow-inner`}
       style={{
         x, y,
-        width: 450 + index * 280,
-        height: 450 + index * 280
+        borderColor: themeColor === 'orange' ? 'rgba(249,115,22,0.1)' : themeColor === 'rose' ? 'rgba(225,29,72,0.1)' : 'rgba(34,211,238,0.1)',
+        width: 450 + index * 250,
+        height: 450 + index * 250
       }}
     />
   );
 };
 
-const DigitCounter: React.FC<{ label: string; value: string; colorClass: string; icon?: string }> = ({ label, value, colorClass, icon }) => {
-  const [displayValue, setDisplayValue] = useState(value);
-
-  useEffect(() => {
-    let iteration = 0;
-    const interval = setInterval(() => {
-      setDisplayValue(prev =>
-        prev.split("")
-          .map((char, index) => {
-            if (index < iteration) return value[index];
-            if (char === " ") return " ";
-            return "0123456789X#$%"[Math.floor(Math.random() * 14)];
-          })
-          .join("")
-      );
-      if (iteration >= value.length) clearInterval(interval);
-      iteration += 1 / 2;
-    }, 40);
-    return () => clearInterval(interval);
-  }, [value]);
-
+const DataNodeHUD: React.FC<{ label: string; value: string; icon: React.ReactNode; posClass: string; theme: any; delay?: number }> = ({ label, value, icon, posClass, theme, delay = 0 }) => {
   return (
-    <div className="space-y-3 group perspective-1000">
-      <div className="flex items-center gap-3 px-2">
-        <div className={`w-1 h-1 rounded-full ${colorClass.replace('text-', 'bg-')} animate-pulse`} />
-        <p className={`text-[10px] font-black uppercase tracking-[0.8em] transition-colors duration-500 ${colorClass} opacity-50 group-hover:opacity-100`}>
-          {label}
-        </p>
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay, duration: 0.8 }}
+      className={`absolute ${posClass} glass-panel border ${theme.borderColor} p-4 rounded-3xl w-48 shadow-2xl backdrop-blur-md hidden md:flex flex-col gap-2 z-30 group`}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <div className={`w-6 h-6 rounded-lg ${theme.bgColor}/10 flex items-center justify-center shrink-0`}>
+          {icon}
+        </div>
+        <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">{label}</p>
       </div>
-      <div className="flex items-center gap-6 justify-center">
-        {icon && (
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-black text-2xl shadow-[0_0_40px_rgba(0,0,0,0.5)] transition-all duration-500 bg-current ${colorClass.replace('text-', 'bg-')} group-hover:scale-110`}>
-            {icon}
-          </div>
-        )}
-        <h3 className={`text-5xl md:text-6xl font-black font-orbitron italic text-white glow-text transition-all duration-500 group-hover:scale-105 tracking-tighter`}>
-          {displayValue}
-        </h3>
-      </div>
-    </div>
+      <p className={`text-xl font-orbitron font-black italic shadow-black drop-shadow-md ${theme.textColor} group-hover:scale-105 transition-all origin-left`}>
+        {value}
+      </p>
+    </motion.div>
   );
 };
 
-const CosmicHero: React.FC<{ springX: MotionValue<number>; springY: MotionValue<number> }> = ({ springX, springY }) => {
+const CosmicHero: React.FC<{ springX: MotionValue<number>; springY: MotionValue<number>; activeTab: string }> = ({ springX, springY, activeTab }) => {
   const craftRotateX = useTransform(springY, [-500, 500], [10, -10]);
   const craftRotateY = useTransform(springX, [-500, 500], [-10, 10]);
   const coreX = useTransform(springX, [-500, 500], [-30, 30]);
   const coreY = useTransform(springY, [-500, 500], [-30, 30]);
+  
+  const theme = THEMES[activeTab as keyof typeof THEMES] || THEMES.beginner;
+  const statChips = [
+    { label: 'HASH POWER', value: '2.12M TH/s', icon: <Globe className={`w-3 h-3 ${theme.textColor}`}/> },
+    { label: 'LATENCY', value: '12ms', icon: <Activity className={`w-3 h-3 ${theme.textColor}`}/> },
+    { label: 'REWARD POOL', value: '2.5M XTTA', icon: <Crown className={`w-3 h-3 ${theme.textColor}`}/> },
+    { label: 'OPERATORS', value: '8,402', icon: <ShieldCheck className={`w-3 h-3 ${theme.textColor}`}/> }
+  ];
 
   return (
-    <section className="relative h-[580px] flex flex-col items-center justify-center text-center overflow-hidden">
+    <section className="relative h-[250px] sm:h-[280px] lg:h-[320px] 2xl:h-[480px] flex flex-col items-center justify-center text-center overflow-visible">
+      {/* HUD Nodes */}
+      <DataNodeHUD label="GLOBAL HASH POWER" value="2,122,520 TH/s" icon={<Globe className={`w-3 h-3 ${theme.textColor}`}/>} posClass="left-10 top-20" theme={theme} delay={0.1}/>
+      <DataNodeHUD label="NETWORK LATENCY" value="12ms" icon={<Activity className={`w-3 h-3 ${theme.textColor}`}/>} posClass="left-10 bottom-20" theme={theme} delay={0.3}/>
+      <DataNodeHUD label="TOTAL REWARD POOL" value="2.5M XTTA" icon={<Crown className={`w-3 h-3 ${theme.textColor}`}/>} posClass="right-10 top-20" theme={theme} delay={0.2}/>
+      <DataNodeHUD label="ACTIVE OPERATORS" value="8,402" icon={<ShieldCheck className={`w-3 h-3 ${theme.textColor}`}/>} posClass="right-10 bottom-20" theme={theme} delay={0.4}/>
+
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
-        {[1, 2, 3, 4].map(i => (
-          <OrbitalRing key={i} index={i} springX={springX} springY={springY} />
+        {[1, 2, 3].map(i => (
+          <OrbitalRing key={i} index={i} springX={springX} springY={springY} themeColor={theme.color} />
         ))}
 
         <motion.div
           style={{ x: coreX, y: coreY, rotateX: craftRotateX, rotateY: craftRotateY }}
-          className="relative w-[500px] h-[500px] flex items-center justify-center"
+          className="relative w-[190px] h-[190px] sm:w-[230px] sm:h-[230px] lg:w-[260px] lg:h-[260px] 2xl:w-[400px] 2xl:h-[400px] flex items-center justify-center transition-colors duration-1000"
         >
           <motion.div
             animate={{ scale: [1, 1.25, 1], opacity: [0.1, 0.4, 0.1] }}
             transition={{ duration: 5, repeat: Infinity }}
-            className="absolute w-full h-full bg-cyan-500/10 blur-[150px] rounded-full"
+            className={`absolute w-full h-full ${theme.bgColor}/10 blur-[120px] rounded-full`}
           />
           <motion.div
-            animate={{ y: [0, -20, 0] }}
+            animate={{ y: [0, -10, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-            className="relative z-10 w-[320px] h-[320px]"
+            className="relative z-10 w-[132px] h-[132px] sm:w-[150px] sm:h-[150px] lg:w-[160px] lg:h-[160px] 2xl:w-[240px] 2xl:h-[240px]"
           >
-            {/* Outer rotating ring */}
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-[-20px] rounded-full border-2 border-cyan-500/20"
-              style={{ borderTopColor: 'rgba(34,211,238,0.6)', borderRightColor: 'rgba(34,211,238,0.3)' }}
+              className={`absolute inset-[-20px] rounded-full border-2 ${theme.borderColor}`}
+              style={{ borderTopColor: theme.ring1, borderRightColor: theme.ring2 }}
             />
-            {/* Middle counter-rotating ring */}
             <motion.div
               animate={{ rotate: -360 }}
               transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-              className="absolute inset-[10px] rounded-full border border-cyan-400/15"
-              style={{ borderBottomColor: 'rgba(6,182,212,0.5)', borderLeftColor: 'rgba(6,182,212,0.2)' }}
+              className={`absolute inset-[10px] rounded-full border ${theme.borderColor}`}
+              style={{ borderBottomColor: theme.ring2, borderLeftColor: theme.ring1 }}
             />
-            {/* Inner pulsing ring */}
             <motion.div
               animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.7, 0.3] }}
               transition={{ duration: 3, repeat: Infinity }}
-              className="absolute inset-[30px] rounded-full border border-cyan-300/30"
+              className={`absolute inset-[30px] rounded-full border ${theme.borderColor}`}
             />
-            {/* Core glow */}
-            <div className="absolute inset-[50px] rounded-full bg-gradient-to-br from-cyan-500/20 via-cyan-400/10 to-transparent blur-[30px]" />
-            {/* Central energy core */}
+            <div className={`absolute inset-[50px] rounded-full bg-gradient-to-br ${theme.gradient} blur-[20px]`} />
             <motion.div
               animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
               transition={{ duration: 2.5, repeat: Infinity }}
-              className="absolute inset-[70px] rounded-full bg-gradient-to-br from-cyan-400/40 via-cyan-500/60 to-cyan-600/40 shadow-[0_0_80px_rgba(34,211,238,0.4),inset_0_0_40px_rgba(34,211,238,0.3)]"
+              className={`absolute inset-[70px] rounded-full bg-gradient-to-br ${theme.gradient} ${theme.glow}`}
             />
-            {/* Inner bright core */}
             <motion.div
               animate={{ scale: [1.1, 0.9, 1.1] }}
               transition={{ duration: 2, repeat: Infinity }}
-              className="absolute inset-[100px] rounded-full bg-gradient-to-br from-white/30 via-cyan-300/50 to-cyan-500/30 shadow-[0_0_40px_rgba(34,211,238,0.6)]"
+              className={`absolute inset-[85px] rounded-full bg-gradient-to-br from-white/30 ${theme.gradient} ${theme.glow}`}
             />
-            {/* Owl emblem in center */}
-            <div className="absolute inset-[110px] rounded-full flex items-center justify-center">
-              <span className="text-4xl select-none" role="img" aria-label="owl">OWL</span>
+            <div className="absolute inset-[90px] rounded-full flex items-center justify-center">
+              <Zap className="w-10 h-10 text-white drop-shadow-[0_0_10px_rgba(255,255,255,1)]" />
             </div>
-            {/* Decorative dots on ring */}
-            {[0, 60, 120, 180, 240, 300].map((deg) => (
-              <motion.div
-                key={deg}
-                animate={{ opacity: [0.3, 1, 0.3] }}
-                transition={{ duration: 2, repeat: Infinity, delay: deg / 360 }}
-                className="absolute w-2 h-2 bg-cyan-400 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.8)]"
-                style={{
-                  top: `${50 - 45 * Math.cos((deg * Math.PI) / 180)}%`,
-                  left: `${50 + 45 * Math.sin((deg * Math.PI) / 180)}%`,
-                  transform: 'translate(-50%, -50%)',
-                }}
-              />
-            ))}
           </motion.div>
         </motion.div>
       </div>
 
-      <div className="relative z-20 space-y-20">
-        <div className="space-y-4">
+      <div className="relative z-20 mt-4 lg:mt-10">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center"
           >
-            <h2 className="text-[100px] md:text-[120px] font-black font-orbitron tracking-tighter italic uppercase text-white leading-none drop-shadow-[0_30px_60px_rgba(0,0,0,1)] selection:bg-cyan-500">
-              FEED<span className="text-cyan-400 glow-cyan">VERSE</span>
+            <h2 className="text-[42px] sm:text-[52px] md:text-[80px] 2xl:text-[100px] font-black font-orbitron tracking-tighter italic uppercase text-white leading-none drop-shadow-[0_20px_40px_rgba(0,0,0,1)]">
+              FEED<span className={theme.textColor}>VERSE</span>
             </h2>
-            <div className="flex items-center gap-10 w-full max-w-4xl opacity-40">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent to-cyan-500" />
-              <p className="text-[10px] font-black tracking-[1.5em] text-cyan-400">COMMAND_CENTER_V4</p>
-              <div className="h-px flex-1 bg-gradient-to-l from-transparent to-cyan-500" />
+            <div className={`flex items-center gap-6 w-full max-w-2xl opacity-60 mt-2`}>
+              <div className={`h-px flex-1 bg-gradient-to-r ${theme.textGradient}`} />
+              <p className={`text-[8px] sm:text-[10px] font-black tracking-[0.45em] sm:tracking-[1em] ${theme.textColor}`}>COMMAND_CENTER_V4</p>
+              <div className={`h-px flex-1 bg-gradient-to-l ${theme.textGradient}`} />
             </div>
           </motion.div>
-        </div>
-
-        <div className="flex flex-col md:flex-row items-center justify-center gap-16 md:gap-32">
-          <DigitCounter label="Global Hash Power" value="2122520" colorClass="text-cyan-400" />
-          <DigitCounter label="Total XTTA Secured" value="2565336" colorClass="text-amber-500" icon="T" />
-        </div>
+      </div>
+      <div className="absolute -bottom-8 left-0 right-0 z-30 flex gap-3 overflow-x-auto px-3 pb-1 md:hidden no-scrollbar">
+        {statChips.map((stat) => (
+          <div key={stat.label} className={`min-w-[138px] rounded-2xl border ${theme.borderColor} bg-black/70 px-3 py-2 text-left backdrop-blur-xl`}>
+            <div className="flex items-center gap-2 text-slate-500">
+              {stat.icon}
+              <span className="text-[7px] font-black uppercase tracking-[0.25em]">{stat.label}</span>
+            </div>
+            <p className={`mt-1 font-orbitron text-sm font-black italic ${theme.textColor}`}>{stat.value}</p>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -208,103 +222,101 @@ const QuestHallView: React.FC<{
   onMouseMove: (e: React.MouseEvent) => void;
 }> = ({ filteredOrders, activeTab, setActiveTab, setShowPrefs, setViewingOrder, springX, springY, onMouseMove }) => {
   const { t } = useTranslation();
+  const theme = THEMES[activeTab as keyof typeof THEMES] || THEMES.beginner;
 
   return (
-    <div onMouseMove={onMouseMove} className="space-y-12 max-w-7xl mx-auto pb-40 relative">
-      <CosmicHero springX={springX} springY={springY} />
+    <div onMouseMove={onMouseMove} className="space-y-8 lg:space-y-12 max-w-7xl mx-auto pb-32 lg:pb-40 relative">
+      <CosmicHero springX={springX} springY={springY} activeTab={activeTab} />
 
-      <section className="flex flex-col lg:flex-row lg:items-center justify-between gap-12 px-14">
-        <div className="flex bg-black/80 p-3 rounded-[3.5rem] border border-white/5 backdrop-blur-3xl shadow-[0_30px_80px_rgba(0,0,0,0.8)] relative group overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+      {/* Difficulty Selectors */}
+      <section className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-12 px-0 lg:px-10 pt-8 md:pt-0">
+        <div className="flex glass-panel p-1.5 lg:p-2 rounded-[1.5rem] lg:rounded-[3.5rem] border border-white/5 relative group overflow-x-auto w-full lg:w-auto shadow-2xl no-scrollbar">
           {[
-            { id: 'beginner', label: 'Primary Sync', icon: 'B1', desc: 'For F-D rank feeders · Notional below 100K', activeColor: 'bg-gradient-to-r from-cyan-500 to-blue-500 text-black shadow-[0_0_50px_rgba(34,211,238,0.4)]' },
-            { id: 'competitive', label: 'Combat Feed', icon: 'C2', desc: 'For C-B rank feeders · Notional 100K to 1M', activeColor: 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-[0_0_50px_rgba(249,115,22,0.4)]' },
-            { id: 'master', label: 'Zenith Oracle', icon: 'M3', desc: 'For A-S rank feeders · Notional above 1M', activeColor: 'bg-gradient-to-r from-amber-400 to-yellow-300 text-black shadow-[0_0_50px_rgba(251,191,36,0.4)]' }
+            { id: 'beginner', label: 'Primary Sync', icon: <ShieldCheck size={18}/>, colorClass: 'text-cyan-400', activeClass: 'bg-cyan-500 text-black shadow-[0_0_30px_rgba(34,211,238,0.4)]' },
+            { id: 'competitive', label: 'Combat Feed', icon: <Sword size={18}/>, colorClass: 'text-orange-400', activeClass: 'bg-orange-500 text-black shadow-[0_0_30px_rgba(249,115,22,0.4)]' },
+            { id: 'master', label: 'Zenith Oracle', icon: <Crown size={18}/>, colorClass: 'text-rose-400', activeClass: 'bg-rose-500 text-black shadow-[0_0_30px_rgba(225,29,72,0.4)]' }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-8 py-4 rounded-[2.8rem] text-[10px] font-black uppercase tracking-[0.3em] transition-all flex items-center gap-3 group relative z-10 ${activeTab === tab.id
-                ? `${tab.activeColor} scale-105`
-                : 'text-slate-500 hover:text-cyan-400'
-                }`}
+              className={`min-h-[48px] px-4 sm:px-6 lg:px-8 py-3 lg:py-4 rounded-[1.2rem] lg:rounded-[3rem] text-[9px] lg:text-[10px] font-black uppercase tracking-[0.16em] lg:tracking-[0.3em] transition-all flex items-center gap-2 lg:gap-3 relative z-10 flex-1 lg:flex-none justify-center whitespace-nowrap ${
+                activeTab === tab.id
+                ? `${tab.activeClass} scale-105`
+                : `${tab.colorClass} hover:bg-white/5`
+              }`}
             >
-              <span className="text-lg group-hover:scale-125 transition-transform">{tab.icon}</span>
-              {tab.label}
+              <span className="group-hover:scale-110 transition-transform">{tab.icon}</span>
+              <span className="hidden sm:inline">{tab.label}</span>
             </button>
           ))}
         </div>
 
-        <div className="flex gap-8">
-          <button onClick={() => setShowPrefs(true)} className="w-16 h-16 rounded-[2.5rem] bg-black/60 border border-white/10 flex items-center justify-center text-xl hover:bg-cyan-500/10 hover:border-cyan-500/50 transition-all group relative overflow-hidden">
-            <span className="group-hover:rotate-180 transition-transform duration-700 relative z-10">CFG</span>
+        <div className="flex gap-3 lg:gap-6 shrink-0">
+          <button onClick={() => setShowPrefs(true)} className="min-h-[48px] w-12 lg:w-14 lg:h-14 rounded-2xl glass-panel flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/50 transition-all shadow-inner">
+            <Terminal size={20} />
           </button>
-          <button className="px-10 py-4 rounded-[2.5rem] bg-cyan-500 text-black font-black font-orbitron text-[11px] uppercase tracking-[0.3em] italic shadow-[0_30px_60px_rgba(34,211,238,0.4)] hover:bg-cyan-400 hover:scale-105 active:scale-95 transition-all relative overflow-hidden group">
-            Initiate Neural Scan
+          <button className={`btn-cyber !min-h-[48px] !text-[10px] lg:!text-[11px] tracking-[0.18em] lg:tracking-[0.3em] flex flex-1 lg:flex-none items-center justify-center gap-2 !px-5 lg:!px-8`}>
+            <Rocket size={16} className="fill-black" />
+            INITIATE SCAN
           </button>
         </div>
       </section>
 
-      {/* 分区描述横幅 */}
-
+      {/* Directive Banner */}
       <motion.div
         key={activeTab}
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="px-14"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="px-0 lg:px-10"
       >
-        <div className={`flex items-center justify-between px-10 py-5 rounded-[2rem] border backdrop-blur-sm ${activeTab === 'beginner' ? 'bg-cyan-500/5 border-cyan-500/10' :
-          activeTab === 'competitive' ? 'bg-orange-500/5 border-orange-500/10' :
-            'bg-amber-500/5 border-amber-500/10'
-          }`}>
-          <div className="flex items-center gap-6">
-            <span className="text-3xl">{activeTab === 'beginner' ? 'B1' : activeTab === 'competitive' ? 'C2' : 'M3'}</span>
+        <div className={`flex flex-col md:flex-row items-start md:items-center justify-between px-4 sm:px-5 lg:px-10 py-4 lg:py-6 rounded-[1.5rem] lg:rounded-[2.5rem] glass-panel border shadow-lg ${theme.borderColor}`}>
+          <div className="flex items-center gap-4 lg:gap-6">
+            <div className={`w-11 h-11 lg:w-14 lg:h-14 rounded-2xl ${theme.bgColor}/10 flex items-center justify-center shrink-0`}>
+               {activeTab === 'beginner' ? <ShieldCheck className={`w-7 h-7 ${theme.textColor}`}/> : activeTab === 'competitive' ? <Sword className={`w-7 h-7 ${theme.textColor}`}/> : <Crown className={`w-7 h-7 ${theme.textColor}`}/>}
+            </div>
             <div>
-              <p className={`text-sm font-black uppercase tracking-widest ${activeTab === 'beginner' ? 'text-cyan-400' : activeTab === 'competitive' ? 'text-orange-400' : 'text-amber-400'
-                }`}>
-                {activeTab === 'beginner' ? t.zone.beginner : activeTab === 'competitive' ? t.zone.competitive : t.zone.master}
+              <p className={`text-sm lg:text-lg font-black font-orbitron uppercase tracking-widest italic mb-1 ${theme.textColor}`}>
+                » {activeTab === 'beginner' ? 'STANDARD ORACLE PROTOCOL' : activeTab === 'competitive' ? 'HOSTILE MARKET SECURED' : 'RESTRICTED A/S LEVEL'}
               </p>
-              <p className="text-[10px] text-slate-500 font-bold tracking-wider mt-1">
-                {activeTab === 'beginner' ? t.zone.beginnerDesc :
-                  activeTab === 'competitive' ? t.zone.competitiveDesc :
-                    t.zone.masterDesc}
+              <p className="text-[9px] lg:text-[10px] text-slate-400 font-bold tracking-wider leading-relaxed">
+                {activeTab === 'beginner' ? 'RECOMMENDED FOR F-D OPERATORS. SAFE YIELD SECURED.' :
+                 activeTab === 'competitive' ? 'ENHANCED COLLATERAL REQUIRED. EXTREME VOLATILITY.' :
+                 'LETHAL PENALTIES ACTIVE. ELITE CONSENSUS ONLY.'}
               </p>
             </div>
           </div>
-          <div className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${activeTab === 'beginner' ? 'bg-cyan-500/10 text-cyan-400' :
-            activeTab === 'competitive' ? 'bg-orange-500/10 text-orange-400' :
-              'bg-amber-500/10 text-amber-400'
-            }`}>
-            {filteredOrders.length} {t.zone.quests}
+          <div className="mt-4 md:mt-0 flex gap-4">
+             <div className={`px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest ${theme.bgColor}/10 ${theme.textColor} border ${theme.borderColor} shadow-inner`}>
+               {filteredOrders.length} MISSIONS IDENTIFIED
+             </div>
           </div>
         </div>
       </motion.div>
 
-      <div className="px-14">
+      {/* Orders Grid */}
+      <div className="px-0 lg:px-10">
         <AnimatePresence mode="popLayout">
           {filteredOrders.length > 0 ? (
-            <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+            <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-8">
               {filteredOrders.map(order => (
                 <motion.div
                   key={order.orderId}
-                  initial={{ opacity: 0, scale: 0.8, y: 100 }}
+                  initial={{ opacity: 0, scale: 0.9, y: 50 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ type: "spring", damping: 25, stiffness: 120 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 150 }}
                 >
                   <OrderCard order={order} onGrab={() => setViewingOrder(order)} />
                 </motion.div>
               ))}
             </motion.div>
           ) : (
-            <div className="py-80 flex flex-col items-center text-center space-y-12 opacity-30">
-              <motion.div
-                animate={{ rotate: 360, scale: [1, 1.1, 1] }}
-                transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-                className="text-[180px] filter drop-shadow-[0_0_80px_rgba(34,211,238,0.2)]"
-              >
-                VOID              </motion.div>
-              <p className="font-orbitron font-black text-4xl uppercase tracking-[0.8em] text-cyan-400 glow-cyan">VOID_DETECTED</p>
+            <div className="py-10 lg:py-40">
+              <SystemEmpty 
+                title="VOID_DETECTED" 
+                subtitle="No missions available in this sector matching your credentials." 
+                icon="target" 
+              />
             </div>
           )}
         </AnimatePresence>
@@ -334,6 +346,8 @@ const App: React.FC = () => {
   const activeTab = useUIStore((s) => s.activeTab);
   const setActiveTab = useUIStore((s) => s.setActiveTab);
   const grabAndFeed = useUIStore((s) => s.grabAndFeed);
+  const rewardQueue = useUIStore((s) => s.rewardQueue);
+  const dequeueReward = useUIStore((s) => s.dequeueReward);
 
   const [dataLoading, setDataLoading] = React.useState(true);
   const [profileError, setProfileError] = React.useState<string | null>(null);
@@ -649,29 +663,18 @@ const App: React.FC = () => {
   const renderContent = () => {
     // No profile: show connect wallet / error prompt inside Layout
     if (!profile) {
-      return (
-        <div className="flex items-center justify-center py-32 min-h-[50vh]">
-          <div className="text-center space-y-6 max-w-md px-8">
-            <div className="text-6xl mb-4">{!authAddress ? '🔗' : '⚠️'}</div>
-            <h2 className="text-2xl font-bold font-orbitron text-cyan-400">
-              {!authAddress ? 'Connect Your Wallet' : 'Profile Load Failed'}
-            </h2>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              {!authAddress
-                ? 'Connect your wallet to access the Feed Engine dashboard, manage orders, and earn rewards.'
-                : profileError || 'Unable to load your feeder profile. The server may be temporarily unavailable.'}
-            </p>
-            {authAddress && (
-              <button
-                onClick={() => { setProfileError(null); void loadProfile(); }}
-                className="px-6 py-3 bg-cyan-500/20 border border-cyan-500/50 text-cyan-400 rounded-lg hover:bg-cyan-500/30 transition-all font-semibold"
-              >
-                ↻ Retry
-              </button>
-            )}
+      if (profileError || !authAddress) {
+        return (
+          <div className="flex flex-col items-center justify-center py-32 min-h-[60vh] max-w-2xl mx-auto">
+            <SystemError 
+              message={!authAddress ? "NODE CONNECTIVITY REQUIRED" : profileError || "CRITICAL_FAILURE: UNABLE TO MOUNT PROFILE"}
+              resolution={!authAddress ? "Initialize your node link to access the matrix." : "Server linkage failure. Awaiting command override."}
+              onRetry={authAddress ? () => { setProfileError(null); void loadProfile(); } : undefined}
+            />
           </div>
-        </div>
-      );
+        );
+      }
+      return <SystemLoader fullScreen message="SYS_SYNC: MOUNTING PROFILE RECORD..." />;
     }
 
     switch (activeView) {
@@ -709,18 +712,8 @@ const App: React.FC = () => {
   // 首次渲染时 profile 尚未初始化（useEffect 还未执行），显示加载画面
 
   if (dataLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-[#030406] text-cyan-400">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-          className="w-16 h-16 border-4 border-cyan-500/30 border-t-cyan-400 rounded-full"
-        />
-      </div>
-    );
+    return <SystemLoader fullScreen message="SYS_SYNC: INITIALIZING GLOBAL MATRIX..." subMessage="CONNECTING DECENTRALIZED DATA FEEDS" />;
   }
-
-
 
   return (
     <Layout profile={profile} activeView={activeView} onNavigate={setActiveView}>
@@ -734,6 +727,16 @@ const App: React.FC = () => {
       <AnimatePresence>
         {showPrefs && <PreferencesModal prefs={prefs} onClose={() => setShowPrefs(false)} onUpdate={setPrefs} />}
       </AnimatePresence>
+
+      {/* Global Reward Modal wired to the multi-event queue */}
+      <RewardModal 
+        isOpen={rewardQueue.length > 0} 
+        onClose={() => dequeueReward()} 
+        type={rewardQueue[0]?.type || 'MISSION_SUCCESS'}
+        title={rewardQueue[0]?.title || ''}
+        subtitle={rewardQueue[0]?.subtitle}
+        value={rewardQueue[0]?.value}
+      />
     </Layout>
   );
 };

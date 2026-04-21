@@ -1,0 +1,146 @@
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+@layer base {
+  :root {
+    --neon-cyan: #22d3ee;
+    --neon-rose: #f43f5e;
+    --neon-emerald: #10b981;
+    --neon-amber: #fbbf24;
+  }
+
+  body {
+    @apply font-inter bg-[#020305] text-slate-200 overflow-hidden m-0;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: rgba(0,0,0,0.4); }
+  ::-webkit-scrollbar-thumb { 
+      background: linear-gradient(transparent, var(--neon-cyan), transparent);
+      border-radius: 10px; 
+  }
+}
+
+@layer components {
+  /* =========================================================
+     PERSPECTIVE GRID & OVERLAYS 
+     ========================================================= */
+  .layout-grid-floor {
+    @apply fixed w-[200%] h-[200%] -bottom-[50%] -left-[50%] opacity-5 pointer-events-none z-0;
+    background-image: linear-gradient(var(--neon-cyan) 1px, transparent 1px), linear-gradient(90deg, var(--neon-cyan) 1px, transparent 1px);
+    background-size: 60px 60px;
+    transform: perspective(800px) rotateX(60deg);
+    mask-image: radial-gradient(circle at center, white, transparent 70%);
+  }
+
+  .layout-hud-overlay {
+    @apply fixed inset-0 pointer-events-none z-50 opacity-15 mix-blend-overlay;
+    background: url('https://www.transparenttextures.com/patterns/stardust.png'),
+                repeating-linear-gradient(0deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 1px, transparent 1px, transparent 2px);
+  }
+
+  .scan-line-overlay {
+    @apply absolute left-0 w-full h-[100px] pointer-events-none z-[5] animate-scan-move;
+    background: linear-gradient(to bottom, transparent, rgba(34, 211, 238, 0.15), transparent);
+  }
+
+  /* =========================================================
+     CORE CYBERPUNK COMPONENTS 
+     ========================================================= */
+  
+  /* Glass Panels (Stats, Cards, Modals) */
+  .glass-panel {
+    @apply bg-[#04070c]/85 border border-cyan-500/10 backdrop-blur-3xl shadow-2xl transition-colors duration-500;
+  }
+  .glass-panel:hover {
+    @apply border-cyan-500/30;
+  }
+
+  /* Cyber Buttons */
+  .btn-cyber {
+    @apply relative px-6 py-3 bg-cyan-500 text-black font-black font-orbitron uppercase italic rounded-xl
+           shadow-[0_0_20px_rgba(34,211,238,0.3)] 
+           hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] hover:scale-[1.02] active:scale-95 transition-all;
+  }
+  
+  .btn-cyber-ghost {
+    @apply relative px-6 py-3 bg-cyan-500/10 border border-cyan-500/50 text-cyan-400 font-bold uppercase rounded-lg
+           hover:bg-cyan-500/20 hover:scale-[1.02] active:scale-95 transition-all;
+  }
+  
+  .btn-danger {
+    @apply relative px-6 py-3 bg-red-600/20 border border-red-500/50 text-red-500 font-bold uppercase rounded-lg
+           hover:bg-red-500/30 hover:scale-[1.02] active:scale-95 transition-all;
+  }
+
+  /* System Badges (Tags like B1, M3, Condition Badges) */
+  .cyber-badge {
+    @apply px-3 py-1 rounded-lg border backdrop-blur-sm flex items-center gap-1.5;
+  }
+  .cyber-badge-cyan {
+    @apply bg-cyan-500/20 border-cyan-500/30 text-cyan-400;
+  }
+  .cyber-badge-amber {
+    @apply bg-amber-500/20 border-amber-500/30 text-amber-400;
+  }
+  .cyber-badge-danger {
+    @apply bg-red-500/20 border-red-500/30 text-red-400;
+  }
+
+  /* Glow Utilities */
+  .glow-text-cyan {
+    text-shadow: 0 0 20px var(--neon-cyan);
+    @apply text-cyber-300;
+  }
+  .glow-text-amber {
+    text-shadow: 0 0 20px var(--neon-amber);
+    @apply text-reward-400;
+  }
+}
+
+@layer utilities {
+  .safe-main-padding {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 7rem);
+  }
+
+  .safe-bottom-nav {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+  }
+
+  .safe-bottom-bar {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+  }
+
+  .safe-modal-padding {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 7rem);
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(34, 211, 238, 0.45) rgba(0, 0, 0, 0.2);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.35);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(transparent, var(--neon-cyan), transparent);
+    border-radius: 999px;
+  }
+}

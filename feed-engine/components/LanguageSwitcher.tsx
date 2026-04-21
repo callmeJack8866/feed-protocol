@@ -1,11 +1,10 @@
-
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { useLanguage, LANGUAGES } from '../i18n';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Check, ChevronDown } from 'lucide-react';
 
 /**
- * 语言切换器组件
- * 下拉选择器，旗帜图标 + 语言名称
+ * Language selector with flag, locale code, and a compact dropdown.
  */
 const LanguageSwitcher: React.FC = () => {
     const { language, setLanguage } = useLanguage();
@@ -14,7 +13,7 @@ const LanguageSwitcher: React.FC = () => {
 
     const currentLang = LANGUAGES.find(l => l.code === language);
 
-    /** 点击外部关闭 */
+    /** Close dropdown when clicking outside. */
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -27,10 +26,9 @@ const LanguageSwitcher: React.FC = () => {
 
     return (
         <div ref={ref} className="relative z-50">
-            {/* 触发按钮 */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-cyan-500/30 transition-all group"
+                className="flex min-h-[44px] items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-cyan-500/30 transition-all group"
             >
                 <span className="text-lg">{currentLang?.flag}</span>
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-cyan-400 transition-colors">
@@ -38,13 +36,12 @@ const LanguageSwitcher: React.FC = () => {
                 </span>
                 <motion.span
                     animate={{ rotate: isOpen ? 180 : 0 }}
-                    className="text-slate-500 text-xs"
+                    className="text-slate-500"
                 >
-                    ▼
+                    <ChevronDown size={14} />
                 </motion.span>
             </button>
 
-            {/* 下拉菜单 */}
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
@@ -52,13 +49,13 @@ const LanguageSwitcher: React.FC = () => {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -8, scale: 0.95 }}
                         transition={{ duration: 0.15 }}
-                        className="absolute right-0 mt-3 w-56 bg-[#0F1115] border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden backdrop-blur-xl"
+                        className="absolute right-0 mt-3 w-56 max-w-[calc(100vw-2rem)] bg-[#0F1115] border border-white/10 rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.8)] overflow-hidden backdrop-blur-xl"
                     >
                         {LANGUAGES.map(lang => (
                             <button
                                 key={lang.code}
                                 onClick={() => { setLanguage(lang.code); setIsOpen(false); }}
-                                className={`w-full flex items-center gap-4 px-5 py-3.5 hover:bg-white/5 transition-colors ${language === lang.code ? 'bg-cyan-500/10 border-l-2 border-cyan-500' : 'border-l-2 border-transparent'
+                                className={`w-full min-h-[52px] flex items-center gap-4 px-5 py-3.5 hover:bg-white/5 transition-colors ${language === lang.code ? 'bg-cyan-500/10 border-l-2 border-cyan-500' : 'border-l-2 border-transparent'
                                     }`}
                             >
                                 <span className="text-xl">{lang.flag}</span>
@@ -72,9 +69,9 @@ const LanguageSwitcher: React.FC = () => {
                                     <motion.span
                                         initial={{ scale: 0 }}
                                         animate={{ scale: 1 }}
-                                        className="text-cyan-400 text-sm"
+                                        className="text-cyan-400"
                                     >
-                                        ✓
+                                        <Check size={16} />
                                     </motion.span>
                                 )}
                             </button>

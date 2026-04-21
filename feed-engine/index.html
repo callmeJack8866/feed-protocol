@@ -5,104 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Feed Engine | Decentralized Manual Oracle</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --neon-cyan: #22d3ee;
-            --neon-rose: #f43f5e;
-            --neon-emerald: #10b981;
-            --neon-amber: #fbbf24;
-        }
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #020305;
-            color: #E2E8F0;
-            overflow: hidden;
-            margin: 0;
-        }
-        .font-orbitron {
-            font-family: 'Orbitron', sans-serif;
-        }
-        
-        /* Perspective Grid Floor */
-        .perspective-grid {
-            position: fixed;
-            bottom: -50%; left: -50%; width: 200%; height: 200%;
-            background-image: 
-                linear-gradient(var(--neon-cyan) 1px, transparent 1px),
-                linear-gradient(90deg, var(--neon-cyan) 1px, transparent 1px);
-            background-size: 60px 60px;
-            transform: perspective(800px) rotateX(60deg);
-            opacity: 0.05;
-            pointer-events: none;
-            z-index: 0;
-            mask-image: radial-gradient(circle at center, white, transparent 70%);
-        }
-
-        /* Digital Noise & Scanlines */
-        .hud-overlay {
-            position: fixed;
-            inset: 0;
-            background: 
-                url('https://www.transparenttextures.com/patterns/stardust.png'),
-                repeating-linear-gradient(0deg, rgba(0,0,0,0.05) 0px, rgba(0,0,0,0.05) 1px, transparent 1px, transparent 2px);
-            pointer-events: none;
-            z-index: 1000;
-            opacity: 0.15;
-            mix-blend-mode: overlay;
-        }
-
-        /* Chromatic Aberration Simulation */
-        .glass-panel {
-            background: rgba(4, 7, 12, 0.85);
-            backdrop-filter: blur(50px);
-            border: 1px solid rgba(34, 211, 238, 0.1);
-            box-shadow: 
-                0 0 100px rgba(0, 0, 0, 0.9),
-                inset 0 0 20px rgba(34, 211, 238, 0.02);
-            transition: border-color 0.5s ease;
-        }
-        .glass-panel:hover {
-            border-color: rgba(34, 211, 238, 0.3);
-        }
-
-        /* Neon Glow Helpers */
-        .glow-cyan { text-shadow: 0 0 20px var(--neon-cyan); color: var(--neon-cyan); }
-        .glow-amber { text-shadow: 0 0 20px var(--neon-amber); color: var(--neon-amber); }
-        
-        .glow-border-cyan { box-shadow: 0 0 30px rgba(34, 211, 238, 0.2); }
-        .glow-border-rose { box-shadow: 0 0 30px rgba(244, 63, 94, 0.2); }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.4); }
-        ::-webkit-scrollbar-thumb { 
-            background: linear-gradient(transparent, var(--neon-cyan), transparent);
-            border-radius: 10px; 
-        }
-
-        @keyframes pulse-cyan {
-            0%, 100% { opacity: 0.4; }
-            50% { opacity: 0.8; }
-        }
-        .animate-pulse-cyan { animation: pulse-cyan 3s ease-in-out infinite; }
-
-        /* Scanning Line */
-        .scan-line {
-            position: absolute;
-            left: 0; width: 100%; height: 100px;
-            background: linear-gradient(to bottom, transparent, rgba(34, 211, 238, 0.15), transparent);
-            pointer-events: none;
-            z-index: 5;
-            animation: scan-move 4s linear infinite;
-        }
-        @keyframes scan-move {
-            0% { transform: translateY(-100%); }
-            100% { transform: translateY(400%); }
-        }
-    </style>
-<script type="importmap">
+    <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@^19.2.3",
@@ -114,8 +18,8 @@
 </script>
 </head>
 <body>
-    <div class="perspective-grid"></div>
-    <div class="hud-overlay"></div>
+    <div class="layout-grid-floor"></div>
+    <div class="layout-hud-overlay"></div>
     <div id="root"></div>
 <script type="module" src="/index.tsx"></script>
 </body>

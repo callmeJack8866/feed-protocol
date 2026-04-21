@@ -12,6 +12,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { FeedOrder, FeederProfile, FeedHistoryItem, ViewType, FeederRank } from './types';
+import { RewardType } from './components/feedback/RewardModal';
+
+export interface PendingReward {
+  id: string;
+  type: RewardType;
+  title: string;
+  subtitle?: string;
+  value?: string;
+}
 
 // ========================================================================
 // 1. Auth Store — JWT / 钱包 / SIWE 认证
@@ -147,10 +156,46 @@ export const useFeederStore = create<FeederState>()((set) => ({
     onFeedComplete: (xpEarned, feedEarned) =>
         set((state) => {
             if (!state.profile) return {};
+            const oldXp = state.profile.xp;
+            const newXp = oldXp + xpEarned;
+            
+            const oldLevel = Math.max(1, Math.floor(oldXp / 1000) + 1);
+            const newLevel = Math.max(1, Math.floor(newXp / 1000) + 1);
+
+            // Trigger global sequence
+            const uiQueue = useUIStore.getState();
+            uiQueue.enqueueReward({
+                id: `feed_${Date.now()}`,
+                type: 'MISSION_SUCCESS',
+                title: 'FEED VERIFIED',
+                subtitle: 'BLOCKCHAIN CONSENSUS REACHED',
+                value: `+${xpEarned} XP / +${feedEarned} FEED`
+            });
+
+            if (newLevel > oldLevel) {
+                uiQueue.enqueueReward({
+                    id: `level_${Date.now()}`,
+                    type: 'RANK_UP',
+                    title: 'CLEARANCE ELEVATED',
+                    subtitle: 'YOU HAVE ADVANCED A STRUCTURAL TIER',
+                    value: `LEVEL ${newLevel}`
+                });
+            }
+
+            if (state.profile.totalFeeds === 0) {
+                uiQueue.enqueueReward({
+                    id: `ach_${Date.now()}`,
+                    type: 'ACHIEVEMENT_UNLOCK',
+                    title: 'FIRST BLOOD',
+                    subtitle: 'YOU COMMITTED YOUR FIRST DATAPOINT TO THE MATRIX',
+                    value: 'BADGE UNLOCKED'
+                });
+            }
+
             return {
                 profile: {
                     ...state.profile,
-                    xp: state.profile.xp + xpEarned,
+                    xp: newXp,
                     balanceFEED: state.profile.balanceFEED + feedEarned,
                     totalFeeds: state.profile.totalFeeds + 1,
                 },
@@ -173,6 +218,8 @@ interface UIState {
     showPreferences: boolean;
     /** 当前分区 Tab */
     activeTab: 'beginner' | 'competitive' | 'master';
+    /** 全局奖励反馈队列 */
+    rewardQueue: PendingReward[];
 
     // Actions
     setActiveView: (view: ViewType) => void;
@@ -182,6 +229,10 @@ interface UIState {
     setActiveTab: (tab: 'beginner' | 'competitive' | 'master') => void;
     /** 抢单后进入喂价 */
     grabAndFeed: (order: FeedOrder) => void;
+    /** 加入提示队列 */
+    enqueueReward: (reward: PendingReward) => void;
+    /** 移除当前提示 */
+    dequeueReward: () => void;
 }
 
 export const useUIStore = create<UIState>()((set) => ({
@@ -190,6 +241,7 @@ export const useUIStore = create<UIState>()((set) => ({
     activeOrder: null,
     showPreferences: false,
     activeTab: 'beginner',
+    rewardQueue: [],
 
     setActiveView: (activeView) => set({ activeView }),
 
@@ -202,4 +254,8 @@ export const useUIStore = create<UIState>()((set) => ({
     setActiveTab: (activeTab) => set({ activeTab }),
 
     grabAndFeed: (order) => set({ viewingOrder: null, activeOrder: order }),
+
+    enqueueReward: (reward) => set((state) => ({ rewardQueue: [...state.rewardQueue, reward] })),
+
+    dequeueReward: () => set((state) => ({ rewardQueue: state.rewardQueue.slice(1) })),
 }));
